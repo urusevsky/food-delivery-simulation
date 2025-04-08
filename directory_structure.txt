@@ -1,0 +1,41 @@
+food-delivery-simulation/
+├── delivery_sim/
+│   ├── __init__.py
+│   ├── entities/
+│   │   ├── __init__.py
+│   │   ├── order.py
+│   │   ├── driver.py
+│   │   ├── pair.py
+│   │   ├── delivery_unit.py
+│   │   └── states.py
+│   ├── events/
+│   │   ├── __init__.py
+│   │   ├── base_events.py
+│   │   ├── order_events.py
+│   │   ├── driver_events.py
+│   │   ├── pair_events.py
+│   │   ├── delivery_events.py
+│   │   └── dispatcher.py
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── order_service.py
+│   │   ├── pairing_service.py
+│   │   ├── assignment_service.py
+│   │   └── delivery_service.py
+│   ├── repositories/
+│   │   ├── __init__.py
+│   │   ├── order_repository.py
+│   │   ├── driver_repository.py
+│   │   └── pair_repository.py
+│   ├── simulation/
+│   │   ├── __init__.py
+│   │   ├── simulation_clock.py
+│   │   ├── simulation_context.py
+│   │   └── simulation_runner.py
+│   └── utils/
+│       ├── __init__.py
+│       ├── distance_calculator.py
+│       ├── cost_functions.py
+│       └── config_loader.py
+├── requirements.txt
+├── main.py
