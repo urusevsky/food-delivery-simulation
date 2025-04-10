@@ -17,25 +17,17 @@ food-delivery-simulation/
 │   │   ├── delivery_events.py
 │   │   └── dispatcher.py
 │   ├── services/
-│   │   ├── __init__.py
-│   │   ├── order_service.py
-│   │   ├── pairing_service.py
-│   │   ├── assignment_service.py
-│   │   └── delivery_service.py
-│   ├── repositories/
-│   │   ├── __init__.py
-│   │   ├── order_repository.py
-│   │   ├── driver_repository.py
-│   │   └── pair_repository.py
 │   ├── simulation/
-│   │   ├── __init__.py
-│   │   ├── simulation_clock.py
-│   │   ├── simulation_context.py
-│   │   └── simulation_runner.py
 │   └── utils/
-│       ├── __init__.py
-│       ├── distance_calculator.py
-│       ├── cost_functions.py
-│       └── config_loader.py
+├── tests/                        # New test directory
+│   ├── unit/                     # Unit tests
+│   │   ├── entities/             # Tests for entity classes
+│   │   │   ├── test_order.py     # Tests for Order class
+│   │   │   └── test_driver.py    # Tests for Driver class
+│   │   └── events/               # Tests for event classes
+│   ├── integration/              # Integration tests
+│   │   ├── test_order_pairing.py # Tests for order pairing functionality
+│   │   └── test_event_flow.py    # Tests for event propagation
+│   └── conftest.py               # Shared pytest configuration and fixtures
 ├── requirements.txt
 ├── main.py
