@@ -1,6 +1,9 @@
 import pytest
+import simpy
 from delivery_sim.entities.driver import Driver
 from delivery_sim.entities.states import DriverState
+from delivery_sim.events.event_dispatcher import EventDispatcher
+from delivery_sim.events.driver_events import DriverStateChangedEvent
 
 def test_driver_initialization():
     """Test that a Driver is properly initialized with default values."""
@@ -114,3 +117,30 @@ def test_can_logout():
     # Driver should be able to log out when back to AVAILABLE
     driver.transition_to(DriverState.AVAILABLE)
     assert driver.can_logout() is True
+
+def test_driver_state_change_dispatches_event():
+    """Test that state changes generate events when a dispatcher is provided."""
+    # Setup
+    env = simpy.Environment()
+    dispatcher = EventDispatcher()
+    driver = Driver("D1", [0, 0], 100, 120)
+    
+    # Track received events
+    received_events = []
+    def test_handler(event):
+        received_events.append(event)
+    
+    # Register handler
+    dispatcher.register(DriverStateChangedEvent, test_handler)
+    
+    # Change state with dispatcher and env
+    driver.transition_to(DriverState.ASSIGNED, dispatcher, env)
+    
+    # Verify event was dispatched with correct data
+    assert len(received_events) == 1
+    event = received_events[0]
+    assert isinstance(event, DriverStateChangedEvent)
+    assert event.driver_id == "D1"
+    assert event.old_state == DriverState.AVAILABLE
+    assert event.new_state == DriverState.ASSIGNED
+    assert event.timestamp == env.now    

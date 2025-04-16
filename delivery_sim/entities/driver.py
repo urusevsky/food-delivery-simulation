@@ -1,4 +1,5 @@
-from .states import DriverState
+from delivery_sim.entities.states import DriverState
+from delivery_sim.events.driver_events import DriverStateChangedEvent
 
 class Driver:
     """
@@ -30,13 +31,14 @@ class Driver:
         self.current_delivery = None  # Reference to assigned DeliveryUnit
         self.last_state_change_time = login_time
         
-    def transition_to(self, new_state, event_dispatcher=None):
+    def transition_to(self, new_state, event_dispatcher=None, env=None):
         """
         Change the driver's state with validation.
         
         Args:
             new_state: The new state to transition to
             event_dispatcher: Optional event dispatcher to notify about state change
+            env: SimPy environment for getting current simulation time
             
         Returns:
             True if transition was successful
@@ -44,7 +46,7 @@ class Driver:
         Raises:
             ValueError: If transition is invalid
         """
-        # Define valid transitions from each state
+        # Define valid transitions
         valid_transitions = {
             DriverState.OFFLINE: [DriverState.AVAILABLE],
             DriverState.AVAILABLE: [DriverState.ASSIGNED, DriverState.OFFLINE],
@@ -64,12 +66,19 @@ class Driver:
         
         # Update state
         self.state = new_state
-        # We'll update this with actual timestamp when we integrate with SimPy
-        # self.last_state_change_time = SimulationClock.now()
         
-        # We'll handle event dispatching later when we integrate events
-        # if event_dispatcher:
-        #     event_dispatcher.dispatch(DriverStateChangedEvent(...))
+        # Set the last state change time if env is provided
+        current_time = env.now if env else self.last_state_change_time
+        self.last_state_change_time = current_time
+        
+        # Dispatch event if dispatcher was provided
+        if event_dispatcher and env:
+            event_dispatcher.dispatch(DriverStateChangedEvent(
+                timestamp=current_time,
+                driver_id=self.driver_id,
+                old_state=old_state,
+                new_state=new_state
+            ))
         
         return True
     
