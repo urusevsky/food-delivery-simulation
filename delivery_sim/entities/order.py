@@ -1,4 +1,5 @@
-from .states import OrderState
+from delivery_sim.entities.states import OrderState
+from delivery_sim.events.order_events import OrderStateChangedEvent
 
 class Order:
     """
@@ -29,27 +30,27 @@ class Order:
         self.pair = None  # Reference to a Pair if this order becomes paired
         self.delivery_unit = None  # Reference to DeliveryUnit once assigned
         
-    def transition_to(self, new_state, event_dispatcher=None):
+    def transition_to(self, new_state, event_dispatcher=None, env=None):
         """
         Change the order's state with validation.
         
         Args:
             new_state: The new state to transition to
             event_dispatcher: Optional event dispatcher to notify about state change
+            env: SimPy environment for getting current simulation time
             
         Returns:
-            True if transition was successful, False otherwise
+            True if transition was successful
             
         Raises:
             ValueError: If transition is invalid
         """
-        # Define valid transitions from each state
+        # Define valid transitions
         valid_transitions = {
             OrderState.CREATED: [OrderState.PAIRED, OrderState.ASSIGNED],
             OrderState.PAIRED: [OrderState.ASSIGNED],
             OrderState.ASSIGNED: [OrderState.PICKED_UP],
-            OrderState.PICKED_UP: [OrderState.DELIVERED],
-            # Terminal state - no transitions out of DELIVERED
+            OrderState.PICKED_UP: [OrderState.DELIVERED]
         }
         
         # Check if transition is valid
@@ -64,9 +65,14 @@ class Order:
         # Update state
         self.state = new_state
         
-        # We'll handle event dispatching later when we integrate events
-        # if event_dispatcher:
-        #     event_dispatcher.dispatch(OrderStateChangedEvent(...))
+        # Dispatch event if dispatcher was provided
+        if event_dispatcher and env:
+            event_dispatcher.dispatch(OrderStateChangedEvent(
+                timestamp=env.now,
+                order_id=self.order_id,
+                old_state=old_state,
+                new_state=new_state
+            ))
         
         return True
     

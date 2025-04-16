@@ -1,8 +1,9 @@
-# tests/unit/entities/test_order.py
-
 import pytest
+import simpy
 from delivery_sim.entities.order import Order
 from delivery_sim.entities.states import OrderState
+from delivery_sim.events.event_dispatcher import EventDispatcher
+from delivery_sim.events.order_events import OrderStateChangedEvent
 
 # Group 1: Testing Order creation and basic properties
 def test_order_creation():
@@ -107,3 +108,30 @@ def test_order_string_representation():
     # VERIFY
     assert "Order(id=123" in string_repr, "String representation should include the order ID"
     assert f"state={order.state}" in string_repr, "String representation should include the state"
+
+def test_order_state_change_dispatches_event():
+    """Test that order state changes generate events when a dispatcher is provided."""
+    # Setup
+    env = simpy.Environment()
+    dispatcher = EventDispatcher()
+    order = Order("O123", [0, 0], [2, 3], 100)  # ID, restaurant_loc, customer_loc, arrival_time
+    
+    # Track received events
+    received_events = []
+    def test_handler(event):
+        received_events.append(event)
+    
+    # Register handler
+    dispatcher.register(OrderStateChangedEvent, test_handler)
+    
+    # Change state with dispatcher and env
+    order.transition_to(OrderState.PAIRED, dispatcher, env)
+    
+    # Verify event was dispatched with correct data
+    assert len(received_events) == 1
+    event = received_events[0]
+    assert isinstance(event, OrderStateChangedEvent)
+    assert event.order_id == "O123"
+    assert event.old_state == OrderState.CREATED
+    assert event.new_state == OrderState.PAIRED
+    assert event.timestamp == env.now    
