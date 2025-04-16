@@ -1,4 +1,4 @@
-from .base_events import Event
+from delivery_sim.events.base_events import Event
 
 class DriverEvent(Event):
     """Base class for all driver-related events."""

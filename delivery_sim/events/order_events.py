@@ -1,4 +1,4 @@
-from .base_events import Event
+from delivery_sim.events.base_events import Event
 
 class OrderEvent(Event):
     """Base class for all order-related events."""
