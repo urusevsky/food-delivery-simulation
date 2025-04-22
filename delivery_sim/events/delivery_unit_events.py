@@ -6,7 +6,7 @@ class DeliveryUnitEvent(Event):
         super().__init__(timestamp)
         self.delivery_unit_id = delivery_unit_id
 
-class DeliveryAssignedEvent(DeliveryUnitEvent):
+class DeliveryUnitAssignedEvent(DeliveryUnitEvent):
     """Event for when a delivery entity is assigned to a driver."""
     def __init__(self, timestamp, delivery_unit_id, entity_type, entity_id, driver_id):
         super().__init__(timestamp, delivery_unit_id)
@@ -14,7 +14,7 @@ class DeliveryAssignedEvent(DeliveryUnitEvent):
         self.entity_id = entity_id
         self.driver_id = driver_id
         
-class DeliveryCompletedEvent(DeliveryUnitEvent):
+class DeliveryUnitCompletedEvent(DeliveryUnitEvent):
     """Event for when a delivery is fully completed."""
     def __init__(self, timestamp, delivery_unit_id, driver_id):
         super().__init__(timestamp, delivery_unit_id)
