@@ -1,4 +1,5 @@
 from delivery_sim.entities.states import DeliveryUnitState
+from delivery_sim.events.delivery_unit_events import DeliveryUnitStateChangedEvent
 
 class DeliveryUnit:
     """

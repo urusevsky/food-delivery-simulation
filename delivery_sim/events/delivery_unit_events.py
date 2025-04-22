@@ -19,3 +19,10 @@ class DeliveryCompletedEvent(DeliveryUnitEvent):
     def __init__(self, timestamp, delivery_unit_id, driver_id):
         super().__init__(timestamp, delivery_unit_id)
         self.driver_id = driver_id
+
+class DeliveryUnitStateChangedEvent(DeliveryUnitEvent):
+    """Technical event for tracking delivery unit state transitions."""
+    def __init__(self, timestamp, delivery_unit_id, old_state, new_state):
+        super().__init__(timestamp, delivery_unit_id)
+        self.old_state = old_state
+        self.new_state = new_state        
