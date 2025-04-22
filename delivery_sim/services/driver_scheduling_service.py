@@ -1,5 +1,6 @@
 from delivery_sim.entities.states import DriverState
-from delivery_sim.events.driver_events import DriverLoggedInEvent, DriverStateChangedEvent, DriverLogoutAttemptEvent, DriverLoggedOutEvent
+from delivery_sim.events.driver_events import DriverLoggedInEvent, DriverLogoutAttemptEvent, DriverLoggedOutEvent
+from delivery_sim.events.delivery_unit_events import DeliveryUnitCompletedEvent
 
 class DriverSchedulingService:
     def __init__(self, env, event_dispatcher, driver_repository):
@@ -9,29 +10,31 @@ class DriverSchedulingService:
         
         # Register for relevant events
         self.event_dispatcher.register(DriverLoggedInEvent, self.handle_driver_login)
-        self.event_dispatcher.register(DriverStateChangedEvent, self.handle_driver_state_changed)
+        self.event_dispatcher.register(DeliveryUnitCompletedEvent, self.handle_delivery_completed)
         self.event_dispatcher.register(DriverLogoutAttemptEvent, self.handle_driver_logout_attempt)
     
     # Event Handlers
     def handle_driver_login(self, event):
-        """Handler for DriverLoggedInEvent"""
+        """Handler for DriverLoggedInEvent - schedules future logout attempt."""
         driver_id = event.driver_id
         intended_logout_time = event.timestamp + event.service_duration
         
         self.schedule_driver_logout(driver_id, intended_logout_time)
     
-    def handle_driver_state_changed(self, event):
-        """Handler for DriverStateChangedEvent"""
-        if event.new_state != DriverState.AVAILABLE:
-            return
-            
+    def handle_delivery_completed(self, event):
+        """
+        Check if driver should log out after completing a delivery.
+        
+        Args:
+            event: The DeliveryUnitCompletedEvent
+        """
         driver_id = event.driver_id
         timestamp = event.timestamp
         
         self.check_overdue_logout(driver_id, timestamp)
     
     def handle_driver_logout_attempt(self, event):
-        """Handler for DriverLogoutAttemptEvent"""
+        """Handler for scheduled logout attempts at a driver's intended time."""
         driver_id = event.driver_id
         timestamp = event.timestamp
         
@@ -39,12 +42,11 @@ class DriverSchedulingService:
     
     # Operations
     def schedule_driver_logout(self, driver_id, intended_logout_time):
-        """Operation to schedule a driver's logout monitoring process."""
-        # Start a SimPy process to monitor this driver
+        """Schedule a logout attempt for when the driver's intended time arrives."""
         self.env.process(self._driver_logout_process(driver_id, intended_logout_time))
     
     def check_overdue_logout(self, driver_id, current_time):
-        """Operation to check if a driver should log out after state change."""
+        """Check if a driver should log out after completing a delivery."""
         driver = self.driver_repository.find_by_id(driver_id)
         if not driver:
             return
@@ -56,7 +58,7 @@ class DriverSchedulingService:
             ))
     
     def attempt_driver_logout(self, driver_id, timestamp):
-        """Operation to attempt logging out a driver."""
+        """Attempt to log out a driver if they're available."""
         driver = self.driver_repository.find_by_id(driver_id)
         if not driver:
             return False
@@ -64,7 +66,6 @@ class DriverSchedulingService:
         if driver.can_logout():
             # Update driver state
             driver.transition_to(DriverState.OFFLINE, self.event_dispatcher, self.env)
-            driver.actual_log_out_time = timestamp
             
             # Dispatch completion event
             self.event_dispatcher.dispatch(DriverLoggedOutEvent(
@@ -80,7 +81,7 @@ class DriverSchedulingService:
     
     # SimPy process (internal method)
     def _driver_logout_process(self, driver_id, intended_logout_time):
-        """SimPy process that monitors a driver's logout schedule."""
+        """SimPy process that schedules a logout attempt at the intended time."""
         time_until_logout = intended_logout_time - self.env.now
         if time_until_logout > 0:
             yield self.env.timeout(time_until_logout)
