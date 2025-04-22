@@ -30,22 +30,22 @@ class Order:
         self.pair = None  # Reference to a Pair if this order becomes paired
         self.delivery_unit = None  # Reference to DeliveryUnit once assigned
         
-    def transition_to(self, new_state, event_dispatcher=None, env=None):
+        # Timing information for lifecycle events
+        self.pair_time = None
+        self.assignment_time = None
+        self.pickup_time = None
+        self.delivery_time = None
+
+    def can_transition_to(self, new_state):
         """
-        Change the order's state with validation.
+        Check if this order can transition to the specified state.
         
         Args:
-            new_state: The new state to transition to
-            event_dispatcher: Optional event dispatcher to notify about state change
-            env: SimPy environment for getting current simulation time
+            new_state: The state to check transition to
             
         Returns:
-            True if transition was successful
-            
-        Raises:
-            ValueError: If transition is invalid
+            bool: True if transition is valid, False otherwise
         """
-        # Define valid transitions
         valid_transitions = {
             OrderState.CREATED: [OrderState.PAIRED, OrderState.ASSIGNED],
             OrderState.PAIRED: [OrderState.ASSIGNED],
@@ -53,8 +53,24 @@ class Order:
             OrderState.PICKED_UP: [OrderState.DELIVERED]
         }
         
-        # Check if transition is valid
-        if self.state not in valid_transitions or new_state not in valid_transitions.get(self.state, []):
+        return new_state in valid_transitions.get(self.state, [])
+
+    def transition_to(self, new_state, event_dispatcher=None, env=None):
+        """
+        Change the order's state with validation.
+        
+        Args:
+            new_state: The new state to transition to
+            event_dispatcher: Optional event dispatcher for events
+            env: SimPy environment for current time
+            
+        Returns:
+            bool: True if transition succeeded, False otherwise
+            
+        Raises:
+            ValueError: If transition is invalid
+        """
+        if not self.can_transition_to(new_state):
             raise ValueError(
                 f"Cannot transition order {self.order_id} from {self.state} to {new_state}"
             )
@@ -65,7 +81,18 @@ class Order:
         # Update state
         self.state = new_state
         
-        # Dispatch event if dispatcher was provided
+        # Update timing information based on new state
+        if env:
+            if new_state == OrderState.PAIRED:
+                self.pair_time = env.now
+            elif new_state == OrderState.ASSIGNED:
+                self.assignment_time = env.now
+            elif new_state == OrderState.PICKED_UP:
+                self.pickup_time = env.now
+            elif new_state == OrderState.DELIVERED:
+                self.delivery_time = env.now
+        
+        # Dispatch event if dispatcher provided
         if event_dispatcher and env:
             event_dispatcher.dispatch(OrderStateChangedEvent(
                 timestamp=env.now,
