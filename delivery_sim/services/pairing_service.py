@@ -1,5 +1,5 @@
 from delivery_sim.events.order_events import OrderCreatedEvent
-from delivery_sim.events.pair_events import PairCreatedEvent
+from delivery_sim.events.pair_events import PairCreatedEvent, PairingFailedEvent
 from delivery_sim.entities.pair import Pair
 from delivery_sim.entities.states import OrderState
 
@@ -65,12 +65,23 @@ class PairingService:
         """
         # Get the order from repository
         new_order = self.order_repository.find_by_id(order_id)
-        if not new_order or new_order.state != OrderState.CREATED:
+        # Error Handling 
+        if not new_order:
+            print(f"ERROR: Order {order_id} not found when attempting pairing")
+            return False
+        
+        if new_order.state != OrderState.CREATED:
+            print(f"ERROR: Order {order_id} in incorrect state {new_order.state} for pairing")
             return False
         
         # Find potential candidates for pairing
         candidates = self.find_pairing_candidates(new_order)
         if not candidates:
+            # No candidates found
+            self.event_dispatcher.dispatch(PairingFailedEvent(
+                timestamp=self.env.now,
+                order_id=order_id
+            ))
             return False
         
         # Find the best match among candidates
