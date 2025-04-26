@@ -13,6 +13,12 @@ class PairCreatedEvent(PairEvent):
         self.order1_id = order1_id
         self.order2_id = order2_id
 
+class PairingFailedEvent(Event):
+    """Event for when an order failed to find a suitable pairing match."""
+    def __init__(self, timestamp, order_id):
+        super().__init__(timestamp)
+        self.order_id = order_id        
+
 class PairAssignedEvent(PairEvent):
     """Event for when a pair is assigned to a driver."""
     def __init__(self, timestamp, pair_id, driver_id, delivery_unit_id):
