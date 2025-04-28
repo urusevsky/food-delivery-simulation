@@ -53,8 +53,8 @@ class PairingService:
         Try to pair the new order with an existing order.
         
         This is the main operation that:
-        1. Finds potential pairing candidates
-        2. Evaluates the best match
+        1. Finds potential pairing candidates 
+        2. Evaluates the best match based on delivery cost
         3. Forms a pair if a good match is found
         
         Args:
@@ -65,19 +65,11 @@ class PairingService:
         """
         # Get the order from repository
         new_order = self.order_repository.find_by_id(order_id)
-        # Error Handling 
-        if not new_order:
-            print(f"ERROR: Order {order_id} not found when attempting pairing")
-            return False
-        
-        if new_order.state != OrderState.CREATED:
-            print(f"ERROR: Order {order_id} in incorrect state {new_order.state} for pairing")
-            return False
         
         # Find potential candidates for pairing
         candidates = self.find_pairing_candidates(new_order)
         if not candidates:
-            # No candidates found
+            # Business outcome: No suitable pairing candidates found
             self.event_dispatcher.dispatch(PairingFailedEvent(
                 timestamp=self.env.now,
                 order_id=order_id
@@ -85,12 +77,11 @@ class PairingService:
             return False
         
         # Find the best match among candidates
-        best_match, best_sequence, best_score = self.calculate_best_match(new_order, candidates)
-        if not best_match:
-            return False
+        # (This will always succeed if candidates exist)
+        best_match, best_sequence, best_cost = self.calculate_best_match(new_order, candidates)
         
         # Form the pair with the best match
-        self.form_pair(new_order, best_match, best_sequence, best_score)
+        self.form_pair(new_order, best_match, best_sequence, best_cost)
         return True
     
     def find_pairing_candidates(self, new_order):
@@ -127,20 +118,20 @@ class PairingService:
             candidates: List of potential pairing candidates
             
         Returns:
-            tuple: (best_candidate, best_sequence, best_score) or (None, None, None) if no good match
+            tuple: (best_candidate, best_sequence, best_cost) for the optimal pairing
         """
         best_candidate = None
         best_sequence = None
-        best_score = float('inf')
+        best_cost = float('inf')
         
         for candidate in candidates:
-            sequence, score = self.evaluate_sequences(new_order, candidate)
-            if score < best_score:
-                best_score = score
+            sequence, cost = self.evaluate_sequences(new_order, candidate)
+            if cost < best_cost:
+                best_cost = cost
                 best_sequence = sequence
                 best_candidate = candidate
         
-        return best_candidate, best_sequence, best_score
+        return best_candidate, best_sequence, best_cost
     
     def form_pair(self, order1, order2, sequence, cost):
         """
