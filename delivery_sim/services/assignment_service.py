@@ -5,6 +5,8 @@ from delivery_sim.events.order_events import OrderCreatedEvent
 from delivery_sim.events.pair_events import PairCreatedEvent, PairingFailedEvent
 from delivery_sim.events.driver_events import DriverLoggedInEvent
 from delivery_sim.events.delivery_unit_events import DeliveryUnitCompletedEvent, DeliveryUnitAssignedEvent
+from delivery_sim.utils.location_utils import calculate_distance
+
 
 class AssignmentService:
     """
@@ -270,11 +272,11 @@ class AssignmentService:
             float: Total travel distance/time cost
         """
         if hasattr(delivery_entity, 'order_id'):  # It's an order
-            return self._distance(driver.location, delivery_entity.restaurant_location) + \
-                self._distance(delivery_entity.restaurant_location, delivery_entity.customer_location)
+            return calculate_distance(driver.location, delivery_entity.restaurant_location) + \
+                calculate_distance(delivery_entity.restaurant_location, delivery_entity.customer_location)
         else:  # It's a pair
             # First leg is from driver to first pickup location
-            return self._distance(driver.location, delivery_entity.optimal_sequence[0]) + \
+            return calculate_distance(driver.location, delivery_entity.optimal_sequence[0]) + \
                 delivery_entity.optimal_cost
     
     def calculate_adjusted_cost(self, driver, entity):
@@ -312,12 +314,6 @@ class AssignmentService:
         }
         
         return adjusted_cost, components
-    
-    def _distance(self, loc1, loc2):
-        """
-        Calculate Euclidean distance between two locations.
-        """
-        return ((loc1[0] - loc2[0])**2 + (loc1[1] - loc2[1])**2)**0.5
     
     def _periodic_assignment_process(self):
         """SimPy process that runs the periodic global optimization."""

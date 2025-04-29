@@ -2,6 +2,7 @@ from delivery_sim.events.order_events import OrderCreatedEvent
 from delivery_sim.events.pair_events import PairCreatedEvent, PairingFailedEvent
 from delivery_sim.entities.pair import Pair
 from delivery_sim.entities.states import OrderState
+from delivery_sim.utils.location_utils import calculate_distance, locations_are_equal
 
 class PairingService:
     """
@@ -185,7 +186,7 @@ class PairingService:
             tuple: (best_sequence, best_cost) for the optimal delivery sequence
         """
         sequences = []
-        same_restaurant = self._locations_are_equal(
+        same_restaurant = locations_are_equal(
             order1.restaurant_location, 
             order2.restaurant_location
         )
@@ -244,7 +245,7 @@ class PairingService:
         """
         total_distance = 0.0
         for i in range(len(sequence) - 1):
-            total_distance += self._distance(sequence[i], sequence[i + 1])
+            total_distance += calculate_distance(sequence[i], sequence[i + 1])
         return total_distance
     
     def _check_proximity_constraints(self, order1, order2):
@@ -258,11 +259,11 @@ class PairingService:
         Returns:
             bool: True if orders meet proximity criteria, False otherwise
         """
-        restaurant_distance = self._distance(
+        restaurant_distance = calculate_distance(
             order1.restaurant_location,
             order2.restaurant_location
         )
-        customer_distance = self._distance(
+        customer_distance = calculate_distance(
             order1.customer_location,
             order2.customer_location
         )
@@ -270,28 +271,3 @@ class PairingService:
         return (restaurant_distance <= self.config.restaurants_proximity_threshold and
                 customer_distance <= self.config.customers_proximity_threshold)
     
-    def _distance(self, loc1, loc2):
-        """
-        Calculate Euclidean distance between two locations.
-        
-        Args:
-            loc1: First location as [x, y]
-            loc2: Second location as [x, y]
-            
-        Returns:
-            float: Distance between locations
-        """
-        return ((loc1[0] - loc2[0])**2 + (loc1[1] - loc2[1])**2)**0.5
-    
-    def _locations_are_equal(self, loc1, loc2):
-        """
-        Check if two locations are the same.
-        
-        Args:
-            loc1: First location as [x, y]
-            loc2: Second location as [x, y]
-            
-        Returns:
-            bool: True if locations are equal, False otherwise
-        """
-        return loc1[0] == loc2[0] and loc1[1] == loc2[1]
