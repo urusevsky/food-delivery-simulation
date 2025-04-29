@@ -95,7 +95,7 @@ class PairingService:
             list: Orders that meet proximity criteria
         """
         # Get all unassigned single orders
-        all_singles = self.order_repository.find_by_state(OrderState.CREATED)
+        all_singles = self.order_repository.find_unassigned_orders()
         
         # Filter out the new order itself
         potential_candidates = [

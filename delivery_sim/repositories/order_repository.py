@@ -54,15 +54,14 @@ class OrderRepository:
         """
         return [order for order in self.orders.values() if order.state == state]
     
-    def find_waiting_orders(self):
+    def find_unassigned_orders(self):
         """
-        Find orders waiting for assignment (in CREATED or PAIRED state).
+        Find orders waiting for assignment (in CREATED state).
         
         Returns:
-            list: Orders waiting for driver assignment
+            list: Orders that are ready for assignment but not yet assigned
         """
-        return [order for order in self.orders.values() 
-                if order.state in [OrderState.CREATED, OrderState.PAIRED]]
+        return self.find_by_state(OrderState.CREATED)
     
     def count(self):
         """
