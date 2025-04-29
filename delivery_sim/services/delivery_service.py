@@ -1,0 +1,278 @@
+from delivery_sim.entities.states import OrderState, DriverState, DeliveryUnitState
+from delivery_sim.events.delivery_unit_events import DeliveryUnitCompletedEvent, DeliveryUnitAssignedEvent
+from delivery_sim.utils.location_utils import calculate_distance, locations_are_equal
+
+class DeliveryService:
+    """
+    Service responsible for executing delivery processes once assignments are made.
+    
+    This service manages the physical delivery process from start to finish,
+    including driver movement, restaurant pickups, and customer deliveries.
+    It handles both single orders and pairs with clear tracking of completion status.
+    """
+    
+    def __init__(self, env, event_dispatcher, driver_repository, order_repository, 
+                 pair_repository, delivery_unit_repository, config):
+        """
+        Initialize the delivery service with its dependencies.
+        
+        Args:
+            env: SimPy environment
+            event_dispatcher: Central event dispatcher
+            driver_repository: Repository for accessing drivers
+            order_repository: Repository for accessing orders
+            pair_repository: Repository for accessing pairs
+            delivery_unit_repository: Repository for accessing delivery units
+            config: Configuration containing delivery parameters
+        """
+        self.env = env
+        self.event_dispatcher = event_dispatcher
+        self.driver_repository = driver_repository
+        self.order_repository = order_repository
+        self.pair_repository = pair_repository
+        self.delivery_unit_repository = delivery_unit_repository
+        self.config = config
+        
+        # Register for assignment events
+        event_dispatcher.register(DeliveryUnitAssignedEvent, self.handle_delivery_assigned)
+    
+    # === Event Handlers ===
+    
+    def handle_delivery_assigned(self, event):
+        """
+        Handler for DeliveryUnitAssignedEvent.
+        
+        This lightweight handler extracts necessary data and delegates to
+        the operation that manages the delivery process.
+        
+        Args:
+            event: The DeliveryUnitAssignedEvent
+        """
+        delivery_unit_id = event.delivery_unit_id
+        entity_type = event.entity_type  # "order" or "pair"
+        entity_id = event.entity_id
+        driver_id = event.driver_id
+        
+        self.start_delivery(delivery_unit_id, entity_type, entity_id, driver_id)
+    
+    # === Operations ===
+    
+    def start_delivery(self, delivery_unit_id, entity_type, entity_id, driver_id):
+        """
+        Start the delivery process for an assigned delivery unit.
+        
+        This operation:
+        1. Retrieves all required entities
+        2. Initiates the appropriate SimPy process based on entity type
+        
+        Args:
+            delivery_unit_id: ID of the delivery unit
+            entity_type: Type of entity ("order" or "pair")
+            entity_id: ID of the entity being delivered
+            driver_id: ID of the driver performing the delivery
+            
+        Returns:
+            bool: True if delivery started successfully, False otherwise
+        """
+        # Retrieve entities
+        delivery_unit = self.delivery_unit_repository.find_by_id(delivery_unit_id)
+        driver = self.driver_repository.find_by_id(driver_id)
+        
+        if not delivery_unit or not driver:
+            print(f"Error: Could not find delivery unit {delivery_unit_id} or driver {driver_id}")
+            return False
+        
+        # Retrieve the delivery entity (order or pair)
+        if entity_type == "order":
+            entity = self.order_repository.find_by_id(entity_id)
+            if not entity:
+                print(f"Error: Could not find order {entity_id}")
+                return False
+                
+            # Start the single order delivery process
+            self.env.process(self._single_order_delivery_process(driver, entity, delivery_unit))
+            
+        else:  # "pair"
+            entity = self.pair_repository.find_by_id(entity_id)
+            if not entity:
+                print(f"Error: Could not find pair {entity_id}")
+                return False
+                
+            # Start the pair delivery process
+            self.env.process(self._pair_delivery_process(driver, entity, delivery_unit))
+        
+        print(f"Started delivery process for {entity_type} {entity_id} by driver {driver_id} at time {self.env.now}")
+        return True
+    
+    # === SimPy Processes ===
+    
+    def _single_order_delivery_process(self, driver, order, delivery_unit):
+        """
+        SimPy process for delivering a single order.
+        
+        This process manages:
+        1. Travel to restaurant
+        2. Pickup at restaurant
+        3. Travel to customer
+        4. Delivery to customer
+        5. Completion of delivery unit
+        
+        Args:
+            driver: The driver performing the delivery
+            order: The order being delivered
+            delivery_unit: The delivery unit being fulfilled
+        """
+        # Get current location
+        current_location = driver.location
+        
+        # Step 1: Travel to restaurant
+        travel_time = self._calculate_travel_time(current_location, order.restaurant_location)
+        yield self.env.timeout(travel_time)
+        
+        # Process pickup
+        previous_location = current_location
+        current_location = order.restaurant_location
+        driver.update_location(current_location)
+        
+        # Update order state and log
+        order.transition_to(OrderState.PICKED_UP, self.event_dispatcher, self.env)
+        print(f"Driver {driver.driver_id} picked up Order {order.order_id} from restaurant at time {self.env.now}")
+        
+        # Step 2: Travel to customer
+        travel_time = self._calculate_travel_time(current_location, order.customer_location)
+        yield self.env.timeout(travel_time)
+        
+        # Process delivery
+        previous_location = current_location
+        current_location = order.customer_location
+        driver.update_location(current_location)
+        
+        # Update order state and log
+        order.transition_to(OrderState.DELIVERED, self.event_dispatcher, self.env)
+        print(f"Driver {driver.driver_id} delivered Order {order.order_id} to customer at time {self.env.now}")
+        
+        # Complete delivery unit
+        self._complete_delivery_unit(driver, delivery_unit)
+    
+    def _pair_delivery_process(self, driver, pair, delivery_unit):
+        """
+        SimPy process for delivering a pair of orders.
+        
+        This process follows the optimal sequence determined during pair formation
+        and properly handles pickups and deliveries at each stop.
+        
+        Args:
+            driver: The driver performing the delivery
+            pair: The pair being delivered
+            delivery_unit: The delivery unit being fulfilled
+        """
+        # Get current location
+        current_location = driver.location
+        
+        # Follow the optimal sequence determined during pair formation
+        for stop in pair.optimal_sequence:
+            # Travel to the next stop
+            travel_time = self._calculate_travel_time(current_location, stop)
+            yield self.env.timeout(travel_time)
+            
+            # Update driver location
+            previous_location = current_location
+            current_location = stop
+            driver.update_location(current_location)
+            
+            # Determine what action to take at this location
+            self._process_pair_stop(driver, pair, stop)
+        
+        # Complete delivery unit
+        self._complete_delivery_unit(driver, delivery_unit)
+    
+    def _process_pair_stop(self, driver, pair, location):
+        """
+        Process a stop in a pair delivery sequence.
+        
+        Determines if this is a restaurant or customer location and handles
+        the appropriate pickup or delivery action.
+        
+        Args:
+            driver: The driver making the stop
+            pair: The pair being delivered
+            location: The current stop location
+        """
+        # Check if this is a restaurant location
+        for order in [pair.order1, pair.order2]:
+            if locations_are_equal(location, order.restaurant_location):
+                # Update order state
+                order.transition_to(OrderState.PICKED_UP, self.event_dispatcher, self.env)
+                
+                # Track pickup in pair
+                pair.record_order_pickup(order.order_id)
+                
+                # Log pickup with pair context
+                print(f"Driver {driver.driver_id} picked up Order {order.order_id} (of Pair {pair.pair_id}) "
+                      f"from restaurant at time {self.env.now}")
+        
+        # Check if this is a customer location
+        for order in [pair.order1, pair.order2]:
+            if locations_are_equal(location, order.customer_location):
+                # Update order state
+                order.transition_to(OrderState.DELIVERED, self.event_dispatcher, self.env)
+                
+                # Track delivery in pair
+                is_complete = pair.record_order_delivery(order.order_id)
+                
+                # Log delivery with pair context
+                print(f"Driver {driver.driver_id} delivered Order {order.order_id} (of Pair {pair.pair_id}) "
+                      f"to customer at time {self.env.now}")
+                
+                if is_complete:
+                    print(f"All orders in Pair {pair.pair_id} have been delivered")
+    
+    def _complete_delivery_unit(self, driver, delivery_unit):
+        """
+        Mark a delivery unit as completed.
+        
+        Updates delivery unit state, driver state, and dispatches completion event.
+        This is a critical method that signals to the rest of the system that
+        the driver is now available for new assignments.
+        
+        Args:
+            driver: The driver who completed the delivery
+            delivery_unit: The delivery unit to complete
+        """
+        # Update delivery unit state
+        delivery_unit.transition_to(DeliveryUnitState.COMPLETED, self.event_dispatcher, self.env)
+        
+        # Add to driver's completed deliveries
+        driver.completed_deliveries.append(delivery_unit)
+        
+        # Update driver state to available
+        driver.transition_to(DriverState.AVAILABLE, self.event_dispatcher, self.env)
+        
+        # Dispatch completion event - this is the main event other services listen for
+        self.event_dispatcher.dispatch(DeliveryUnitCompletedEvent(
+            timestamp=self.env.now,
+            delivery_unit_id=delivery_unit.unit_id,
+            driver_id=driver.driver_id
+        ))
+        
+        # Log for debugging
+        print(f"Driver {driver.driver_id} completed delivery unit {delivery_unit.unit_id} at time {self.env.now}")
+    
+    # === Utility Methods ===
+    
+    def _calculate_travel_time(self, origin, destination):
+        """
+        Calculate travel time between two locations.
+        
+        Args:
+            origin: Starting location [x, y]
+            destination: Ending location [x, y]
+            
+        Returns:
+            float: Time in minutes to travel between locations
+        """
+        distance = calculate_distance(origin, destination)
+        # Use speed from config or default value
+        speed = getattr(self.config, 'driver_speed', 0.5)  # km per minute
+        return distance / speed
+    
