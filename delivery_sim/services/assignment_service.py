@@ -5,7 +5,7 @@ from delivery_sim.events.order_events import OrderCreatedEvent
 from delivery_sim.events.pair_events import PairCreatedEvent, PairingFailedEvent
 from delivery_sim.events.driver_events import DriverLoggedInEvent
 from delivery_sim.events.delivery_unit_events import DeliveryUnitCompletedEvent, DeliveryUnitAssignedEvent
-from delivery_sim.utils.location_utils import calculate_distance
+from delivery_sim.utils.location_utils import calculate_distance, locations_are_equal
 
 
 class AssignmentService:
@@ -46,70 +46,104 @@ class AssignmentService:
         # Start the periodic assignment process
         self.process = env.process(self._periodic_assignment_process())
     
-    # ===== Event Handlers =====
+    # ===== Event Handlers (Entry Points) =====
     
     def handle_order_created(self, event):
         """
         Handler for OrderCreatedEvent in single mode.
-        Attempts immediate assignment for the new order.
+        Validates the order and attempts immediate assignment if valid.
         """
+        # Validate order exists
         order_id = event.order_id
-        self.attempt_immediate_assignment_from_delivery_entity(order_id, "order")
+        order = self.order_repository.find_by_id(order_id)
+        
+        if not order:
+            self._log_entity_not_found("Order", order_id)
+            return
+            
+        # Pass validated entity to operation
+        self.attempt_immediate_assignment_from_delivery_entity(order, "order")
     
     def handle_pair_created(self, event):
         """
         Handler for PairCreatedEvent in pair mode.
-        Attempts immediate assignment for the newly formed pair.
+        Validates the pair and attempts immediate assignment if valid.
         """
+        # Validate pair exists
         pair_id = event.pair_id
-        self.attempt_immediate_assignment_from_delivery_entity(pair_id, "pair")
+        pair = self.pair_repository.find_by_id(pair_id)
+        
+        if not pair:
+            self._log_entity_not_found("Pair", pair_id)
+            return
+            
+        # Pass validated entity to operation
+        self.attempt_immediate_assignment_from_delivery_entity(pair, "pair")
     
     def handle_pairing_failed(self, event):
         """
         Handler for PairingFailedEvent in pair mode.
-        Attempts immediate assignment for the order that failed to pair.
+        Validates the order and attempts immediate assignment if valid.
         """
+        # Validate order exists
         order_id = event.order_id
-        self.attempt_immediate_assignment_from_delivery_entity(order_id, "order")
+        order = self.order_repository.find_by_id(order_id)
+        
+        if not order:
+            self._log_entity_not_found("Order", order_id)
+            return
+            
+        # Pass validated entity to operation
+        self.attempt_immediate_assignment_from_delivery_entity(order, "order")
     
     def handle_driver_login(self, event):
         """
         Handler for DriverLoggedInEvent.
-        Attempts immediate assignment for the newly available driver.
+        Validates the driver and attempts immediate assignment if valid.
         """
+        # Validate driver exists
         driver_id = event.driver_id
-        self.attempt_immediate_assignment_from_driver(driver_id)
+        driver = self.driver_repository.find_by_id(driver_id)
+        
+        if not driver:
+            self._log_entity_not_found("Driver", driver_id)
+            return
+            
+        # Pass validated entity to operation
+        self.attempt_immediate_assignment_from_driver(driver)
     
     def handle_delivery_completed(self, event):
         """
         Handler for DeliveryUnitCompletedEvent.
-        Attempts immediate assignment for the driver who just completed a delivery.
+        Validates the driver and attempts immediate assignment if valid.
         """
+        # Validate driver exists
         driver_id = event.driver_id
-        self.attempt_immediate_assignment_from_driver(driver_id)
+        driver = self.driver_repository.find_by_id(driver_id)
+        
+        if not driver:
+            self._log_entity_not_found("Driver", driver_id)
+            return
+            
+        # Pass validated entity to operation
+        self.attempt_immediate_assignment_from_driver(driver)
     
     # ===== Operations =====
     
-    def attempt_immediate_assignment_from_delivery_entity(self, delivery_entity_id, entity_type):
+    def attempt_immediate_assignment_from_delivery_entity(self, delivery_entity, entity_type):
         """
         Try to find an available driver for a delivery entity.
         
-        This method implements the business logic for immediate assignment decisions,
+        This operation implements the business logic for immediate assignment decisions,
         determining if a clear opportunity exists to assign a driver immediately.
         
         Args:
-            delivery_entity_id: ID of the order or pair to assign
+            delivery_entity: The order or pair to assign
             entity_type: Type of entity ("order" or "pair")
             
         Returns:
             bool: True if assignment succeeded, False otherwise
         """
-        # Get the entity from repository 
-        # (assuming validation happens in test layer)
-        delivery_entity = (self.order_repository.find_by_id(delivery_entity_id) 
-                        if entity_type == "order" 
-                        else self.pair_repository.find_by_id(delivery_entity_id))
-        
         # Business logic: Check for available drivers
         available_drivers = self.driver_repository.find_available_drivers()
         if not available_drivers:
@@ -128,24 +162,20 @@ class AssignmentService:
             # Business outcome: Cost exceeds immediate assignment threshold
             return False
     
-    def attempt_immediate_assignment_from_driver(self, driver_id):
+    def attempt_immediate_assignment_from_driver(self, driver):
         """
         Try to find the best delivery entity for a newly available driver.
         
-        This method implements the business logic for immediate assignment decisions
+        This operation implements the business logic for immediate assignment decisions
         from the driver perspective, determining if there's a clear opportunity to 
         assign the driver to a waiting order or pair.
         
         Args:
-            driver_id: ID of the driver who became available
+            driver: The driver who became available
             
         Returns:
             bool: True if assignment succeeded, False otherwise
         """
-        # Get the driver from repository
-        # (assuming validation happens in test layer)
-        driver = self.driver_repository.find_by_id(driver_id)
-        
         # Get unassigned delivery entities
         unassigned_orders = self.order_repository.find_unassigned_orders()
         unassigned_pairs = self.pair_repository.find_unassigned_pairs()
@@ -173,6 +203,13 @@ class AssignmentService:
     def _find_best_match(self, fixed_entity, candidates):
         """
         Find the best matching entity from a list of candidates.
+        
+        Args:
+            fixed_entity: Either a driver or delivery entity we're finding a match for
+            candidates: List of potential matches (drivers or delivery entities)
+        
+        Returns:
+            tuple: (best_match, best_cost, best_components) or (None, float('inf'), None) if no candidates
         """
         best_match = None
         best_adjusted_cost = float('inf')
@@ -200,7 +237,21 @@ class AssignmentService:
     def _create_assignment(self, driver, entity, assignment_path, cost_components):
         """
         Create a delivery unit and update entity states.
+        
+        Args:
+            driver: The driver to assign
+            entity: The order or pair to assign
+            assignment_path: How this assignment was made ('immediate' or 'periodic')
+            cost_components: Dictionary with cost calculation components
+            
+        Returns:
+            DeliveryUnit: The created delivery unit
         """
+        # Critical validation - ensure driver is still available
+        if driver.state != DriverState.AVAILABLE:
+            print(f"Critical error: Driver {driver.driver_id} not available when creating assignment")
+            return None
+            
         # Create delivery unit
         delivery_unit = DeliveryUnit(entity, driver, self.env.now)
         delivery_unit.assignment_path = assignment_path
@@ -256,34 +307,18 @@ class AssignmentService:
         
         return delivery_unit
     
-    def calculate_base_delivery_cost(self, driver, delivery_entity):
-        """
-        Calculate the base travel cost for a potential delivery assignment.
-        
-        This represents the actual distance/time the driver would need to travel:
-        - For single orders: driver location → restaurant → customer
-        - For pairs: driver location → first location in optimal sequence → rest of sequence
-        
-        Args:
-            driver: The driver being evaluated
-            delivery_entity: The order or pair being evaluated
-            
-        Returns:
-            float: Total travel distance/time cost
-        """
-        if hasattr(delivery_entity, 'order_id'):  # It's an order
-            return calculate_distance(driver.location, delivery_entity.restaurant_location) + \
-                calculate_distance(delivery_entity.restaurant_location, delivery_entity.customer_location)
-        else:  # It's a pair
-            # First leg is from driver to first pickup location
-            return calculate_distance(driver.location, delivery_entity.optimal_sequence[0]) + \
-                delivery_entity.optimal_cost
-    
     def calculate_adjusted_cost(self, driver, entity):
         """
         Calculate adjusted cost using weighted objective function.
         
         Adjusted Cost = base_cost - throughput_factor * num_orders - age_factor * age
+        
+        Args:
+            driver: The driver being evaluated
+            entity: The order or pair being evaluated
+            
+        Returns:
+            tuple: (adjusted_cost, components_dictionary)
         """
         # Calculate base delivery cost
         base_cost = self.calculate_base_delivery_cost(driver, entity)
@@ -314,6 +349,29 @@ class AssignmentService:
         }
         
         return adjusted_cost, components
+    
+    def calculate_base_delivery_cost(self, driver, delivery_entity):
+        """
+        Calculate the base travel cost for a potential delivery assignment.
+        
+        This represents the actual distance/time the driver would need to travel:
+        - For single orders: driver location → restaurant → customer
+        - For pairs: driver location → first location in optimal sequence → rest of sequence
+        
+        Args:
+            driver: The driver being evaluated
+            delivery_entity: The order or pair being evaluated
+            
+        Returns:
+            float: Total travel distance/time cost
+        """
+        if hasattr(delivery_entity, 'order_id'):  # It's an order
+            return calculate_distance(driver.location, delivery_entity.restaurant_location) + \
+                calculate_distance(delivery_entity.restaurant_location, delivery_entity.customer_location)
+        else:  # It's a pair
+            # First leg is from driver to first pickup location
+            return calculate_distance(driver.location, delivery_entity.optimal_sequence[0]) + \
+                delivery_entity.optimal_cost
     
     def _periodic_assignment_process(self):
         """SimPy process that runs the periodic global optimization."""
@@ -385,6 +443,13 @@ class AssignmentService:
     def _generate_cost_matrix(self, waiting_entities, available_drivers):
         """
         Generate cost matrix for Hungarian algorithm.
+        
+        Args:
+            waiting_entities: List of unassigned orders and pairs
+            available_drivers: List of available drivers
+            
+        Returns:
+            list: 2D matrix of adjusted costs
         """
         cost_matrix = []
         
@@ -397,3 +462,14 @@ class AssignmentService:
         
         return cost_matrix
     
+    # ===== Helper Methods =====
+    
+    def _log_entity_not_found(self, entity_type, entity_id):
+        """
+        Centralized logging for entity not found errors.
+        
+        Args:
+            entity_type: Type of entity that wasn't found
+            entity_id: ID of the entity that wasn't found
+        """
+        print(f"Error: {entity_type} {entity_id} not found in {self.__class__.__name__} at time {self.env.now}")
