@@ -6,7 +6,7 @@ from delivery_sim.events.pair_events import PairCreatedEvent, PairingFailedEvent
 from delivery_sim.events.driver_events import DriverLoggedInEvent
 from delivery_sim.events.delivery_unit_events import DeliveryUnitCompletedEvent, DeliveryUnitAssignedEvent
 from delivery_sim.utils.location_utils import calculate_distance, locations_are_equal
-
+from delivery_sim.utils.validation_utils import log_entity_not_found
 
 class AssignmentService:
     """
@@ -58,7 +58,7 @@ class AssignmentService:
         order = self.order_repository.find_by_id(order_id)
         
         if not order:
-            self._log_entity_not_found("Order", order_id)
+            log_entity_not_found("Order", order_id)
             return
             
         # Pass validated entity to operation
@@ -74,7 +74,7 @@ class AssignmentService:
         pair = self.pair_repository.find_by_id(pair_id)
         
         if not pair:
-            self._log_entity_not_found("Pair", pair_id)
+            log_entity_not_found("Pair", pair_id)
             return
             
         # Pass validated entity to operation
@@ -90,7 +90,7 @@ class AssignmentService:
         order = self.order_repository.find_by_id(order_id)
         
         if not order:
-            self._log_entity_not_found("Order", order_id)
+            log_entity_not_found("Order", order_id)
             return
             
         # Pass validated entity to operation
@@ -106,7 +106,7 @@ class AssignmentService:
         driver = self.driver_repository.find_by_id(driver_id)
         
         if not driver:
-            self._log_entity_not_found("Driver", driver_id)
+            log_entity_not_found("Driver", driver_id)
             return
             
         # Pass validated entity to operation
@@ -122,7 +122,7 @@ class AssignmentService:
         driver = self.driver_repository.find_by_id(driver_id)
         
         if not driver:
-            self._log_entity_not_found("Driver", driver_id)
+            log_entity_not_found("Driver", driver_id)
             return
             
         # Pass validated entity to operation
@@ -462,14 +462,3 @@ class AssignmentService:
         
         return cost_matrix
     
-    # ===== Helper Methods =====
-    
-    def _log_entity_not_found(self, entity_type, entity_id):
-        """
-        Centralized logging for entity not found errors.
-        
-        Args:
-            entity_type: Type of entity that wasn't found
-            entity_id: ID of the entity that wasn't found
-        """
-        print(f"Error: {entity_type} {entity_id} not found in {self.__class__.__name__} at time {self.env.now}")

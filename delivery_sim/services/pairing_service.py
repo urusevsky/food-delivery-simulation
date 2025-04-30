@@ -3,6 +3,7 @@ from delivery_sim.events.pair_events import PairCreatedEvent, PairingFailedEvent
 from delivery_sim.entities.pair import Pair
 from delivery_sim.entities.states import OrderState
 from delivery_sim.utils.location_utils import calculate_distance, locations_are_equal
+from delivery_sim.utils.validation_utils import log_entity_not_found
 
 class PairingService:
     """
@@ -36,49 +37,52 @@ class PairingService:
     
     def handle_order_created(self, event):
         """
-        Handler for OrderCreatedEvent. Attempts to pair the new order.
+        Handler for OrderCreatedEvent. Validates the order and attempts pairing if valid.
         
-        This is a lightweight handler that extracts the necessary information
-        and delegates to the appropriate operation.
+        This handler implements the Entry-Point Validation Pattern by validating
+        entities before passing them to operations.
         
         Args:
             event: The OrderCreatedEvent
         """
+        # Extract identifiers from event
         order_id = event.order_id
-        self.attempt_pairing(order_id)
+        
+        # Validate order exists
+        new_order = self.order_repository.find_by_id(order_id)
+        if not new_order:
+            log_entity_not_found(self.__class__.__name__, "Order", order_id, self.env.now)
+            return
+        
+        # Pass validated entity to operation
+        self.attempt_pairing(new_order)
     
     # ===== Operations =====
     
-    def attempt_pairing(self, order_id):
+    def attempt_pairing(self, new_order):
         """
         Try to pair the new order with an existing order.
         
-        This is the main operation that:
-        1. Finds potential pairing candidates 
-        2. Evaluates the best match based on delivery cost
-        3. Forms a pair if a good match is found
+        This operation assumes the new_order has been validated by the handler
+        and focuses purely on business logic.
         
         Args:
-            order_id: ID of the order to attempt pairing for
+            new_order: The validated Order object to attempt pairing for
             
         Returns:
             bool: True if pairing succeeded, False otherwise
         """
-        # Get the order from repository
-        new_order = self.order_repository.find_by_id(order_id)
-        
         # Find potential candidates for pairing
         candidates = self.find_pairing_candidates(new_order)
         if not candidates:
             # Business outcome: No suitable pairing candidates found
             self.event_dispatcher.dispatch(PairingFailedEvent(
                 timestamp=self.env.now,
-                order_id=order_id
+                order_id=new_order.order_id
             ))
             return False
         
         # Find the best match among candidates
-        # (This will always succeed if candidates exist)
         best_match, best_sequence, best_cost = self.calculate_best_match(new_order, candidates)
         
         # Form the pair with the best match

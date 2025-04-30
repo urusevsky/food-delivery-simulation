@@ -1,6 +1,8 @@
 from delivery_sim.entities.states import OrderState, DriverState, DeliveryUnitState
 from delivery_sim.events.delivery_unit_events import DeliveryUnitCompletedEvent, DeliveryUnitAssignedEvent
 from delivery_sim.utils.location_utils import calculate_distance, locations_are_equal
+from delivery_sim.utils.validation_utils import log_entity_not_found
+
 
 class DeliveryService:
     """
@@ -36,72 +38,79 @@ class DeliveryService:
         # Register for assignment events
         event_dispatcher.register(DeliveryUnitAssignedEvent, self.handle_delivery_assigned)
     
-    # === Event Handlers ===
+    # === Event Handlers (Entry Points) ===
     
     def handle_delivery_assigned(self, event):
         """
         Handler for DeliveryUnitAssignedEvent.
         
-        This lightweight handler extracts necessary data and delegates to
-        the operation that manages the delivery process.
+        Validates all entities needed for delivery and delegates to the appropriate
+        operation if validation succeeds.
         
         Args:
             event: The DeliveryUnitAssignedEvent
         """
+        # Extract identifiers from event
         delivery_unit_id = event.delivery_unit_id
         entity_type = event.entity_type  # "order" or "pair"
         entity_id = event.entity_id
         driver_id = event.driver_id
         
-        self.start_delivery(delivery_unit_id, entity_type, entity_id, driver_id)
-    
-    # === Operations ===
-    
-    def start_delivery(self, delivery_unit_id, entity_type, entity_id, driver_id):
-        """
-        Start the delivery process for an assigned delivery unit.
-        
-        This operation:
-        1. Retrieves all required entities
-        2. Initiates the appropriate SimPy process based on entity type
-        
-        Args:
-            delivery_unit_id: ID of the delivery unit
-            entity_type: Type of entity ("order" or "pair")
-            entity_id: ID of the entity being delivered
-            driver_id: ID of the driver performing the delivery
-            
-        Returns:
-            bool: True if delivery started successfully, False otherwise
-        """
-        # Retrieve entities
+        # Validate delivery unit
         delivery_unit = self.delivery_unit_repository.find_by_id(delivery_unit_id)
+        if not delivery_unit:
+            log_entity_not_found("DeliveryUnit", delivery_unit_id)
+            return
+        
+        # Validate driver
         driver = self.driver_repository.find_by_id(driver_id)
+        if not driver:
+            log_entity_not_found("Driver", driver_id)
+            return
         
-        if not delivery_unit or not driver:
-            print(f"Error: Could not find delivery unit {delivery_unit_id} or driver {driver_id}")
-            return False
-        
-        # Retrieve the delivery entity (order or pair)
+        # Validate delivery entity (order or pair)
         if entity_type == "order":
             entity = self.order_repository.find_by_id(entity_id)
             if not entity:
-                print(f"Error: Could not find order {entity_id}")
-                return False
-                
-            # Start the single order delivery process
-            self.env.process(self._single_order_delivery_process(driver, entity, delivery_unit))
-            
-        else:  # "pair"
+                log_entity_not_found("Order", entity_id)
+                return
+        else:  # entity_type == "pair"
             entity = self.pair_repository.find_by_id(entity_id)
             if not entity:
-                print(f"Error: Could not find pair {entity_id}")
-                return False
-                
+                log_entity_not_found("Pair", entity_id)
+                return
+        
+        # Pass fully validated entities to operation
+        self.start_delivery(driver, entity, delivery_unit)
+    
+    # === Operations (Business Logic) ===
+    
+    def start_delivery(self, driver, entity, delivery_unit):
+        """
+        Start the delivery process for a validated assignment.
+        
+        This operation focuses purely on business logic, assuming all entities
+        have been validated by the calling handler.
+        
+        Args:
+            driver: The validated Driver object
+            entity: The validated Order or Pair object
+            delivery_unit: The validated DeliveryUnit object
+            
+        Returns:
+            bool: True if delivery started successfully
+        """
+        # Determine entity type and start appropriate process
+        if hasattr(entity, 'order_id'):  # It's an order
+            # Start the single order delivery process
+            self.env.process(self._single_order_delivery_process(driver, entity, delivery_unit))
+        else:  # It's a pair
             # Start the pair delivery process
             self.env.process(self._pair_delivery_process(driver, entity, delivery_unit))
         
-        print(f"Started delivery process for {entity_type} {entity_id} by driver {driver_id} at time {self.env.now}")
+        print(f"Started delivery process for {'Order' if hasattr(entity, 'order_id') else 'Pair'} "
+              f"{entity.order_id if hasattr(entity, 'order_id') else entity.pair_id} "
+              f"by driver {driver.driver_id} at time {self.env.now}")
         return True
     
     # === SimPy Processes ===
