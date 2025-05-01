@@ -1,5 +1,7 @@
 from delivery_sim.entities.driver import Driver
 from delivery_sim.events.driver_events import DriverLoggedInEvent
+import numpy as np
+from scipy.stats import lognorm
 
 class DriverArrivalService:
     """
@@ -10,7 +12,7 @@ class DriverArrivalService:
     drivers log in.
     """
     
-    def __init__(self, env, event_dispatcher, driver_repository, config, id_generator):
+    def __init__(self, env, event_dispatcher, driver_repository, config, id_generator, operational_rng_manager):
         """
         Initialize the driver arrival service.
         
@@ -20,12 +22,18 @@ class DriverArrivalService:
             driver_repository: Repository for storing created drivers
             config: Configuration containing arrival rate parameters
             id_generator: Generator for unique driver IDs
+            operational_rng_manager: Manager for random number streams
         """
         self.env = env
         self.event_dispatcher = event_dispatcher
         self.driver_repository = driver_repository
         self.config = config
         self.id_generator = id_generator
+        
+        # Get all random streams at initialization time
+        self.arrival_stream = operational_rng_manager.get_stream('driver_arrivals')
+        self.location_stream = operational_rng_manager.get_stream('driver_initial_locations')
+        self.service_duration_stream = operational_rng_manager.get_stream('service_duration')
         
         # Start the arrival process
         self.process = env.process(self._arrival_process())
@@ -62,40 +70,62 @@ class DriverArrivalService:
             ))
             
             # Log for debugging
-            print(f"Driver {driver_id} logged in at time {self.env.now}")
+            print(f"Driver {driver_id} logged in at time {self.env.now}, service duration: {service_duration:.2f} minutes")
     
     def _generate_inter_arrival_time(self):
         """
-        Generate the time until the next driver arrival.
+        Generate the time until the next driver arrival using an exponential distribution.
         
-        In a complete implementation, this would use a random distribution.
+        This models arrivals as a Poisson process, which is standard for independent
+        arrivals in service systems.
         
         Returns:
             float: Time until next arrival in minutes
         """
-        # Placeholder: In a real implementation, this would use a distribution
-        return self.config.mean_driver_inter_arrival_time
+        return self.arrival_stream.exponential(self.config.mean_driver_inter_arrival_time)
     
     def _generate_initial_location(self):
         """
         Generate an initial location for a new driver.
         
-        In a complete implementation, this would use a spatial distribution.
+        This uses a uniform distribution across the delivery area.
+        In a more sophisticated model, this might use hotspots or other spatial distributions.
         
         Returns:
             list: [x, y] coordinates
         """
-        # Placeholder: In a real implementation, this would use a distribution
-        return [10, 10]
+        area_size = self.config.delivery_area_size
+        return self.location_stream.uniform(0, area_size, size=2).tolist()
     
     def _generate_service_duration(self):
         """
-        Generate a service duration for a new driver.
+        Generate a service duration for a new driver using a truncated lognormal distribution.
         
-        In a complete implementation, this would use a distribution.
+        Lognormal is a common distribution for service times as it:
+        1. Is always positive
+        2. Has a long right tail (some drivers work much longer than average)
+        3. Has more mass near the mean than exponential
+        
+        We truncate it to ensure values stay within reasonable bounds.
         
         Returns:
             float: Service duration in minutes
         """
-        # Placeholder: In a real implementation, this would use a distribution
-        return 120  # minutes
+        # Extract parameters from config
+        mean = self.config.mean_service_duration
+        std_dev = self.config.service_duration_std_dev
+        min_duration = self.config.min_service_duration
+        max_duration = self.config.max_service_duration
+        
+        # Calculate lognormal parameters
+        sigma_squared = np.log(1 + (std_dev / mean) ** 2)
+        sigma = np.sqrt(sigma_squared)
+        mu = np.log(mean) - sigma_squared / 2
+        
+        # Create distribution and calculate bounds
+        distribution = lognorm(s=sigma, scale=np.exp(mu))
+        cdf_lower = distribution.cdf(min_duration)
+        cdf_upper = distribution.cdf(max_duration)
+        
+        # Generate truncated lognormal using inverse CDF method
+        return distribution.ppf(self.service_duration_stream.uniform(cdf_lower, cdf_upper))
