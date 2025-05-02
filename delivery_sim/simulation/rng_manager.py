@@ -30,35 +30,6 @@ class StructuralRNGManager:
             Uniform random samples
         """
         return self.rng.uniform(low, high, size)
-    
-    def generate_normal(self, mean, std, size=None):
-        """
-        Generate normally distributed random numbers.
-        
-        Args:
-            mean: Mean of distribution
-            std: Standard deviation
-            size: Output shape (optional)
-            
-        Returns:
-            Normal random samples
-        """
-        return self.rng.normal(mean, std, size)
-    
-    def choice(self, items, size=None, replace=True, p=None):
-        """
-        Randomly select items from a list.
-        
-        Args:
-            items: Array-like containing items to choose from
-            size: Output shape (optional)
-            replace: Whether to sample with replacement
-            p: Probability weights for each item
-            
-        Returns:
-            Selected items
-        """
-        return self.rng.choice(items, size=size, replace=replace, p=p)
 
 class OperationalRNGManager:
     """
