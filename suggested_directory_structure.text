@@ -1,0 +1,135 @@
+food-delivery-simulation/               # Project root
+│
+├── delivery_sim/                       # Core simulation package
+│   ├── __init__.py
+│   ├── entities/                       # Domain entities
+│   │   ├── __init__.py
+│   │   ├── driver.py
+│   │   ├── order.py
+│   │   ├── pair.py
+│   │   ├── restaurant.py
+│   │   ├── delivery_unit.py
+│   │   └── states.py
+│   │
+│   ├── events/                         # Event system
+│   │   ├── __init__.py
+│   │   ├── base_events.py
+│   │   ├── order_events.py
+│   │   ├── driver_events.py
+│   │   ├── pair_events.py
+│   │   ├── delivery_unit_events.py
+│   │   └── event_dispatcher.py
+│   │
+│   ├── repositories/                   # Data storage
+│   │   ├── __init__.py
+│   │   ├── order_repository.py
+│   │   ├── driver_repository.py
+│   │   ├── pair_repository.py
+│   │   ├── restaurant_repository.py
+│   │   └── delivery_unit_repository.py
+│   │
+│   ├── services/                       # Business logic
+│   │   ├── __init__.py
+│   │   ├── order_arrival_service.py
+│   │   ├── driver_arrival_service.py
+│   │   ├── pairing_service.py
+│   │   ├── assignment_service.py
+│   │   ├── delivery_service.py
+│   │   └── driver_scheduling_service.py
+│   │
+│   ├── simulation/                     # Simulation infrastructure
+│   │   ├── __init__.py
+│   │   ├── configuration.py
+│   │   ├── simulation_runner.py
+│   │   └── rng_manager.py
+│   │
+│   └── utils/                          # Utility functions and helpers
+│       ├── __init__.py
+│       ├── id_generator.py
+│       ├── location_utils.py
+│       └── validation_utils.py
+│
+├── experiments/                        # Experimental components
+│   ├── __init__.py
+│   ├── design/                         # Experimental design
+│   │   ├── __init__.py
+│   │   ├── experiment_config.py
+│   │   ├── parameter_ranges.py
+│   │   └── sampling_strategies.py
+│   │
+│   ├── results/                        # Results processing
+│   │   ├── __init__.py
+│   │   ├── metrics_calculator.py
+│   │   ├── results_aggregator.py
+│   │   └── statistical_analyzer.py
+│   │
+│   ├── visualization/                  # Data visualization
+│   │   ├── __init__.py
+│   │   ├── spatial_visualizer.py
+│   │   ├── time_series_plotter.py
+│   │   └── performance_dashboard.py
+│   │
+│   └── runners/                        # Experiment runners
+│       ├── __init__.py
+│       ├── experiment_runner.py
+│       ├── sensitivity_analyzer.py
+│       └── parameter_sweep.py
+│
+├── examples/                           # Educational examples
+│   ├── run_basic_simulation.py
+│   ├── parameter_tuning_example.py
+│   ├── pairing_vs_single_comparison.py
+│   └── visualization_example.py
+│
+├── scripts/                            # Research workflow utilities
+│   ├── run_batch_experiments.py
+│   ├── aggregate_results.py
+│   ├── generate_report.py
+│   └── create_thesis_figures.py
+│
+├── tests/                              # Test suite
+│   ├── __init__.py
+│   ├── conftest.py                     # Shared pytest configuration
+│   ├── unit/                           # Unit tests
+│   │   ├── __init__.py
+│   │   ├── entities/
+│   │   ├── events/
+│   │   ├── repositories/
+│   │   ├── services/
+│   │   └── simulation/
+│   │
+│   ├── integration/                    # Integration tests
+│   │   ├── __init__.py
+│   │   ├── test_event_flow.py
+│   │   └── test_order_pairing.py
+│   │
+│   └── system/                         # System tests
+│       ├── __init__.py
+│       └── test_simulation_runner.py
+│
+├── docs/                               # Documentation
+│   ├── architecture.md
+│   ├── configuration.md
+│   ├── event_driven_approach.md
+│   ├── experiment_design.md
+│   └── images/
+│
+├── notebooks/                          # Jupyter notebooks for analysis
+│   ├── exploratory_analysis.ipynb
+│   ├── parameter_sensitivity.ipynb
+│   └── result_visualization.ipynb
+│
+├── data/                               # Data storage (gitignored)
+│   ├── .gitignore                      # Git ignore file specific to data
+│   ├── raw/                            # Raw simulation output
+│   ├── processed/                      # Processed results
+│   └── figures/                        # Generated figures
+│
+├── requirements.txt                    # Package dependencies
+├── setup.py                            # Package installation
+├── .gitignore                          # Git ignore file
+├── README.md                           # Project overview
+├── LICENSE                             # License information
+└── pyproject.toml                      # Project configuration
+
+
