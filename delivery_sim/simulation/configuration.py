@@ -121,14 +121,45 @@ class ExperimentConfig:
                 f"replications={self.num_replications}, "
                 f"master_seed={self.master_seed})")
 
+class LoggingConfig:
+    """Configuration for logging system behavior."""
+    
+    def __init__(self,
+                 console_level="INFO",      # Level for console output
+                 file_level="DEBUG",        # Level for file output
+                 log_to_file=False,         # Whether to log to file
+                 log_dir="logs",            # Directory for log files
+                 log_file=None,             # Specific log file name (optional)
+                 component_levels=None):    # Dict of component-specific levels
+        
+        # Convert string levels to numeric values if needed
+        from delivery_sim.utils.logging_system import get_level_from_name
+        self.console_level = (get_level_from_name(console_level) 
+                             if isinstance(console_level, str) 
+                             else console_level)
+        self.file_level = (get_level_from_name(file_level) 
+                          if isinstance(file_level, str) 
+                          else file_level)
+        self.log_to_file = log_to_file
+        self.log_dir = log_dir
+        self.log_file = log_file
+        self.component_levels = component_levels or {}
+        
+        # If component_levels contains string levels, convert them
+        if component_levels:
+            for component, level in list(self.component_levels.items()):
+                if isinstance(level, str):
+                    self.component_levels[component] = get_level_from_name(level)
 
 class SimulationConfig:
     """Complete configuration for a simulation experiment."""
     
-    def __init__(self, structural_config, operational_config, experiment_config):
+    def __init__(self, structural_config, operational_config, 
+                 experiment_config, logging_config=None):
         self.structural_config = structural_config
         self.operational_config = operational_config
         self.experiment_config = experiment_config
+        self.logging_config = logging_config or LoggingConfig()
     
     def __str__(self):
         """String representation for debugging and logging."""
