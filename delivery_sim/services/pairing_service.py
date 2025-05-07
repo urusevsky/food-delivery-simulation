@@ -4,6 +4,7 @@ from delivery_sim.entities.pair import Pair
 from delivery_sim.entities.states import OrderState
 from delivery_sim.utils.location_utils import calculate_distance, locations_are_equal
 from delivery_sim.utils.validation_utils import log_entity_not_found
+from delivery_sim.utils.logging_system import get_logger
 
 class PairingService:
     """
@@ -16,21 +17,24 @@ class PairingService:
     def __init__(self, env, event_dispatcher, order_repository, pair_repository, config):
         """
         Initialize the pairing service with its dependencies.
-        
-        Args:
-            env: SimPy environment
-            event_dispatcher: Central event dispatcher
-            order_repository: Repository for accessing orders
-            pair_repository: Repository for storing created pairs
-            config: Configuration containing pairing parameters
         """
+        # Get a logger instance specific to this component
+        self.logger = get_logger("service.pairing")
+        
+        # Store dependencies
         self.env = env
         self.event_dispatcher = event_dispatcher
         self.order_repository = order_repository
         self.pair_repository = pair_repository
         self.config = config
         
-        # Register for events this service handles
+        # Log service initialization with simulation time
+        self.logger.info(f"[t={self.env.now:.2f}] PairingService initialized with configuration: "
+                        f"restaurant_threshold={config.restaurants_proximity_threshold}km, "
+                        f"customer_threshold={config.customers_proximity_threshold}km")
+        
+        # Register for events and log with simulation time
+        self.logger.simulation_event(f"[t={self.env.now:.2f}] Registering handler for OrderCreatedEvent")
         self.event_dispatcher.register(OrderCreatedEvent, self.handle_order_created)
     
     # ===== Event Handlers =====
@@ -45,13 +49,17 @@ class PairingService:
         Args:
             event: The OrderCreatedEvent
         """
+        # Log event handling with simulation time
+        self.logger.simulation_event(f"[t={self.env.now:.2f}] Handling OrderCreatedEvent for order {event.order_id}")
+        
         # Extract identifiers from event
         order_id = event.order_id
         
-        # Validate order exists
+        # Validate order exists - follow Entry-Point Validation pattern
         new_order = self.order_repository.find_by_id(order_id)
         if not new_order:
-            log_entity_not_found(self.__class__.__name__, "Order", order_id, self.env.now)
+            # Log validation failure with simulation time
+            self.logger.validation(f"[t={self.env.now:.2f}] Order {order_id} not found, cannot attempt pairing")
             return
         
         # Pass validated entity to operation
@@ -62,20 +70,24 @@ class PairingService:
     def attempt_pairing(self, new_order):
         """
         Try to pair the new order with an existing order.
-        
-        This operation assumes the new_order has been validated by the handler
-        and focuses purely on business logic.
-        
-        Args:
-            new_order: The validated Order object to attempt pairing for
-            
-        Returns:
-            bool: True if pairing succeeded, False otherwise
         """
+        # Log operation start with simulation time
+        self.logger.debug(f"[t={self.env.now:.2f}] Attempting to pair order {new_order.order_id}")
+        
         # Find potential candidates for pairing
         candidates = self.find_pairing_candidates(new_order)
+        
+        # Log candidate results with simulation time
+        self.logger.debug(f"[t={self.env.now:.2f}] Found {len(candidates)} potential pairing candidates for order {new_order.order_id}")
+        
         if not candidates:
-            # Business outcome: No suitable pairing candidates found
+            # Log business outcome with simulation time
+            self.logger.info(f"[t={self.env.now:.2f}] No pairing candidates found for order {new_order.order_id}")
+            
+            # Log event dispatch with simulation time
+            self.logger.simulation_event(f"[t={self.env.now:.2f}] Dispatching PairingFailedEvent for order {new_order.order_id}")
+            
+            # Dispatch event
             self.event_dispatcher.dispatch(PairingFailedEvent(
                 timestamp=self.env.now,
                 order_id=new_order.order_id
@@ -85,22 +97,24 @@ class PairingService:
         # Find the best match among candidates
         best_match, best_sequence, best_cost = self.calculate_best_match(new_order, candidates)
         
+        # Log match selection with simulation time
+        self.logger.debug(f"[t={self.env.now:.2f}] Selected best match for order {new_order.order_id}: "
+                          f"order {best_match.order_id} with cost {best_cost:.2f}")
+        
+        # Log business outcome with simulation time
+        self.logger.info(f"[t={self.env.now:.2f}] Pairing order {new_order.order_id} with order {best_match.order_id}")
+        
         # Form the pair with the best match
-        self.form_pair(new_order, best_match, best_sequence, best_cost)
-        return True
+        pair = self.form_pair(new_order, best_match, best_sequence, best_cost)
+        return pair
     
     def find_pairing_candidates(self, new_order):
         """
         Find orders that meet proximity criteria for pairing.
-        
-        Args:
-            new_order: The order to find candidates for
-            
-        Returns:
-            list: Orders that meet proximity criteria
         """
-        # Get all unassigned single orders
+        # Get all unassigned single orders - log with simulation time
         all_singles = self.order_repository.find_unassigned_orders()
+        self.logger.debug(f"[t={self.env.now:.2f}] Evaluating {len(all_singles)} unassigned orders as potential pairing candidates")
         
         # Filter out the new order itself
         potential_candidates = [
@@ -109,28 +123,34 @@ class PairingService:
         ]
         
         # Apply proximity filters
-        return [
+        candidates = [
             candidate for candidate in potential_candidates
             if self._check_proximity_constraints(new_order, candidate)
         ]
+        
+        # Log detailed filter results with simulation time
+        self.logger.debug(f"[t={self.env.now:.2f}] After proximity filtering: {len(candidates)} candidates remain")
+        
+        return candidates
     
     def calculate_best_match(self, new_order, candidates):
         """
         Find the best order to pair with and the optimal delivery sequence.
-        
-        Args:
-            new_order: The new order to pair
-            candidates: List of potential pairing candidates
-            
-        Returns:
-            tuple: (best_candidate, best_sequence, best_cost) for the optimal pairing
         """
+        # Log method entry with simulation time
+        self.logger.debug(f"[t={self.env.now:.2f}] Calculating best match for order {new_order.order_id} among {len(candidates)} candidates")
+        
         best_candidate = None
         best_sequence = None
         best_cost = float('inf')
         
         for candidate in candidates:
+            # Evaluate this candidate
             sequence, cost = self.evaluate_sequences(new_order, candidate)
+            
+            # Log individual evaluation with simulation time
+            self.logger.debug(f"[t={self.env.now:.2f}] Evaluated candidate {candidate.order_id}: cost={cost:.2f}")
+            
             if cost < best_cost:
                 best_cost = cost
                 best_sequence = sequence
@@ -141,15 +161,6 @@ class PairingService:
     def form_pair(self, order1, order2, sequence, cost):
         """
         Create a pair from two orders and update their state.
-        
-        Args:
-            order1: First order in the pair
-            order2: Second order in the pair
-            sequence: Optimal delivery sequence for this pair
-            cost: Total delivery cost for this pair
-            
-        Returns:
-            Pair: The newly created pair
         """
         # Create the pair entity
         pair = Pair(order1, order2, self.env.now)
@@ -159,9 +170,12 @@ class PairingService:
         # Add to repository
         self.pair_repository.add(pair)
         
-        # Update order states
+        # Update order states - assuming transition_to logs its own actions
         order1.transition_to(OrderState.PAIRED, self.event_dispatcher, self.env)
         order2.transition_to(OrderState.PAIRED, self.event_dispatcher, self.env)
+        
+        # Log event dispatch with simulation time
+        self.logger.simulation_event(f"[t={self.env.now:.2f}] Dispatching PairCreatedEvent for pair {pair.pair_id}")
         
         # Dispatch pair created event
         self.event_dispatcher.dispatch(PairCreatedEvent(
@@ -171,8 +185,8 @@ class PairingService:
             order2_id=order2.order_id
         ))
         
-        # Log for debugging
-        print(f"Formed pair {pair.pair_id} at time {self.env.now}")
+        # Log detailed pair formation with simulation time
+        self.logger.info(f"[t={self.env.now:.2f}] Formed pair {pair.pair_id} with optimal cost {cost:.2f}")
         
         return pair
     
@@ -189,6 +203,10 @@ class PairingService:
         Returns:
             tuple: (best_sequence, best_cost) for the optimal delivery sequence
         """
+
+        # Detailed sequence evaluation - log with simulation time
+        self.logger.debug(f"[t={self.env.now:.2f}] Evaluating delivery sequences for orders {order1.order_id} and {order2.order_id}")
+
         sequences = []
         same_restaurant = locations_are_equal(
             order1.restaurant_location, 
@@ -234,7 +252,10 @@ class PairingService:
             if cost < best_cost:
                 best_cost = cost
                 best_sequence = seq
-        
+
+        # Log sequence selection with simulation time
+        self.logger.debug(f"[t={self.env.now:.2f}] Selected best sequence with cost {best_cost:.2f}")
+                
         return best_sequence, best_cost
     
     def calculate_travel_distance(self, sequence):
@@ -263,14 +284,20 @@ class PairingService:
         Returns:
             bool: True if orders meet proximity criteria, False otherwise
         """
-        restaurant_distance = calculate_distance(
+        # Calculate distances
+        restaurant_distance = self._calculate_distance(
             order1.restaurant_location,
             order2.restaurant_location
         )
-        customer_distance = calculate_distance(
+        customer_distance = self._calculate_distance(
             order1.customer_location,
             order2.customer_location
         )
+        
+        # Log constraint check with simulation time (very detailed)
+        self.logger.debug(f"[t={self.env.now:.2f}] Proximity check for orders {order1.order_id}-{order2.order_id}: "
+                          f"restaurant_distance={restaurant_distance:.2f}km, threshold={self.config.restaurants_proximity_threshold}km, "
+                          f"customer_distance={customer_distance:.2f}km, threshold={self.config.customers_proximity_threshold}km")
         
         return (restaurant_distance <= self.config.restaurants_proximity_threshold and
                 customer_distance <= self.config.customers_proximity_threshold)
