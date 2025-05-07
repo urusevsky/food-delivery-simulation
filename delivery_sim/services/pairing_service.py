@@ -78,7 +78,7 @@ class PairingService:
         candidates = self.find_pairing_candidates(new_order)
         
         # Log candidate results with simulation time
-        self.logger.debug(f"[t={self.env.now:.2f}] Found {len(candidates)} potential pairing candidates for order {new_order.order_id}")
+        self.logger.debug(f"[t={self.env.now:.2f}] Found {len(candidates)} qualified pairing candidates for order {new_order.order_id}")
         
         if not candidates:
             # Log business outcome with simulation time
