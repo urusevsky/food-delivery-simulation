@@ -14,6 +14,7 @@ from delivery_sim.services.assignment_service import AssignmentService
 from delivery_sim.services.delivery_service import DeliveryService
 from delivery_sim.services.driver_scheduling_service import DriverSchedulingService
 from delivery_sim.utils.id_generator import SequentialIdGenerator
+from delivery_sim.utils.logging_system import get_logger, configure_logging
 
 
 class FlatConfig:
@@ -48,6 +49,9 @@ class SimulationRunner:
     appropriately, and running the simulation for the specified duration.
     """
     def __init__(self, config):
+        # Get a logger instance specific to this component
+        self.logger = get_logger("simulation.runner")
+        
         # Store the hierarchical configuration
         self.config = config
         
@@ -57,6 +61,13 @@ class SimulationRunner:
             config.operational_config,
             config.experiment_config
         )
+        
+        # Configure logging based on config
+        if hasattr(config, 'logging_config'):
+            configure_logging(config.logging_config)
+        
+        # Log initialization
+        self.logger.info("SimulationRunner initialized")
         
         # Structural component containers (constant across replications)
         self.id_generators = {}
@@ -83,82 +94,113 @@ class SimulationRunner:
         Returns:
             SimulationRunner: self for method chaining
         """
+        self.logger.info("Beginning simulation initialization")
+        
         # First initialize structural components
         self.initialize_structural_components()
         
         # Then initialize operational components
         self.initialize_operational_components()
         
-        print("Simulation initialization complete.")
+        self.logger.info("Simulation initialization complete")
         return self
     
     def initialize_structural_components(self):
         """Initialize components that remain constant across replications."""
+        self.logger.info("Initializing structural components")
+        
         # Initialize ID generators
         self.id_generators = self._setup_id_generators()
         
         # Initialize structural random number generator
-        self.structural_rng = self._setup_structural_rng()
+        structural_seed = self.config.experiment_config.generate_structural_seed()
+        self.structural_rng = StructuralRNGManager(structural_seed)
+        self.logger.debug(f"Using structural seed: {structural_seed}")
         
-        # Initialize restaurant repository - this creates the fixed 
-        # geographical infrastructure that remains constant across replications
+        # Initialize restaurant repository
         self.restaurant_repository = RestaurantRepository()
         
-        # Generate restaurant infrastructure - this creates the actual
-        # restaurant entities at their geographic locations
+        # Generate restaurant infrastructure
         self._setup_restaurant_infrastructure()
         
-        print("Structural components initialized.")
+        self.logger.info("Structural components initialization complete")
         return self
     
     def initialize_operational_components(self, replication_number=0):
         """Initialize components that change with each replication."""
-        # Create fresh SimPy environment
-        self.env = simpy.Environment()
+        self.logger.info(f"Initializing operational components for replication {replication_number}")
         
-        # Create fresh event dispatcher
+        # Create SimPy environment and event dispatcher
+        self.env = simpy.Environment()
         self.event_dispatcher = EventDispatcher()
         
         # Set up operational random number generator
-        self.operational_rng = self._setup_operational_rng(replication_number)
+        operational_base_seed = self.config.experiment_config.generate_operational_base_seed()
+        self.operational_rng = OperationalRNGManager(operational_base_seed, replication_number)
+        self.logger.debug(f"Using operational base seed: {operational_base_seed} for replication {replication_number}")
         
-        # Initialize repositories (except restaurant which is preserved)
+        # Initialize repositories
         self.repositories = self._setup_repositories()
         
         # Initialize services
         self.services = self._setup_services()
         
-        print(f"Operational components initialized for replication {replication_number}.")
+        self.logger.info(f"Operational components initialization complete for replication {replication_number}")
         return self
     
     def run(self):
         """Run the simulation for the configured duration."""
-        print(f"Starting simulation run for {self.config.experiment_config.simulation_duration} minutes")
+        duration = self.config.experiment_config.simulation_duration
+        self.logger.info(f"Starting simulation run for {duration} minutes")
         
         # Run the simulation
-        self.env.run(until=self.config.experiment_config.simulation_duration)
+        self.env.run(until=duration)
         
-        print(f"Simulation completed")
+        # Log final simulation time to mark completion
+        self.logger.info(f"Simulation completed after {self.env.now:.2f} minutes")
+        
+        # Log summary statistics
+        self._log_simulation_summary()
         
         return self.repositories
     
+    def _log_simulation_summary(self):
+        """Log summary statistics of the simulation run."""
+        # Order statistics
+        orders = self.order_repository.find_all()
+        completed_orders = len([o for o in orders if o.state == 'delivered'])
+        total_orders = len(orders)
+        
+        # Driver statistics
+        drivers = self.driver_repository.find_all()
+        total_drivers = len(drivers)
+        
+        # Pair statistics if pairing enabled
+        if self.config.operational_config.pairing_enabled:
+            pairs = self.pair_repository.find_all()
+            completed_pairs = len([p for p in pairs if p.state == 'completed'])
+            total_pairs = len(pairs)
+            pair_ratio = len(pairs) / len(orders) if orders else 0
+            
+            self.logger.info(f"Simulation summary: "
+                          f"{completed_orders}/{total_orders} orders completed, "
+                          f"{completed_pairs}/{total_pairs} pairs completed, "
+                          f"pair ratio: {pair_ratio:.2f}, "
+                          f"total drivers: {total_drivers}")
+        else:
+            self.logger.info(f"Simulation summary: "
+                          f"{completed_orders}/{total_orders} orders completed, "
+                          f"total drivers: {total_drivers}")
+    
     def _setup_id_generators(self):
         """Set up ID generators for each entity type."""
-        return {
+        id_generators = {
             'order': SequentialIdGenerator(1),
             'driver': SequentialIdGenerator(1),
             'restaurant': SequentialIdGenerator(1)
         }
-    
-    def _setup_structural_rng(self):
-        """Set up the random number generator for structural elements."""
-        structural_seed = self.config.experiment_config.generate_structural_seed()
-        return StructuralRNGManager(structural_seed)
-    
-    def _setup_operational_rng(self, replication_number=0):
-        """Set up the random number generator for operational processes."""
-        operational_base_seed = self.config.experiment_config.generate_operational_base_seed()
-        return OperationalRNGManager(operational_base_seed, replication_number=replication_number)
+        self.logger.debug(f"Created ID generators for: {', '.join(id_generators.keys())}")
+        return id_generators
     
     def _setup_repositories(self):
         """
@@ -168,20 +210,25 @@ class SimulationRunner:
         structural initialization while creating fresh repositories for dynamic
         entities that change with each replication.
         """
-        return {
-            # Reuse existing restaurant repository to maintain constant
-            # geographical layout across replications - this ensures that
-            # differences between replications are due to operational
-            # randomness, not structural differences
+        # Store repositories for convenient access (used in _log_simulation_summary)
+        repositories = {
+            # Reuse existing restaurant repository
             'restaurant': self.restaurant_repository,
             
-            # Create fresh repositories for dynamic entities that should
-            # be generated anew for each replication
+            # Create fresh repositories for dynamic entities
             'order': OrderRepository(),
             'driver': DriverRepository(),
             'pair': PairRepository(),
             'delivery_unit': DeliveryUnitRepository()
         }
+        
+        # Store direct references for easier access in summary logging
+        self.order_repository = repositories['order']
+        self.driver_repository = repositories['driver']
+        self.pair_repository = repositories['pair']
+        
+        self.logger.debug(f"Initialized repositories: {', '.join(repositories.keys())}")
+        return repositories
     
     def _setup_restaurant_infrastructure(self):
         """
@@ -190,6 +237,8 @@ class SimulationRunner:
         # Extract parameters from config
         area_size = self.config.structural_config.delivery_area_size
         num_restaurants = self.config.structural_config.num_restaurants
+        
+        self.logger.info(f"Creating {num_restaurants} restaurants in delivery area of {area_size}x{area_size} km")
         
         # Generate random restaurant locations
         restaurants = []
@@ -204,34 +253,58 @@ class SimulationRunner:
             self.restaurant_repository.add(restaurant)
             restaurants.append(restaurant)
         
-        print(f"Created {num_restaurants} restaurants with uniform random distribution")
-        
+        self.logger.info(f"Created {num_restaurants} restaurants with uniform random distribution")
         return restaurants
     
     def _setup_services(self):
         """Initialize and connect all services."""
-        services = {}
-        
-        # Create order arrival service
-        services['order_arrival'] = OrderArrivalService(
-            env=self.env,
-            event_dispatcher=self.event_dispatcher,
-            order_repository=self.repositories['order'],
-            restaurant_repository=self.repositories['restaurant'],
-            config=self.flat_config,
-            id_generator=self.id_generators['order'],
-            operational_rng_manager=self.operational_rng
-        )
-        
-        # Create driver arrival service
-        services['driver_arrival'] = DriverArrivalService(
-            env=self.env,
-            event_dispatcher=self.event_dispatcher,
-            driver_repository=self.repositories['driver'],
-            config=self.flat_config,
-            id_generator=self.id_generators['driver'],
-            operational_rng_manager=self.operational_rng
-        )
+        # Create core services
+        services = {
+            'order_arrival': OrderArrivalService(
+                env=self.env,
+                event_dispatcher=self.event_dispatcher,
+                order_repository=self.repositories['order'],
+                restaurant_repository=self.repositories['restaurant'],
+                config=self.flat_config,
+                id_generator=self.id_generators['order'],
+                operational_rng_manager=self.operational_rng
+            ),
+            
+            'driver_arrival': DriverArrivalService(
+                env=self.env,
+                event_dispatcher=self.event_dispatcher,
+                driver_repository=self.repositories['driver'],
+                config=self.flat_config,
+                id_generator=self.id_generators['driver'],
+                operational_rng_manager=self.operational_rng
+            ),
+            
+            'assignment': AssignmentService(
+                env=self.env,
+                event_dispatcher=self.event_dispatcher,
+                order_repository=self.repositories['order'],
+                driver_repository=self.repositories['driver'],
+                pair_repository=self.repositories['pair'],
+                delivery_unit_repository=self.repositories['delivery_unit'],
+                config=self.flat_config
+            ),
+            
+            'delivery': DeliveryService(
+                env=self.env,
+                event_dispatcher=self.event_dispatcher,
+                driver_repository=self.repositories['driver'],
+                order_repository=self.repositories['order'],
+                pair_repository=self.repositories['pair'],
+                delivery_unit_repository=self.repositories['delivery_unit'],
+                config=self.flat_config
+            ),
+            
+            'driver_scheduling': DriverSchedulingService(
+                env=self.env,
+                event_dispatcher=self.event_dispatcher,
+                driver_repository=self.repositories['driver']
+            )
+        }
         
         # Create pairing service if enabled
         if self.config.operational_config.pairing_enabled:
@@ -243,35 +316,8 @@ class SimulationRunner:
                 config=self.flat_config
             )
         
-        # Create assignment service
-        services['assignment'] = AssignmentService(
-            env=self.env,
-            event_dispatcher=self.event_dispatcher,
-            order_repository=self.repositories['order'],
-            driver_repository=self.repositories['driver'],
-            pair_repository=self.repositories['pair'],
-            delivery_unit_repository=self.repositories['delivery_unit'],
-            config=self.flat_config
-        )
-        
-        # Create delivery service
-        services['delivery'] = DeliveryService(
-            env=self.env,
-            event_dispatcher=self.event_dispatcher,
-            driver_repository=self.repositories['driver'],
-            order_repository=self.repositories['order'],
-            pair_repository=self.repositories['pair'],
-            delivery_unit_repository=self.repositories['delivery_unit'],
-            config=self.flat_config
-        )
-        
-        # Create driver scheduling service
-        services['driver_scheduling'] = DriverSchedulingService(
-            env=self.env,
-            event_dispatcher=self.event_dispatcher,
-            driver_repository=self.repositories['driver']
-        )
-        
-        print(f"Initialized {len(services)} services")
+        # Log services created
+        pairing_status = "with pairing" if self.config.operational_config.pairing_enabled else "without pairing"
+        self.logger.info(f"Initialized {len(services)} services {pairing_status}")
         
         return services
