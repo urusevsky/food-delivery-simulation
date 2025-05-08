@@ -2,6 +2,7 @@ from delivery_sim.entities.states import OrderState, DriverState, DeliveryUnitSt
 from delivery_sim.events.delivery_unit_events import DeliveryUnitCompletedEvent, DeliveryUnitAssignedEvent
 from delivery_sim.utils.location_utils import calculate_distance, locations_are_equal
 from delivery_sim.utils.validation_utils import log_entity_not_found
+from delivery_sim.utils.logging_system import get_logger
 
 
 class DeliveryService:
@@ -27,6 +28,10 @@ class DeliveryService:
             delivery_unit_repository: Repository for accessing delivery units
             config: Configuration containing delivery parameters
         """
+        # Get a logger instance specific to this component
+        self.logger = get_logger("service.delivery")
+        
+        # Store dependencies
         self.env = env
         self.event_dispatcher = event_dispatcher
         self.driver_repository = driver_repository
@@ -35,7 +40,11 @@ class DeliveryService:
         self.delivery_unit_repository = delivery_unit_repository
         self.config = config
         
+        # Log service initialization with configuration details
+        self.logger.info(f"[t={self.env.now:.2f}] DeliveryService initialized with driver_speed={config.driver_speed} km/min")
+        
         # Register for assignment events
+        self.logger.simulation_event(f"[t={self.env.now:.2f}] Registering handler for DeliveryUnitAssignedEvent")
         event_dispatcher.register(DeliveryUnitAssignedEvent, self.handle_delivery_assigned)
     
     # === Event Handlers (Entry Points) ===
@@ -50,6 +59,9 @@ class DeliveryService:
         Args:
             event: The DeliveryUnitAssignedEvent
         """
+        # Log event handling
+        self.logger.simulation_event(f"[t={self.env.now:.2f}] Handling DeliveryUnitAssignedEvent for unit {event.delivery_unit_id}")
+        
         # Extract identifiers from event
         delivery_unit_id = event.delivery_unit_id
         entity_type = event.entity_type  # "order" or "pair"
@@ -59,25 +71,25 @@ class DeliveryService:
         # Validate delivery unit
         delivery_unit = self.delivery_unit_repository.find_by_id(delivery_unit_id)
         if not delivery_unit:
-            log_entity_not_found("DeliveryUnit", delivery_unit_id)
+            self.logger.validation(f"[t={self.env.now:.2f}] DeliveryUnit {delivery_unit_id} not found, cannot start delivery")
             return
         
         # Validate driver
         driver = self.driver_repository.find_by_id(driver_id)
         if not driver:
-            log_entity_not_found("Driver", driver_id)
+            self.logger.validation(f"[t={self.env.now:.2f}] Driver {driver_id} not found, cannot start delivery")
             return
         
         # Validate delivery entity (order or pair)
         if entity_type == "order":
             entity = self.order_repository.find_by_id(entity_id)
             if not entity:
-                log_entity_not_found("Order", entity_id)
+                self.logger.validation(f"[t={self.env.now:.2f}] Order {entity_id} not found, cannot start delivery")
                 return
         else:  # entity_type == "pair"
             entity = self.pair_repository.find_by_id(entity_id)
             if not entity:
-                log_entity_not_found("Pair", entity_id)
+                self.logger.validation(f"[t={self.env.now:.2f}] Pair {entity_id} not found, cannot start delivery")
                 return
         
         # Pass fully validated entities to operation
@@ -103,14 +115,13 @@ class DeliveryService:
         # Determine entity type and start appropriate process
         if hasattr(entity, 'order_id'):  # It's an order
             # Start the single order delivery process
+            self.logger.info(f"[t={self.env.now:.2f}] Starting single order delivery process for order {entity.order_id} by driver {driver.driver_id}")
             self.env.process(self._single_order_delivery_process(driver, entity, delivery_unit))
         else:  # It's a pair
             # Start the pair delivery process
+            self.logger.info(f"[t={self.env.now:.2f}] Starting paired delivery process for pair {entity.pair_id} by driver {driver.driver_id}")
             self.env.process(self._pair_delivery_process(driver, entity, delivery_unit))
         
-        print(f"Started delivery process for {'Order' if hasattr(entity, 'order_id') else 'Pair'} "
-              f"{entity.order_id if hasattr(entity, 'order_id') else entity.pair_id} "
-              f"by driver {driver.driver_id} at time {self.env.now}")
         return True
     
     # === SimPy Processes ===
@@ -136,6 +147,7 @@ class DeliveryService:
         
         # Step 1: Travel to restaurant
         travel_time = self._calculate_travel_time(current_location, order.restaurant_location)
+        self.logger.debug(f"[t={self.env.now:.2f}] Driver {driver.driver_id} traveling to restaurant for order {order.order_id}, ETA: {self.env.now + travel_time:.2f}")
         yield self.env.timeout(travel_time)
         
         # Process pickup
@@ -145,10 +157,11 @@ class DeliveryService:
         
         # Update order state and log
         order.transition_to(OrderState.PICKED_UP, self.event_dispatcher, self.env)
-        print(f"Driver {driver.driver_id} picked up Order {order.order_id} from restaurant at time {self.env.now}")
+        self.logger.info(f"[t={self.env.now:.2f}] Driver {driver.driver_id} picked up Order {order.order_id} from restaurant at time {self.env.now}")
         
         # Step 2: Travel to customer
         travel_time = self._calculate_travel_time(current_location, order.customer_location)
+        self.logger.debug(f"[t={self.env.now:.2f}] Driver {driver.driver_id} traveling to customer for order {order.order_id}, ETA: {self.env.now + travel_time:.2f}")
         yield self.env.timeout(travel_time)
         
         # Process delivery
@@ -158,7 +171,7 @@ class DeliveryService:
         
         # Update order state and log
         order.transition_to(OrderState.DELIVERED, self.event_dispatcher, self.env)
-        print(f"Driver {driver.driver_id} delivered Order {order.order_id} to customer at time {self.env.now}")
+        self.logger.info(f"[t={self.env.now:.2f}] Driver {driver.driver_id} delivered Order {order.order_id} to customer at time {self.env.now}")
         
         # Complete delivery unit
         self._complete_delivery_unit(driver, delivery_unit)
@@ -178,10 +191,17 @@ class DeliveryService:
         # Get current location
         current_location = driver.location
         
+        # Log the delivery sequence
+        sequence_description = self._generate_sequence_description(pair.optimal_sequence)
+        self.logger.debug(f"[t={self.env.now:.2f}] Following delivery sequence for pair {pair.pair_id}: {sequence_description}")
+        
         # Follow the optimal sequence determined during pair formation
-        for stop in pair.optimal_sequence:
+        for i, stop in enumerate(pair.optimal_sequence):
             # Travel to the next stop
             travel_time = self._calculate_travel_time(current_location, stop)
+            next_stop_index = i + 1
+            self.logger.debug(f"[t={self.env.now:.2f}] Driver {driver.driver_id} traveling to stop {i+1}/{len(pair.optimal_sequence)} " 
+                              f"for pair {pair.pair_id}, ETA: {self.env.now + travel_time:.2f}")
             yield self.env.timeout(travel_time)
             
             # Update driver location
@@ -207,6 +227,8 @@ class DeliveryService:
             pair: The pair being delivered
             location: The current stop location
         """
+        self.logger.debug(f"[t={self.env.now:.2f}] Driver {driver.driver_id} arrived at location {location} for pair {pair.pair_id}")
+        
         # Check if this is a restaurant location
         for order in [pair.order1, pair.order2]:
             if locations_are_equal(location, order.restaurant_location):
@@ -217,8 +239,8 @@ class DeliveryService:
                 pair.record_order_pickup(order.order_id)
                 
                 # Log pickup with pair context
-                print(f"Driver {driver.driver_id} picked up Order {order.order_id} (of Pair {pair.pair_id}) "
-                      f"from restaurant at time {self.env.now}")
+                self.logger.info(f"[t={self.env.now:.2f}] Driver {driver.driver_id} picked up Order {order.order_id} (of Pair {pair.pair_id}) "
+                               f"from restaurant at time {self.env.now}")
         
         # Check if this is a customer location
         for order in [pair.order1, pair.order2]:
@@ -230,11 +252,11 @@ class DeliveryService:
                 is_complete = pair.record_order_delivery(order.order_id)
                 
                 # Log delivery with pair context
-                print(f"Driver {driver.driver_id} delivered Order {order.order_id} (of Pair {pair.pair_id}) "
-                      f"to customer at time {self.env.now}")
+                self.logger.info(f"[t={self.env.now:.2f}] Driver {driver.driver_id} delivered Order {order.order_id} (of Pair {pair.pair_id}) "
+                               f"to customer at time {self.env.now}")
                 
                 if is_complete:
-                    print(f"All orders in Pair {pair.pair_id} have been delivered")
+                    self.logger.info(f"[t={self.env.now:.2f}] All orders in Pair {pair.pair_id} have been delivered")
     
     def _complete_delivery_unit(self, driver, delivery_unit):
         """
@@ -249,6 +271,7 @@ class DeliveryService:
             delivery_unit: The delivery unit to complete
         """
         # Update delivery unit state
+        self.logger.info(f"[t={self.env.now:.2f}] Completing delivery unit {delivery_unit.unit_id}")
         delivery_unit.transition_to(DeliveryUnitState.COMPLETED, self.event_dispatcher, self.env)
         
         # Add to driver's completed deliveries
@@ -258,14 +281,12 @@ class DeliveryService:
         driver.transition_to(DriverState.AVAILABLE, self.event_dispatcher, self.env)
         
         # Dispatch completion event - this is the main event other services listen for
+        self.logger.simulation_event(f"[t={self.env.now:.2f}] Dispatching DeliveryUnitCompletedEvent for unit {delivery_unit.unit_id}")
         self.event_dispatcher.dispatch(DeliveryUnitCompletedEvent(
             timestamp=self.env.now,
             delivery_unit_id=delivery_unit.unit_id,
             driver_id=driver.driver_id
         ))
-        
-        # Log for debugging
-        print(f"Driver {driver.driver_id} completed delivery unit {delivery_unit.unit_id} at time {self.env.now}")
     
     # === Utility Methods ===
     
@@ -283,5 +304,18 @@ class DeliveryService:
         distance = calculate_distance(origin, destination)
         # Use speed from config or default value
         speed = getattr(self.config, 'driver_speed', 0.5)  # km per minute
-        return distance / speed
+        travel_time = distance / speed
+        self.logger.debug(f"[t={self.env.now:.2f}] Calculated travel time: {travel_time:.2f} min for distance: {distance:.2f} km at speed: {speed} km/min")
+        return travel_time
     
+    def _generate_sequence_description(self, sequence):
+        """
+        Generate a human-readable description of a delivery sequence.
+        
+        Args:
+            sequence: List of location coordinates
+            
+        Returns:
+            str: Description of the sequence
+        """
+        return " -> ".join([f"[{loc[0]:.2f}, {loc[1]:.2f}]" for loc in sequence])

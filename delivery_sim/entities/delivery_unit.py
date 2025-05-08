@@ -1,5 +1,6 @@
 from delivery_sim.entities.states import DeliveryUnitState
 from delivery_sim.events.delivery_unit_events import DeliveryUnitStateChangedEvent
+from delivery_sim.utils.logging_system import get_logger
 
 class DeliveryUnit:
     """
@@ -18,6 +19,9 @@ class DeliveryUnit:
             driver: The Driver performing the delivery
             assignment_time: When this assignment was made
         """
+        # Get a logger instance
+        self.logger = get_logger("entity.delivery_unit")
+        
         # Core relationships
         self.delivery_entity = delivery_entity
         self.driver = driver
@@ -43,6 +47,9 @@ class DeliveryUnit:
             "age_discount": None,     # Discount for waiting time
             "adjusted_cost": None     # Final cost used in decision
         }
+        
+        # Log creation
+        self.logger.debug(f"DeliveryUnit {self.unit_id} created at time {assignment_time}")
     
     def can_transition_to(self, new_state):
         """
@@ -75,10 +82,16 @@ class DeliveryUnit:
         Raises:
             ValueError: If transition is invalid
         """
+        # Validate transition
         if not self.can_transition_to(new_state):
-            raise ValueError(
-                f"Cannot transition delivery unit {self.unit_id} from {self.state} to {new_state}"
-            )
+            # Log validation failure - with or without timestamp
+            if env:
+                self.logger.validation(f"[t={env.now:.2f}] Cannot transition delivery unit {self.unit_id} from {self.state} to {new_state}")
+            else:
+                self.logger.validation(f"Cannot transition delivery unit {self.unit_id} from {self.state} to {new_state}")
+                
+            # Also raise exception to prevent invalid state
+            raise ValueError(f"Cannot transition delivery unit {self.unit_id} from {self.state} to {new_state}")
         
         # Store old state for event
         old_state = self.state
@@ -88,9 +101,20 @@ class DeliveryUnit:
         
         if new_state == DeliveryUnitState.COMPLETED:
             self.completion_time = env.now if env else None
+            if env:
+                self.logger.debug(f"[t={env.now:.2f}] Set completion_time for delivery unit {self.unit_id}")
+        
+        # Log the state transition
+        if env:
+            self.logger.info(f"[t={env.now:.2f}] DeliveryUnit {self.unit_id} transitioned from {old_state} to {new_state}")
+        else:
+            self.logger.info(f"DeliveryUnit {self.unit_id} transitioned from {old_state} to {new_state}")
         
         # Dispatch event if dispatcher provided
         if event_dispatcher and env:
+            # Log event dispatch at SIMULATION_EVENT level
+            self.logger.simulation_event(f"[t={env.now:.2f}] Dispatching DeliveryUnitStateChangedEvent for unit {self.unit_id}: {old_state} -> {new_state}")
+            
             event_dispatcher.dispatch(DeliveryUnitStateChangedEvent(
                 timestamp=env.now,
                 delivery_unit_id=self.unit_id,
