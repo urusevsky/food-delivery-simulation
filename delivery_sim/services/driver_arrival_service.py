@@ -1,5 +1,6 @@
 from delivery_sim.entities.driver import Driver
 from delivery_sim.events.driver_events import DriverLoggedInEvent
+from delivery_sim.utils.logging_system import get_logger
 import numpy as np
 from scipy.stats import lognorm
 
@@ -24,6 +25,10 @@ class DriverArrivalService:
             id_generator: Generator for unique driver IDs
             operational_rng_manager: Manager for random number streams
         """
+        # Get a logger instance specific to this component
+        self.logger = get_logger("service.driver_arrival")
+        
+        # Store dependencies
         self.env = env
         self.event_dispatcher = event_dispatcher
         self.driver_repository = driver_repository
@@ -35,7 +40,11 @@ class DriverArrivalService:
         self.location_stream = operational_rng_manager.get_stream('driver_initial_locations')
         self.service_duration_stream = operational_rng_manager.get_stream('service_duration')
         
+        # Log service initialization with configuration details
+        self.logger.info(f"[t={self.env.now:.2f}] DriverArrivalService initialized with mean inter-arrival time: {config.mean_driver_inter_arrival_time} minutes")
+        
         # Start the arrival process
+        self.logger.info(f"[t={self.env.now:.2f}] Starting driver arrival process")
         self.process = env.process(self._arrival_process())
     
     def _arrival_process(self):
@@ -43,12 +52,17 @@ class DriverArrivalService:
         while True:
             # Generate time until next driver arrival
             inter_arrival_time = self._generate_inter_arrival_time()
+            self.logger.debug(f"[t={self.env.now:.2f}] Next driver will arrive in {inter_arrival_time:.2f} minutes")
+            
             yield self.env.timeout(inter_arrival_time)
             
             # Generate driver attributes
             driver_id = self.id_generator.next()
             initial_location = self._generate_initial_location()
             service_duration = self._generate_service_duration()
+            
+            self.logger.debug(f"[t={self.env.now:.2f}] Generated attributes for driver {driver_id}: "
+                            f"location={initial_location}, service_duration={service_duration:.2f}")
             
             # Create new driver
             new_driver = Driver(
@@ -61,16 +75,17 @@ class DriverArrivalService:
             # Add to repository
             self.driver_repository.add(new_driver)
             
+            # Log driver creation
+            self.logger.info(f"[t={self.env.now:.2f}] Created driver {driver_id} at location {initial_location} with service duration {service_duration:.2f} minutes")
+            
             # Dispatch driver logged in event
+            self.logger.simulation_event(f"[t={self.env.now:.2f}] Dispatching DriverLoggedInEvent for driver {driver_id}")
             self.event_dispatcher.dispatch(DriverLoggedInEvent(
                 timestamp=self.env.now,
                 driver_id=driver_id,
                 initial_location=initial_location,
                 service_duration=service_duration
             ))
-            
-            # Log for debugging
-            print(f"Driver {driver_id} logged in at time {self.env.now}, service duration: {service_duration:.2f} minutes")
     
     def _generate_inter_arrival_time(self):
         """
@@ -128,4 +143,7 @@ class DriverArrivalService:
         cdf_upper = distribution.cdf(max_duration)
         
         # Generate truncated lognormal using inverse CDF method
-        return distribution.ppf(self.service_duration_stream.uniform(cdf_lower, cdf_upper))
+        service_duration = distribution.ppf(self.service_duration_stream.uniform(cdf_lower, cdf_upper))
+        
+        self.logger.debug(f"[t={self.env.now:.2f}] Generated service duration {service_duration:.2f} (min={min_duration}, max={max_duration})")
+        return service_duration
