@@ -1,5 +1,6 @@
 from delivery_sim.entities.states import OrderState
 from delivery_sim.events.order_events import OrderStateChangedEvent
+from delivery_sim.utils.logging_system import get_logger
 
 class Order:
     """
@@ -10,15 +11,10 @@ class Order:
     """
     
     def __init__(self, order_id, restaurant_location, customer_location, arrival_time):
-        """
-        Initialize a new order with its basic properties.
+        """Initialize a new order with its basic properties."""
+        # Get a logger instance
+        self.logger = get_logger("entity.order")
         
-        Args:
-            order_id: Unique identifier for this order
-            restaurant_location: (x, y) coordinates of the restaurant
-            customer_location: (x, y) coordinates of the customer
-            arrival_time: When this order entered the system
-        """
         # Basic properties
         self.order_id = order_id
         self.restaurant_location = restaurant_location
@@ -35,17 +31,12 @@ class Order:
         self.assignment_time = None
         self.pickup_time = None
         self.delivery_time = None
+        
+        # Log creation
+        self.logger.debug(f"Order {order_id} created")
 
     def can_transition_to(self, new_state):
-        """
-        Check if this order can transition to the specified state.
-        
-        Args:
-            new_state: The state to check transition to
-            
-        Returns:
-            bool: True if transition is valid, False otherwise
-        """
+        """Check if this order can transition to the specified state."""
         valid_transitions = {
             OrderState.CREATED: [OrderState.PAIRED, OrderState.ASSIGNED],
             OrderState.PAIRED: [OrderState.ASSIGNED],
@@ -63,17 +54,17 @@ class Order:
             new_state: The new state to transition to
             event_dispatcher: Optional event dispatcher for events
             env: SimPy environment for current time
-            
-        Returns:
-            bool: True if transition succeeded, False otherwise
-            
-        Raises:
-            ValueError: If transition is invalid
         """
+        # Validate transition
         if not self.can_transition_to(new_state):
-            raise ValueError(
-                f"Cannot transition order {self.order_id} from {self.state} to {new_state}"
-            )
+            # Log validation failure - with or without timestamp
+            if env:
+                self.logger.validation(f"[t={env.now:.2f}] Cannot transition order {self.order_id} from {self.state} to {new_state}")
+            else:
+                self.logger.validation(f"Cannot transition order {self.order_id} from {self.state} to {new_state}")
+                
+            # Also raise exception to prevent invalid state
+            raise ValueError(f"Cannot transition order {self.order_id} from {self.state} to {new_state}")
         
         # Store old state for event
         old_state = self.state
@@ -85,15 +76,31 @@ class Order:
         if env:
             if new_state == OrderState.PAIRED:
                 self.pair_time = env.now
+                self.logger.debug(f"[t={env.now:.2f}] Set pair_time for order {self.order_id}")
+                
             elif new_state == OrderState.ASSIGNED:
                 self.assignment_time = env.now
+                self.logger.debug(f"[t={env.now:.2f}] Set assignment_time for order {self.order_id}")
+                
             elif new_state == OrderState.PICKED_UP:
                 self.pickup_time = env.now
+                self.logger.debug(f"[t={env.now:.2f}] Set pickup_time for order {self.order_id}")
+                
             elif new_state == OrderState.DELIVERED:
                 self.delivery_time = env.now
+                self.logger.debug(f"[t={env.now:.2f}] Set delivery_time for order {self.order_id}")
+        
+        # Log the state transition
+        if env:
+            self.logger.info(f"[t={env.now:.2f}] Order {self.order_id} transitioned from {old_state} to {new_state}")
+        else:
+            self.logger.info(f"Order {self.order_id} transitioned from {old_state} to {new_state}")
         
         # Dispatch event if dispatcher provided
         if event_dispatcher and env:
+            # Log event dispatch at SIMULATION_EVENT level
+            self.logger.simulation_event(f"[t={env.now:.2f}] Dispatching OrderStateChangedEvent for order {self.order_id}: {old_state} -> {new_state}")
+    
             event_dispatcher.dispatch(OrderStateChangedEvent(
                 timestamp=env.now,
                 order_id=self.order_id,
