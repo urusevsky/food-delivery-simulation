@@ -42,9 +42,9 @@ class Driver:
     def can_transition_to(self, new_state):
         """Check if this driver can transition to the specified state."""
         valid_transitions = {
-            DriverState.OFFLINE: [],  # Cannot transition from OFFLINE
+            DriverState.OFFLINE: [],  # Terminal state - can't transition from OFFLINE
             DriverState.AVAILABLE: [DriverState.DELIVERING, DriverState.OFFLINE],
-            DriverState.DELIVERING: [DriverState.AVAILABLE, DriverState.OFFLINE]
+            DriverState.DELIVERING: [DriverState.AVAILABLE]  # Remove OFFLINE from here
         }
         
         return new_state in valid_transitions.get(self.state, [])
