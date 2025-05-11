@@ -25,4 +25,4 @@ class SequentialIdGenerator:
         """
         current = self.counter
         self.counter += 1
-        return current
+        return str(current)  # Convert to string
