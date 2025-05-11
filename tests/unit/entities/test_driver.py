@@ -1,3 +1,4 @@
+# tests/unit/entities/test_driver.py
 import pytest
 import simpy
 from delivery_sim.entities.driver import Driver
@@ -20,19 +21,13 @@ def test_driver_initialization():
     assert driver.service_duration == service_duration
     assert driver.intended_logout_time == login_time + service_duration
     assert driver.state == DriverState.AVAILABLE
-    assert driver.current_delivery is None
+    assert driver.current_delivery_unit is None
     assert driver.last_state_change_time == login_time
 
 def test_valid_state_transitions():
     """Test that valid state transitions work properly."""
     # Test main "happy path" flow
     driver1 = Driver("D1", [0, 0], 100, 120)
-    
-    driver1.transition_to(DriverState.ASSIGNED)
-    assert driver1.state == DriverState.ASSIGNED
-    
-    driver1.transition_to(DriverState.PICKING_UP)
-    assert driver1.state == DriverState.PICKING_UP
     
     driver1.transition_to(DriverState.DELIVERING)
     assert driver1.state == DriverState.DELIVERING
@@ -42,22 +37,6 @@ def test_valid_state_transitions():
     
     driver1.transition_to(DriverState.OFFLINE)
     assert driver1.state == DriverState.OFFLINE
-    
-    # Test direct path from DELIVERING to OFFLINE (for drivers past their logout time)
-    driver2 = Driver("D2", [0, 0], 100, 120)
-    
-    driver2.transition_to(DriverState.ASSIGNED)
-    assert driver2.state == DriverState.ASSIGNED
-    
-    driver2.transition_to(DriverState.PICKING_UP)
-    assert driver2.state == DriverState.PICKING_UP
-    
-    driver2.transition_to(DriverState.DELIVERING)
-    assert driver2.state == DriverState.DELIVERING
-    
-    # Driver completes delivery past their logout time
-    driver2.transition_to(DriverState.OFFLINE)
-    assert driver2.state == DriverState.OFFLINE
     
     # Test direct path from AVAILABLE to OFFLINE (for drivers at logout time with no tasks)
     driver3 = Driver("D3", [0, 0], 100, 120)
@@ -71,20 +50,20 @@ def test_invalid_state_transitions():
     """Test that invalid state transitions raise appropriate errors."""
     driver = Driver("D1", [0, 0], 100, 120)
     
-    # Test AVAILABLE -> DELIVERING (should fail)
+    # Test DELIVERING -> OFFLINE (should fail with updated valid transitions)
+    driver.transition_to(DriverState.DELIVERING)
     with pytest.raises(ValueError):
-        driver.transition_to(DriverState.DELIVERING)
+        driver.transition_to(DriverState.OFFLINE)
     
-    # Move to ASSIGNED state
-    driver.transition_to(DriverState.ASSIGNED)
+    # Test OFFLINE -> any state (should fail)
+    driver = Driver("D2", [0, 0], 100, 120)
+    driver.transition_to(DriverState.OFFLINE)
     
-    # Test ASSIGNED -> AVAILABLE (should fail)
     with pytest.raises(ValueError):
         driver.transition_to(DriverState.AVAILABLE)
     
-    # Test ASSIGNED -> OFFLINE (should fail)
     with pytest.raises(ValueError):
-        driver.transition_to(DriverState.OFFLINE)
+        driver.transition_to(DriverState.DELIVERING)
 
 def test_location_update():
     """Test that driver location updates work properly."""
@@ -102,21 +81,14 @@ def test_can_logout():
     # Driver should be able to log out when AVAILABLE
     assert driver.can_logout() is True
     
-    # Driver should not be able to log out when ASSIGNED
-    driver.transition_to(DriverState.ASSIGNED)
-    assert driver.can_logout() is False
-    
-    # Driver should not be able to log out when PICKING_UP
-    driver.transition_to(DriverState.PICKING_UP)
-    assert driver.can_logout() is False
-    
     # Driver should not be able to log out when DELIVERING
     driver.transition_to(DriverState.DELIVERING)
     assert driver.can_logout() is False
     
-    # Driver should be able to log out when back to AVAILABLE
-    driver.transition_to(DriverState.AVAILABLE)
-    assert driver.can_logout() is True
+    # Driver should not be able to log out when OFFLINE (already logged out)
+    driver = Driver("D2", [0, 0], 100, 120)
+    driver.transition_to(DriverState.OFFLINE)
+    assert driver.can_logout() is False
 
 def test_driver_state_change_dispatches_event():
     """Test that state changes generate events when a dispatcher is provided."""
@@ -134,7 +106,7 @@ def test_driver_state_change_dispatches_event():
     dispatcher.register(DriverStateChangedEvent, test_handler)
     
     # Change state with dispatcher and env
-    driver.transition_to(DriverState.ASSIGNED, dispatcher, env)
+    driver.transition_to(DriverState.DELIVERING, dispatcher, env)
     
     # Verify event was dispatched with correct data
     assert len(received_events) == 1
@@ -142,5 +114,5 @@ def test_driver_state_change_dispatches_event():
     assert isinstance(event, DriverStateChangedEvent)
     assert event.driver_id == "D1"
     assert event.old_state == DriverState.AVAILABLE
-    assert event.new_state == DriverState.ASSIGNED
-    assert event.timestamp == env.now    
+    assert event.new_state == DriverState.DELIVERING
+    assert event.timestamp == env.now
