@@ -56,10 +56,17 @@ class OrderRepository:
     
     def find_unassigned_orders(self):
         """
-        Find orders waiting for assignment (in CREATED state).
+        Find single orders available for individual assignment.
+        
+        IMPORTANT: This returns only orders in CREATED state, not orders
+        in PAIRED state. Once an order is paired, it's no longer eligible
+        for individual assignment - the pair itself becomes the assignment unit.
+        
+        For finding all delivery entities (single orders AND pairs) that need
+        assignment, use this method in conjunction with PairRepository.find_unassigned_pairs().
         
         Returns:
-            list: Orders that are ready for assignment but not yet assigned
+            list: Orders in CREATED state (single orders not part of any pair)
         """
         return self.find_by_state(OrderState.CREATED)
     
