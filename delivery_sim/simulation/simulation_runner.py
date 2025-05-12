@@ -13,7 +13,7 @@ from delivery_sim.services.pairing_service import PairingService
 from delivery_sim.services.assignment_service import AssignmentService
 from delivery_sim.services.delivery_service import DeliveryService
 from delivery_sim.services.driver_scheduling_service import DriverSchedulingService
-from delivery_sim.utils.id_generator import SequentialIdGenerator
+from delivery_sim.utils.id_generator import PrefixedIdGenerator
 from delivery_sim.utils.logging_system import get_logger, configure_logging
 
 
@@ -193,13 +193,26 @@ class SimulationRunner:
                           f"total drivers: {total_drivers}")
     
     def _setup_id_generators(self):
-        """Set up ID generators for each entity type."""
+        """
+        Set up ID generators for each entity type.
+        
+        We use a consistent prefixing scheme:
+        - O for Orders (O1, O2, ...)
+        - D for Drivers (D1, D2, ...)  
+        - R for Restaurants (R1, R2, ...)
+        
+        This makes IDs immediately recognizable while keeping them concise.
+        """
+
         id_generators = {
-            'order': SequentialIdGenerator(1),
-            'driver': SequentialIdGenerator(1),
-            'restaurant': SequentialIdGenerator(1)
+            'order': PrefixedIdGenerator('O', 1),      # Generates: O1, O2, O3, ...
+            'driver': PrefixedIdGenerator('D', 1),     # Generates: D1, D2, D3, ...
+            'restaurant': PrefixedIdGenerator('R', 1)  # Generates: R1, R2, R3, ...
         }
+        
         self.logger.debug(f"Created ID generators for: {', '.join(id_generators.keys())}")
+        self.logger.debug("ID format - Orders: O#, Drivers: D#, Restaurants: R#")
+        
         return id_generators
     
     def _setup_repositories(self):
@@ -233,6 +246,9 @@ class SimulationRunner:
     def _setup_restaurant_infrastructure(self):
         """
         Create and initialize restaurant infrastructure using uniform random distribution.
+        
+        Restaurants are assigned IDs using the prefixed format (R1, R2, etc.)
+        for consistency with other entities in the system.
         """
         # Extract parameters from config
         area_size = self.config.structural_config.delivery_area_size
@@ -246,14 +262,17 @@ class SimulationRunner:
             # Generate random coordinates within delivery area
             location = self.structural_rng.generate_uniform(0, area_size, size=2).tolist()
             
-            # Create restaurant with unique ID and generated location
-            restaurant = Restaurant(restaurant_id=i, location=location)
+            # Get the next restaurant ID from our generator
+            restaurant_id = self.id_generators['restaurant'].next()
+            
+            # Create restaurant with generated ID and location
+            restaurant = Restaurant(restaurant_id=restaurant_id, location=location)
             
             # Add to repository and collection
             self.restaurant_repository.add(restaurant)
             restaurants.append(restaurant)
         
-        self.logger.info(f"Created {num_restaurants} restaurants with uniform random distribution")
+        self.logger.info(f"Created {num_restaurants} restaurants with IDs {restaurants[0].restaurant_id} through {restaurants[-1].restaurant_id}")
         return restaurants
     
     def _setup_services(self):

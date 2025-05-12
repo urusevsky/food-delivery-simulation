@@ -27,10 +27,13 @@ class DeliveryUnit:
         self.driver = driver
         
         # Generate ID based on entity type
-        entity_type = "P" if hasattr(delivery_entity, 'pair_id') else "O"
-        entity_id = (delivery_entity.pair_id if entity_type == "P" 
-                    else delivery_entity.order_id)
-        self.unit_id = f"DU-{entity_type}-{entity_id}-{driver.driver_id}"
+        # For consistency: DU-{entity_id}-{driver_id}
+        if hasattr(delivery_entity, 'pair_id'):
+            # It's a pair: DU-P-O1_O2-D1
+            self.unit_id = f"DU-{delivery_entity.pair_id}-{driver.driver_id}"
+        else:
+            # It's a single order: DU-O1-D1
+            self.unit_id = f"DU-{delivery_entity.order_id}-{driver.driver_id}"
         
         # State and timing
         self.state = DeliveryUnitState.IN_PROGRESS

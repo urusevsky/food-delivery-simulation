@@ -16,7 +16,8 @@ class Pair:
         self.logger = get_logger("entity.pair")
         
         # Core identification
-        self.pair_id = f"{order1.order_id}-{order2.order_id}"
+        # Updated format: P-O1_O2 (using underscore to separate order IDs)
+        self.pair_id = f"P-{order1.order_id}_{order2.order_id}"
         self.order1 = order1
         self.order2 = order2
         
