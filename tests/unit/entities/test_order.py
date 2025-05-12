@@ -13,7 +13,7 @@ def test_order_creation():
     This verifies our constructor works correctly.
     """
     # SETUP - prepare the test objects and initial conditions
-    order_id = "123"
+    order_id = "O123"
     restaurant_location = [0, 0]
     customer_location = [2, 3]
     arrival_time = 100
@@ -36,7 +36,7 @@ def test_all_valid_state_transitions():
     Test all possible valid state transition paths to ensure complete coverage.
     """
     # Path 1: Order gets paired
-    order1 = Order("101", [0, 0], [1, 1], 0)
+    order1 = Order("O101", [0, 0], [1, 1], 0)
     
     # CREATED -> PAIRED
     order1.transition_to(OrderState.PAIRED)
@@ -51,7 +51,7 @@ def test_all_valid_state_transitions():
     order1.transition_to(OrderState.DELIVERED)
     
     # Path 2: Order stays single (direct assignment)
-    order2 = Order("102", [0, 0], [1, 1], 0)
+    order2 = Order("O102", [0, 0], [1, 1], 0)
     
     # CREATED -> ASSIGNED (skipping PAIRED)
     order2.transition_to(OrderState.ASSIGNED)
@@ -68,7 +68,7 @@ def test_invalid_direct_transition_to_delivered():
     This verifies our state validation prevents invalid transitions.
     """
     # SETUP
-    order = Order("123", [0, 0], [1, 1], 0)
+    order = Order("O123", [0, 0], [1, 1], 0)
     
     # EXECUTE & VERIFY - Check that an invalid transition raises ValueError
     with pytest.raises(ValueError):
@@ -84,7 +84,7 @@ def test_invalid_backward_transition():
     This verifies our state validation prevents backward movement.
     """
     # SETUP - Create an order and move it to PAIRED state
-    order = Order("123", [0, 0], [1, 1], 0)
+    order = Order("O123", [0, 0], [1, 1], 0)
     order.transition_to(OrderState.PAIRED)
     
     # EXECUTE & VERIFY - Check that going back to CREATED raises ValueError
@@ -101,13 +101,13 @@ def test_order_string_representation():
     This verifies our __str__ method works correctly.
     """
     # SETUP
-    order = Order("123", [0, 0], [1, 1], 0)
+    order = Order("O123", [0, 0], [1, 1], 0)
     
     # EXECUTE
     string_repr = str(order)
     
     # VERIFY
-    assert "Order(id=123" in string_repr, "String representation should include the order ID"
+    assert "Order(id=O123" in string_repr, "String representation should include the order ID"
     assert f"state={order.state}" in string_repr, "String representation should include the state"
 
 def test_order_state_change_dispatches_event():

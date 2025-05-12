@@ -26,15 +26,15 @@ def test_add_order():
     """
     # ARRANGE
     repository = OrderRepository()
-    order = Order("123", [0, 0], [2, 3], 100)
+    order = Order("O123", [0, 0], [2, 3], 100)
     
     # ACT
     repository.add(order)
     
     # ASSERT
     assert repository.count() == 1, "Repository should contain one order"
-    assert "123" in repository.orders, "Order ID should be in the repository"
-    assert repository.orders["123"] is order, "Repository should store the exact order object"
+    assert "O123" in repository.orders, "Order ID should be in the repository"
+    assert repository.orders["O123"] is order, "Repository should store the exact order object"
 
 def test_add_multiple_orders():
     """
@@ -43,9 +43,9 @@ def test_add_multiple_orders():
     """
     # ARRANGE
     repository = OrderRepository()
-    order1 = Order("101", [0, 0], [1, 1], 100)
-    order2 = Order("102", [1, 1], [2, 2], 105)
-    order3 = Order("103", [2, 2], [3, 3], 110)
+    order1 = Order("O101", [0, 0], [1, 1], 100)
+    order2 = Order("O102", [1, 1], [2, 2], 105)
+    order3 = Order("O103", [2, 2], [3, 3], 110)
     
     # ACT
     repository.add(order1)
@@ -54,7 +54,7 @@ def test_add_multiple_orders():
     
     # ASSERT
     assert repository.count() == 3, "Repository should contain three orders"
-    assert all(order_id in repository.orders for order_id in ["101", "102", "103"])
+    assert all(order_id in repository.orders for order_id in ["O101", "O102", "O103"])
     
 # Test Group 2: Finding orders
 def test_find_by_id_existing_order():
@@ -64,15 +64,15 @@ def test_find_by_id_existing_order():
     """
     # ARRANGE
     repository = OrderRepository()
-    order = Order("123", [0, 0], [2, 3], 100)
+    order = Order("O123", [0, 0], [2, 3], 100)
     repository.add(order)
     
     # ACT
-    found_order = repository.find_by_id("123")
+    found_order = repository.find_by_id("O123")
     
     # ASSERT
     assert found_order is order, "Should return the exact order object"
-    assert found_order.order_id == "123", "Found order should have correct ID"
+    assert found_order.order_id == "O123", "Found order should have correct ID"
 
 def test_find_by_id_nonexistent_order():
     """
@@ -81,11 +81,11 @@ def test_find_by_id_nonexistent_order():
     """
     # ARRANGE
     repository = OrderRepository()
-    order = Order("123", [0, 0], [2, 3], 100)
+    order = Order("O123", [0, 0], [2, 3], 100)
     repository.add(order)
     
     # ACT
-    found_order = repository.find_by_id("999")  # Nonexistent ID
+    found_order = repository.find_by_id("O999")  # Nonexistent ID
     
     # ASSERT
     assert found_order is None, "Should return None for nonexistent order"
@@ -97,8 +97,8 @@ def test_find_all():
     """
     # ARRANGE
     repository = OrderRepository()
-    order1 = Order("101", [0, 0], [1, 1], 100)
-    order2 = Order("102", [1, 1], [2, 2], 105)
+    order1 = Order("O101", [0, 0], [1, 1], 100)
+    order2 = Order("O102", [1, 1], [2, 2], 105)
     
     repository.add(order1)
     repository.add(order2)
@@ -138,9 +138,9 @@ def test_find_by_state():
     repository = OrderRepository()
     
     # Create orders in different states
-    order1 = Order("101", [0, 0], [1, 1], 100)  # CREATED by default
-    order2 = Order("102", [1, 1], [2, 2], 105)
-    order3 = Order("103", [2, 2], [3, 3], 110)
+    order1 = Order("O101", [0, 0], [1, 1], 100)  # CREATED by default
+    order2 = Order("O102", [1, 1], [2, 2], 105)
+    order3 = Order("O103", [2, 2], [3, 3], 110)
     
     # Transition order2 to PAIRED state
     order2.state = OrderState.PAIRED
@@ -183,10 +183,10 @@ def test_find_unassigned_orders_returns_only_single_orders():
     repository = OrderRepository()
     
     # Create orders in various states
-    single_order1 = Order("101", [0, 0], [1, 1], 100)  # CREATED (single)
-    single_order2 = Order("102", [1, 1], [2, 2], 105)  # CREATED (single)
-    paired_order = Order("103", [2, 2], [3, 3], 110)
-    assigned_order = Order("104", [3, 3], [4, 4], 115)
+    single_order1 = Order("O101", [0, 0], [1, 1], 100)  # CREATED (single)
+    single_order2 = Order("O102", [1, 1], [2, 2], 105)  # CREATED (single)
+    paired_order = Order("O103", [2, 2], [3, 3], 110)
+    assigned_order = Order("O104", [3, 3], [4, 4], 115)
     
     # Move orders to different states
     paired_order.state = OrderState.PAIRED  # Part of a pair
@@ -215,8 +215,8 @@ def test_duplicate_order_ids():
     """
     # ARRANGE
     repository = OrderRepository()
-    order1 = Order("123", [0, 0], [1, 1], 100)
-    order2 = Order("123", [2, 2], [3, 3], 105)  # Same ID!
+    order1 = Order("O123", [0, 0], [1, 1], 100)
+    order2 = Order("O123", [2, 2], [3, 3], 105)  # Same ID!
     
     # ACT
     repository.add(order1)
@@ -224,7 +224,7 @@ def test_duplicate_order_ids():
     
     # ASSERT
     assert repository.count() == 1, "Should still have only one order"
-    found_order = repository.find_by_id("123")
+    found_order = repository.find_by_id("O123")
     assert found_order is order2, "Later order should overwrite earlier one"
     assert found_order.restaurant_location == [2, 2], "Should have order2's data"
 
@@ -235,7 +235,7 @@ def test_repository_isolation():
     """
     # ARRANGE
     repository = OrderRepository()
-    order = Order("123", [0, 0], [1, 1], 100)
+    order = Order("O123", [0, 0], [1, 1], 100)
     repository.add(order)
     
     # ACT
@@ -257,13 +257,13 @@ def test_count_accuracy():
     # ACT & ASSERT - Test at different sizes
     assert repository.count() == 0, "Empty repository should have count 0"
     
-    repository.add(Order("1", [0, 0], [1, 1], 100))
+    repository.add(Order("O1", [0, 0], [1, 1], 100))
     assert repository.count() == 1, "Should count 1 after adding one order"
     
-    repository.add(Order("2", [0, 0], [1, 1], 100))
-    repository.add(Order("3", [0, 0], [1, 1], 100))
+    repository.add(Order("O2", [0, 0], [1, 1], 100))
+    repository.add(Order("O3", [0, 0], [1, 1], 100))
     assert repository.count() == 3, "Should count 3 after adding three orders"
     
     # Overwrite an order (same ID)
-    repository.add(Order("3", [2, 2], [3, 3], 100))
+    repository.add(Order("O3", [2, 2], [3, 3], 100))
     assert repository.count() == 3, "Count shouldn't change when overwriting"

@@ -10,15 +10,15 @@ from delivery_sim.events.pair_events import PairStateChangedEvent
 def test_pair_initialization():
     """Test that a Pair is properly initialized with correct attributes."""
     # Create two orders
-    order1 = Order("1", [0, 0], [1, 1], 100)
-    order2 = Order("2", [0, 0], [2, 2], 105)
+    order1 = Order("O1", [0, 0], [1, 1], 100)
+    order2 = Order("O2", [0, 0], [2, 2], 105)
     creation_time = 110
     
     # Create pair
     pair = Pair(order1, order2, creation_time)
     
     # Verify basic properties
-    assert pair.pair_id == "1-2"
+    assert pair.pair_id == "P-O1_O2"
     assert pair.order1 is order1
     assert pair.order2 is order2
     assert pair.creation_time == creation_time
@@ -34,8 +34,8 @@ def test_pair_initialization():
 def test_valid_state_transitions():
     """Test that valid state transitions work properly."""
     # Setup
-    order1 = Order("1", [0, 0], [1, 1], 100)
-    order2 = Order("2", [0, 0], [2, 2], 105)
+    order1 = Order("O1", [0, 0], [1, 1], 100)
+    order2 = Order("O2", [0, 0], [2, 2], 105)
     env = simpy.Environment()
     
     pair = Pair(order1, order2, env.now)
@@ -46,8 +46,8 @@ def test_valid_state_transitions():
     assert pair.assignment_time == env.now
     
     # Record deliveries to enable completion transition
-    pair.record_order_delivery("1")
-    pair.record_order_delivery("2")
+    pair.record_order_delivery("O1")
+    pair.record_order_delivery("O2")
     
     # Test ASSIGNED -> COMPLETED
     pair.transition_to(PairState.COMPLETED, None, env)
@@ -57,8 +57,8 @@ def test_valid_state_transitions():
 def test_invalid_state_transitions():
     """Test that invalid state transitions raise appropriate errors."""
     # Setup
-    order1 = Order("1", [0, 0], [1, 1], 100)
-    order2 = Order("2", [0, 0], [2, 2], 105)
+    order1 = Order("O1", [0, 0], [1, 1], 100)
+    order2 = Order("O2", [0, 0], [2, 2], 105)
     env = simpy.Environment()
     
     pair = Pair(order1, order2, env.now)
@@ -76,8 +76,8 @@ def test_invalid_state_transitions():
         pair.transition_to(PairState.COMPLETED, None, env)
     
     # Test invalid backward transition
-    pair.record_order_delivery("1")
-    pair.record_order_delivery("2")
+    pair.record_order_delivery("O1")
+    pair.record_order_delivery("O2")
     pair.transition_to(PairState.COMPLETED, None, env)
     
     # Cannot go back from COMPLETED to ASSIGNED
@@ -87,8 +87,8 @@ def test_invalid_state_transitions():
 def test_event_dispatch_on_state_change():
     """Test that state changes generate events when a dispatcher is provided."""
     # Setup
-    order1 = Order("1", [0, 0], [1, 1], 100)
-    order2 = Order("2", [0, 0], [2, 2], 105)
+    order1 = Order("O1", [0, 0], [1, 1], 100)
+    order2 = Order("O2", [0, 0], [2, 2], 105)
     env = simpy.Environment()
     dispatcher = EventDispatcher()
     
@@ -118,47 +118,47 @@ def test_event_dispatch_on_state_change():
 def test_order_pickup_tracking():
     """Test that order pickups are correctly tracked."""
     # Setup
-    order1 = Order("1", [0, 0], [1, 1], 100)
-    order2 = Order("2", [0, 0], [2, 2], 105)
+    order1 = Order("O1", [0, 0], [1, 1], 100)
+    order2 = Order("O2", [0, 0], [2, 2], 105)
     pair = Pair(order1, order2, 110)
     
     # Record pickup for first order
-    result = pair.record_order_pickup("1")
+    result = pair.record_order_pickup("O1")
     assert result is True
     assert len(pair.picked_up_orders) == 1
-    assert "1" in pair.picked_up_orders
+    assert "O1" in pair.picked_up_orders
     
     # Record pickup for second order
-    result = pair.record_order_pickup("2")
+    result = pair.record_order_pickup("O2")
     assert result is True
     assert len(pair.picked_up_orders) == 2
-    assert "2" in pair.picked_up_orders
+    assert "O2" in pair.picked_up_orders
     
     # Try to record pickup for non-existent order
-    result = pair.record_order_pickup("3")
+    result = pair.record_order_pickup("O3")
     assert result is False
     assert len(pair.picked_up_orders) == 2
 
 def test_order_delivery_tracking():
     """Test that order deliveries are correctly tracked and completion is detected."""
     # Setup
-    order1 = Order("1", [0, 0], [1, 1], 100)
-    order2 = Order("2", [0, 0], [2, 2], 105)
+    order1 = Order("O1", [0, 0], [1, 1], 100)
+    order2 = Order("O2", [0, 0], [2, 2], 105)
     pair = Pair(order1, order2, 110)
     
     # Record delivery for first order
-    result = pair.record_order_delivery("1")
+    result = pair.record_order_delivery("O1")
     assert result is False  # Not complete yet
     assert len(pair.delivered_orders) == 1
-    assert "1" in pair.delivered_orders
+    assert "O1" in pair.delivered_orders
     
     # Record delivery for second order
-    result = pair.record_order_delivery("2")
+    result = pair.record_order_delivery("O2")
     assert result is True  # Now complete
     assert len(pair.delivered_orders) == 2
-    assert "2" in pair.delivered_orders
+    assert "O2" in pair.delivered_orders
     
     # Try to record delivery for non-existent order
-    result = pair.record_order_delivery("3")
+    result = pair.record_order_delivery("O3")
     assert result is False
     assert len(pair.delivered_orders) == 2

@@ -27,8 +27,8 @@ def test_add_pair():
     """
     # ARRANGE
     repository = PairRepository()
-    order1 = Order("101", [0, 0], [1, 1], 100)
-    order2 = Order("102", [0, 0], [2, 2], 105)
+    order1 = Order("O101", [0, 0], [1, 1], 100)
+    order2 = Order("O102", [0, 0], [2, 2], 105)
     pair = Pair(order1, order2, 110)
     
     # ACT
@@ -48,13 +48,13 @@ def test_add_multiple_pairs():
     repository = PairRepository()
     
     # Create first pair
-    order1_1 = Order("101", [0, 0], [1, 1], 100)
-    order1_2 = Order("102", [0, 0], [2, 2], 105)
+    order1_1 = Order("O101", [0, 0], [1, 1], 100)
+    order1_2 = Order("O102", [0, 0], [2, 2], 105)
     pair1 = Pair(order1_1, order1_2, 110)
     
     # Create second pair
-    order2_1 = Order("103", [1, 1], [2, 2], 110)
-    order2_2 = Order("104", [1, 1], [3, 3], 115)
+    order2_1 = Order("O103", [1, 1], [2, 2], 110)
+    order2_2 = Order("O104", [1, 1], [3, 3], 115)
     pair2 = Pair(order2_1, order2_2, 120)
     
     # ACT
@@ -73,8 +73,8 @@ def test_find_by_id_existing_pair():
     """
     # ARRANGE
     repository = PairRepository()
-    order1 = Order("101", [0, 0], [1, 1], 100)
-    order2 = Order("102", [0, 0], [2, 2], 105)
+    order1 = Order("O101", [0, 0], [1, 1], 100)
+    order2 = Order("O102", [0, 0], [2, 2], 105)
     pair = Pair(order1, order2, 110)
     repository.add(pair)
     
@@ -92,13 +92,13 @@ def test_find_by_id_nonexistent_pair():
     """
     # ARRANGE
     repository = PairRepository()
-    order1 = Order("101", [0, 0], [1, 1], 100)
-    order2 = Order("102", [0, 0], [2, 2], 105)
+    order1 = Order("O101", [0, 0], [1, 1], 100)
+    order2 = Order("O102", [0, 0], [2, 2], 105)
     pair = Pair(order1, order2, 110)
     repository.add(pair)
     
     # ACT
-    found_pair = repository.find_by_id("999-999")  # Nonexistent ID
+    found_pair = repository.find_by_id("P-O999_O999")  # Nonexistent ID
     
     # ASSERT
     assert found_pair is None, "Should return None for nonexistent pair"
@@ -112,12 +112,12 @@ def test_find_all():
     repository = PairRepository()
     
     # Create two pairs
-    order1_1 = Order("101", [0, 0], [1, 1], 100)
-    order1_2 = Order("102", [0, 0], [2, 2], 105)
+    order1_1 = Order("O101", [0, 0], [1, 1], 100)
+    order1_2 = Order("O102", [0, 0], [2, 2], 105)
     pair1 = Pair(order1_1, order1_2, 110)
     
-    order2_1 = Order("103", [1, 1], [2, 2], 110)
-    order2_2 = Order("104", [1, 1], [3, 3], 115)
+    order2_1 = Order("O103", [1, 1], [2, 2], 110)
+    order2_2 = Order("O104", [1, 1], [3, 3], 115)
     pair2 = Pair(order2_1, order2_2, 120)
     
     repository.add(pair1)
@@ -142,16 +142,16 @@ def test_find_by_state():
     repository = PairRepository()
     
     # Create pairs in different states
-    order1_1 = Order("101", [0, 0], [1, 1], 100)
-    order1_2 = Order("102", [0, 0], [2, 2], 105)
+    order1_1 = Order("O101", [0, 0], [1, 1], 100)
+    order1_2 = Order("O102", [0, 0], [2, 2], 105)
     pair1 = Pair(order1_1, order1_2, 110)  # CREATED by default
     
-    order2_1 = Order("103", [1, 1], [2, 2], 110)
-    order2_2 = Order("104", [1, 1], [3, 3], 115)
+    order2_1 = Order("O103", [1, 1], [2, 2], 110)
+    order2_2 = Order("O104", [1, 1], [3, 3], 115)
     pair2 = Pair(order2_1, order2_2, 120)
     
-    order3_1 = Order("105", [2, 2], [3, 3], 120)
-    order3_2 = Order("106", [2, 2], [4, 4], 125)
+    order3_1 = Order("O105", [2, 2], [3, 3], 120)
+    order3_2 = Order("O106", [2, 2], [4, 4], 125)
     pair3 = Pair(order3_1, order3_2, 130)
     
     # Transition pairs to different states
@@ -188,16 +188,16 @@ def test_find_unassigned_pairs():
     repository = PairRepository()
     
     # Create pairs in various states
-    order1_1 = Order("101", [0, 0], [1, 1], 100)
-    order1_2 = Order("102", [0, 0], [2, 2], 105)
+    order1_1 = Order("O101", [0, 0], [1, 1], 100)
+    order1_2 = Order("O102", [0, 0], [2, 2], 105)
     unassigned_pair1 = Pair(order1_1, order1_2, 110)  # CREATED (unassigned)
     
-    order2_1 = Order("103", [1, 1], [2, 2], 110)
-    order2_2 = Order("104", [1, 1], [3, 3], 115)
+    order2_1 = Order("O103", [1, 1], [2, 2], 110)
+    order2_2 = Order("O104", [1, 1], [3, 3], 115)
     unassigned_pair2 = Pair(order2_1, order2_2, 120)  # CREATED (unassigned)
     
-    order3_1 = Order("105", [2, 2], [3, 3], 120)
-    order3_2 = Order("106", [2, 2], [4, 4], 125)
+    order3_1 = Order("O105", [2, 2], [3, 3], 120)
+    order3_2 = Order("O106", [2, 2], [4, 4], 125)
     assigned_pair = Pair(order3_1, order3_2, 130)
     assigned_pair.state = PairState.ASSIGNED  # Already assigned
     
@@ -223,16 +223,16 @@ def test_find_by_order_id():
     repository = PairRepository()
     
     # Create multiple pairs
-    order1 = Order("101", [0, 0], [1, 1], 100)
-    order2 = Order("102", [0, 0], [2, 2], 105)
+    order1 = Order("O101", [0, 0], [1, 1], 100)
+    order2 = Order("O102", [0, 0], [2, 2], 105)
     pair1 = Pair(order1, order2, 110)
     
-    order3 = Order("103", [1, 1], [2, 2], 110)
-    order4 = Order("104", [1, 1], [3, 3], 115)
+    order3 = Order("O103", [1, 1], [2, 2], 110)
+    order4 = Order("O104", [1, 1], [3, 3], 115)
     pair2 = Pair(order3, order4, 120)
     
-    order5 = Order("105", [2, 2], [3, 3], 120)
-    order6 = Order("106", [2, 2], [4, 4], 125)
+    order5 = Order("O105", [2, 2], [3, 3], 120)
+    order6 = Order("O106", [2, 2], [4, 4], 125)
     pair3 = Pair(order5, order6, 130)
     
     repository.add(pair1)
@@ -240,20 +240,20 @@ def test_find_by_order_id():
     repository.add(pair3)
     
     # ACT
-    # Find pairs containing order "101"
-    pairs_with_101 = repository.find_by_order_id("101")
+    # Find pairs containing order "O101"
+    pairs_with_101 = repository.find_by_order_id("O101")
     
-    # Find pairs containing order "104"
-    pairs_with_104 = repository.find_by_order_id("104")
+    # Find pairs containing order "O104"
+    pairs_with_104 = repository.find_by_order_id("O104")
     
     # Find pairs containing non-existent order
-    pairs_with_999 = repository.find_by_order_id("999")
+    pairs_with_999 = repository.find_by_order_id("O999")
     
     # ASSERT
-    assert len(pairs_with_101) == 1, "Should find one pair containing order 101"
+    assert len(pairs_with_101) == 1, "Should find one pair containing order O101"
     assert pair1 in pairs_with_101, "Should find the correct pair"
     
-    assert len(pairs_with_104) == 1, "Should find one pair containing order 104"
+    assert len(pairs_with_104) == 1, "Should find one pair containing order O104"
     assert pair2 in pairs_with_104, "Should find the correct pair"
     
     assert len(pairs_with_999) == 0, "Should find no pairs for non-existent order"
@@ -268,14 +268,14 @@ def test_duplicate_pair_ids():
     repository = PairRepository()
     
     # Create first pair
-    order1_1 = Order("101", [0, 0], [1, 1], 100)
-    order1_2 = Order("102", [0, 0], [2, 2], 105)
+    order1_1 = Order("O101", [0, 0], [1, 1], 100)
+    order1_2 = Order("O102", [0, 0], [2, 2], 105)
     pair1 = Pair(order1_1, order1_2, 110)
     
     # Create another pair that happens to have the same ID
     # (This could happen if orders are paired in different order)
-    order2_1 = Order("101", [1, 1], [2, 2], 120)
-    order2_2 = Order("102", [1, 1], [3, 3], 125)
+    order2_1 = Order("O101", [1, 1], [2, 2], 120)
+    order2_2 = Order("O102", [1, 1], [3, 3], 125)
     pair2 = Pair(order2_1, order2_2, 130)
     
     # ACT
@@ -295,8 +295,8 @@ def test_repository_isolation():
     """
     # ARRANGE
     repository = PairRepository()
-    order1 = Order("101", [0, 0], [1, 1], 100)
-    order2 = Order("102", [0, 0], [2, 2], 105)
+    order1 = Order("O101", [0, 0], [1, 1], 100)
+    order2 = Order("O102", [0, 0], [2, 2], 105)
     pair = Pair(order1, order2, 110)
     repository.add(pair)
     

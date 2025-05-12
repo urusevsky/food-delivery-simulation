@@ -15,7 +15,7 @@ def test_delivery_unit_creation_with_single_order():
     This verifies the constructor works correctly when dealing with an Order entity.
     """
     # ARRANGE - Create the entities we need
-    order = Order("123", [0, 0], [2, 3], 100)
+    order = Order("O123", [0, 0], [2, 3], 100)
     driver = Driver("D1", [0, 0], 100, 120)
     assignment_time = 110
     
@@ -25,7 +25,7 @@ def test_delivery_unit_creation_with_single_order():
     # ASSERT - Verify all properties are initialized correctly
     assert delivery_unit.delivery_entity is order, "DeliveryUnit should reference the order"
     assert delivery_unit.driver is driver, "DeliveryUnit should reference the driver"
-    assert delivery_unit.unit_id == "DU-O-123-D1", "Unit ID should follow pattern DU-O-{order_id}-{driver_id}"
+    assert delivery_unit.unit_id == "DU-O123-D1", "Unit ID should follow pattern DU-O-{order_id}-{driver_id}"
     assert delivery_unit.state == DeliveryUnitState.IN_PROGRESS, "Initial state should be IN_PROGRESS"
     assert delivery_unit.assignment_time == assignment_time, "Assignment time should match provided value"
     assert delivery_unit.completion_time is None, "Completion time should be None initially"
@@ -46,8 +46,8 @@ def test_delivery_unit_creation_with_pair():
     This verifies the constructor correctly handles the Pair entity type.
     """
     # ARRANGE - Create the entities we need
-    order1 = Order("101", [0, 0], [1, 1], 100)
-    order2 = Order("102", [0, 0], [2, 2], 105)
+    order1 = Order("O101", [0, 0], [1, 1], 100)
+    order2 = Order("O102", [0, 0], [2, 2], 105)
     pair = Pair(order1, order2, 110)
     driver = Driver("D2", [0, 0], 100, 120)
     assignment_time = 115
@@ -58,7 +58,7 @@ def test_delivery_unit_creation_with_pair():
     # ASSERT - Verify the unit ID follows the correct pattern for pairs
     assert delivery_unit.delivery_entity is pair, "DeliveryUnit should reference the pair"
     assert delivery_unit.driver is driver, "DeliveryUnit should reference the driver"
-    assert delivery_unit.unit_id == "DU-P-101-102-D2", "Unit ID should follow pattern DU-P-{pair_id}-{driver_id}"
+    assert delivery_unit.unit_id == "DU-P-O101_O102-D2", "Unit ID should follow pattern DU-P-{pair_id}-{driver_id}"
     assert delivery_unit.state == DeliveryUnitState.IN_PROGRESS, "Initial state should be IN_PROGRESS"
     assert delivery_unit.assignment_time == assignment_time, "Assignment time should match provided value"
 
@@ -69,7 +69,7 @@ def test_valid_state_transition_to_completed():
     This is the primary state transition in the delivery unit lifecycle.
     """
     # ARRANGE
-    order = Order("123", [0, 0], [2, 3], 100)
+    order = Order("O123", [0, 0], [2, 3], 100)
     driver = Driver("D1", [0, 0], 100, 120)
     env = simpy.Environment()
     delivery_unit = DeliveryUnit(order, driver, env.now)
@@ -90,7 +90,7 @@ def test_invalid_state_transition():
     The only valid transition is IN_PROGRESS -> COMPLETED, so test other attempts.
     """
     # ARRANGE
-    order = Order("123", [0, 0], [2, 3], 100)
+    order = Order("O123", [0, 0], [2, 3], 100)
     driver = Driver("D1", [0, 0], 100, 120)
     delivery_unit = DeliveryUnit(order, driver, 110)
     
@@ -107,7 +107,7 @@ def test_cannot_transition_from_completed():
     This ensures the terminal state is respected.
     """
     # ARRANGE
-    order = Order("123", [0, 0], [2, 3], 100)
+    order = Order("O123", [0, 0], [2, 3], 100)
     driver = Driver("D1", [0, 0], 100, 120)
     env = simpy.Environment()
     delivery_unit = DeliveryUnit(order, driver, env.now)
@@ -129,7 +129,7 @@ def test_state_change_generates_event():
     This verifies the integration with the event system.
     """
     # ARRANGE
-    order = Order("123", [0, 0], [2, 3], 100)
+    order = Order("O123", [0, 0], [2, 3], 100)
     driver = Driver("D1", [0, 0], 100, 120)
     env = simpy.Environment()
     dispatcher = EventDispatcher()
@@ -162,7 +162,7 @@ def test_assignment_cost_recording():
     This is important for tracking the decision-making process.
     """
     # ARRANGE
-    order = Order("123", [0, 0], [2, 3], 100)
+    order = Order("O123", [0, 0], [2, 3], 100)
     driver = Driver("D1", [0, 0], 100, 120)
     delivery_unit = DeliveryUnit(order, driver, 110)
     
@@ -189,7 +189,7 @@ def test_assignment_path_recording():
     This helps track which assignment strategy was used.
     """
     # ARRANGE
-    order = Order("123", [0, 0], [2, 3], 100)
+    order = Order("O123", [0, 0], [2, 3], 100)
     driver = Driver("D1", [0, 0], 100, 120)
     delivery_unit = DeliveryUnit(order, driver, 110)
     
@@ -210,7 +210,7 @@ def test_delivery_unit_with_minimal_data():
     This verifies robustness when optional fields aren't set.
     """
     # ARRANGE
-    order = Order("123", [0, 0], [2, 3], 100)
+    order = Order("O123", [0, 0], [2, 3], 100)
     driver = Driver("D1", [0, 0], 100, 120)
     
     # ACT - Create delivery unit without setting optional fields
