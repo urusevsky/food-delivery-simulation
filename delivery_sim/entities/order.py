@@ -41,7 +41,8 @@ class Order:
             OrderState.CREATED: [OrderState.PAIRED, OrderState.ASSIGNED],
             OrderState.PAIRED: [OrderState.ASSIGNED],
             OrderState.ASSIGNED: [OrderState.PICKED_UP],
-            OrderState.PICKED_UP: [OrderState.DELIVERED]
+            OrderState.PICKED_UP: [OrderState.DELIVERED],
+            OrderState.DELIVERED: []  # Explicitly terminal
         }
         
         return new_state in valid_transitions.get(self.state, [])

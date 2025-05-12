@@ -62,7 +62,8 @@ class DeliveryUnit:
             bool: True if transition is valid, False otherwise
         """
         valid_transitions = {
-            DeliveryUnitState.IN_PROGRESS: [DeliveryUnitState.COMPLETED]
+            DeliveryUnitState.IN_PROGRESS: [DeliveryUnitState.COMPLETED],
+            DeliveryUnitState.COMPLETED: []  # Explicitly terminal
         }
         
         return new_state in valid_transitions.get(self.state, [])

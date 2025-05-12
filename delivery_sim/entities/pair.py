@@ -44,7 +44,8 @@ class Pair:
         """Check if this pair can transition to the specified state."""
         valid_transitions = {
             PairState.CREATED: [PairState.ASSIGNED],
-            PairState.ASSIGNED: [PairState.COMPLETED]
+            PairState.ASSIGNED: [PairState.COMPLETED],
+            PairState.COMPLETED: []  # Explicitly terminal
         }
         
         # Special case for COMPLETED - requires both orders to be delivered

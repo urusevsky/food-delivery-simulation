@@ -8,9 +8,9 @@ class OrderState:
 
 class DriverState:
     """States that a driver can be in throughout their lifecycle"""
-    OFFLINE = "offline"      # Not available for deliveries
     AVAILABLE = "available"  # Ready to accept assignments
     DELIVERING = "delivering"  # Actively engaged in delivery process
+    OFFLINE = "offline"      # Not available for deliveries
 
 class PairState:
     """States that a pair can be in throughout its lifecycle"""
