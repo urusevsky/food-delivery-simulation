@@ -1,6 +1,7 @@
 from delivery_sim.entities.states import DeliveryUnitState
 from delivery_sim.events.delivery_unit_events import DeliveryUnitStateChangedEvent
 from delivery_sim.utils.logging_system import get_logger
+from delivery_sim.utils.entity_type_utils import EntityType
 
 class DeliveryUnit:
     """
@@ -24,6 +25,7 @@ class DeliveryUnit:
         
         # Core relationships
         self.delivery_entity = delivery_entity
+        self.entity_type = EntityType.DELIVERY_UNIT
         self.driver = driver
         
         # Generate ID based on entity type

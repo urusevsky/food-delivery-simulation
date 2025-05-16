@@ -1,6 +1,7 @@
 from delivery_sim.entities.states import PairState
 from delivery_sim.events.pair_events import PairStateChangedEvent
 from delivery_sim.utils.logging_system import get_logger
+from delivery_sim.utils.entity_type_utils import EntityType
 
 class Pair:
     """
@@ -18,6 +19,7 @@ class Pair:
         # Core identification
         # Updated format: P-O1_O2 (using underscore to separate order IDs)
         self.pair_id = f"P-{order1.order_id}_{order2.order_id}"
+        self.entity_type = EntityType.PAIR
         self.order1 = order1
         self.order2 = order2
         

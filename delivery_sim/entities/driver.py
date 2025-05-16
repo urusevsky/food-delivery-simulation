@@ -1,6 +1,7 @@
 from delivery_sim.entities.states import DriverState
 from delivery_sim.events.driver_events import DriverStateChangedEvent
 from delivery_sim.utils.logging_system import get_logger
+from delivery_sim.utils.entity_type_utils import EntityType
 
 class Driver:
     """
@@ -22,6 +23,7 @@ class Driver:
         
         # Basic properties
         self.driver_id = driver_id
+        self.entity_type = EntityType.DRIVER
         self.location = initial_location
         self.login_time = login_time
         self.service_duration = service_duration

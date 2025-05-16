@@ -1,6 +1,7 @@
 from delivery_sim.entities.states import OrderState
 from delivery_sim.events.order_events import OrderStateChangedEvent
 from delivery_sim.utils.logging_system import get_logger
+from delivery_sim.utils.entity_type_utils import EntityType
 
 class Order:
     """
@@ -17,6 +18,7 @@ class Order:
         
         # Basic properties
         self.order_id = order_id
+        self.entity_type = EntityType.ORDER
         self.restaurant_location = restaurant_location
         self.customer_location = customer_location
         self.arrival_time = arrival_time

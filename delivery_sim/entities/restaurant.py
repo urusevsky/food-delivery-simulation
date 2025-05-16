@@ -1,3 +1,5 @@
+from delivery_sim.utils.entity_type_utils import EntityType
+
 class Restaurant:
     """
     Represents a restaurant in the delivery system.
@@ -17,6 +19,7 @@ class Restaurant:
             location: [x, y] coordinates of the restaurant
         """
         self.restaurant_id = restaurant_id
+        self.entity_type = EntityType.RESTAURANT
         self.location = location
     
     def __str__(self):
