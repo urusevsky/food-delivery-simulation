@@ -3,6 +3,7 @@ from delivery_sim.events.delivery_unit_events import DeliveryUnitCompletedEvent,
 from delivery_sim.utils.location_utils import calculate_distance, locations_are_equal
 from delivery_sim.utils.validation_utils import log_entity_not_found
 from delivery_sim.utils.logging_system import get_logger
+from delivery_sim.utils.entity_type_utils import EntityType
 
 
 class DeliveryService:
@@ -113,11 +114,13 @@ class DeliveryService:
             bool: True if delivery started successfully
         """
         # Determine entity type and start appropriate process
-        if hasattr(entity, 'order_id'):  # It's an order
+        entity_type = entity.entity_type
+        
+        if entity_type == EntityType.ORDER:
             # Start the single order delivery process
             self.logger.info(f"[t={self.env.now:.2f}] Starting single order delivery process for order {entity.order_id} by driver {driver.driver_id}")
             self.env.process(self._single_order_delivery_process(driver, entity, delivery_unit))
-        else:  # It's a pair
+        else:  # Must be PAIR
             # Start the pair delivery process
             self.logger.info(f"[t={self.env.now:.2f}] Starting paired delivery process for pair {entity.pair_id} by driver {driver.driver_id}")
             self.env.process(self._pair_delivery_process(driver, entity, delivery_unit))
