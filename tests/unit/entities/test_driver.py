@@ -5,6 +5,7 @@ from delivery_sim.entities.driver import Driver
 from delivery_sim.entities.states import DriverState
 from delivery_sim.events.event_dispatcher import EventDispatcher
 from delivery_sim.events.driver_events import DriverStateChangedEvent
+from delivery_sim.utils.entity_type_utils import EntityType
 
 def test_driver_initialization():
     """Test that a Driver is properly initialized with default values."""
@@ -23,6 +24,7 @@ def test_driver_initialization():
     assert driver.state == DriverState.AVAILABLE
     assert driver.current_delivery_unit is None
     assert driver.last_state_change_time == login_time
+    assert driver.entity_type == EntityType.DRIVER
 
 def test_valid_state_transitions():
     """Test that valid state transitions work properly."""

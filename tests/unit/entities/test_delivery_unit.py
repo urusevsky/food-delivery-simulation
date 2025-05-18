@@ -7,6 +7,7 @@ from delivery_sim.entities.pair import Pair
 from delivery_sim.entities.driver import Driver
 from delivery_sim.events.event_dispatcher import EventDispatcher
 from delivery_sim.events.delivery_unit_events import DeliveryUnitStateChangedEvent
+from delivery_sim.utils.entity_type_utils import EntityType
 
 # Test Group 1: Testing DeliveryUnit initialization for single orders
 def test_delivery_unit_creation_with_single_order():
@@ -29,6 +30,7 @@ def test_delivery_unit_creation_with_single_order():
     assert delivery_unit.state == DeliveryUnitState.IN_PROGRESS, "Initial state should be IN_PROGRESS"
     assert delivery_unit.assignment_time == assignment_time, "Assignment time should match provided value"
     assert delivery_unit.completion_time is None, "Completion time should be None initially"
+    assert delivery_unit.entity_type == EntityType.DELIVERY_UNIT
     
     # Verify assignment decision information is initialized
     assert delivery_unit.assignment_path is None

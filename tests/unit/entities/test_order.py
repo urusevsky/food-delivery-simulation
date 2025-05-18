@@ -5,6 +5,8 @@ from delivery_sim.entities.order import Order
 from delivery_sim.entities.states import OrderState
 from delivery_sim.events.event_dispatcher import EventDispatcher
 from delivery_sim.events.order_events import OrderStateChangedEvent
+from delivery_sim.utils.entity_type_utils import EntityType
+
 
 # Group 1: Testing Order creation and basic properties
 def test_order_creation():
@@ -29,6 +31,7 @@ def test_order_creation():
     assert order.state == OrderState.CREATED, "Initial state should be CREATED"
     assert order.pair is None, "Initial pair should be None"
     assert order.delivery_unit is None, "Initial delivery_unit should be None"
+    assert order.entity_type == EntityType.ORDER
 
 # Group 2: Testing state transitions (valid cases)
 def test_all_valid_state_transitions():

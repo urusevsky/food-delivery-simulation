@@ -6,6 +6,7 @@ from delivery_sim.entities.order import Order
 from delivery_sim.entities.states import PairState, OrderState
 from delivery_sim.events.event_dispatcher import EventDispatcher
 from delivery_sim.events.pair_events import PairStateChangedEvent
+from delivery_sim.utils.entity_type_utils import EntityType
 
 def test_pair_initialization():
     """Test that a Pair is properly initialized with correct attributes."""
@@ -30,6 +31,7 @@ def test_pair_initialization():
     assert pair.optimal_sequence is None
     assert pair.optimal_cost is None
     assert pair.delivery_unit is None
+    assert pair.entity_type == EntityType.PAIR
 
 def test_valid_state_transitions():
     """Test that valid state transitions work properly."""
