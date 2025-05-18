@@ -284,11 +284,11 @@ class PairingService:
             bool: True if orders meet proximity criteria, False otherwise
         """
         # Calculate distances
-        restaurant_distance = self._calculate_distance(
+        restaurant_distance = calculate_distance(
             order1.restaurant_location,
             order2.restaurant_location
         )
-        customer_distance = self._calculate_distance(
+        customer_distance = calculate_distance(
             order1.customer_location,
             order2.customer_location
         )
