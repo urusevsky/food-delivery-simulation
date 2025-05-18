@@ -5,8 +5,7 @@ from delivery_sim.events.order_events import OrderCreatedEvent
 from delivery_sim.events.pair_events import PairCreatedEvent, PairingFailedEvent
 from delivery_sim.events.driver_events import DriverLoggedInEvent
 from delivery_sim.events.delivery_unit_events import DeliveryUnitCompletedEvent, DeliveryUnitAssignedEvent
-from delivery_sim.utils.location_utils import calculate_distance, locations_are_equal
-from delivery_sim.utils.validation_utils import log_entity_not_found
+from delivery_sim.utils.location_utils import calculate_distance
 from delivery_sim.utils.logging_system import get_logger
 from delivery_sim.utils.entity_type_utils import EntityType
 

@@ -1,7 +1,6 @@
 from delivery_sim.entities.states import DriverState
 from delivery_sim.events.driver_events import DriverLoggedInEvent, DriverLogoutAttemptEvent, DriverLoggedOutEvent
 from delivery_sim.events.delivery_unit_events import DeliveryUnitCompletedEvent
-from delivery_sim.utils.validation_utils import log_entity_not_found
 from delivery_sim.utils.logging_system import get_logger
 
 class DriverSchedulingService:

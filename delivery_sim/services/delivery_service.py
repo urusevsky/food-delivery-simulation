@@ -1,7 +1,6 @@
 from delivery_sim.entities.states import OrderState, DriverState, DeliveryUnitState
 from delivery_sim.events.delivery_unit_events import DeliveryUnitCompletedEvent, DeliveryUnitAssignedEvent
 from delivery_sim.utils.location_utils import calculate_distance, locations_are_equal
-from delivery_sim.utils.validation_utils import log_entity_not_found
 from delivery_sim.utils.logging_system import get_logger
 from delivery_sim.utils.entity_type_utils import EntityType
 

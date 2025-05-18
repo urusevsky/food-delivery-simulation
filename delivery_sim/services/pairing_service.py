@@ -3,7 +3,6 @@ from delivery_sim.events.pair_events import PairCreatedEvent, PairingFailedEvent
 from delivery_sim.entities.pair import Pair
 from delivery_sim.entities.states import OrderState
 from delivery_sim.utils.location_utils import calculate_distance, locations_are_equal
-from delivery_sim.utils.validation_utils import log_entity_not_found
 from delivery_sim.utils.logging_system import get_logger
 
 class PairingService:
