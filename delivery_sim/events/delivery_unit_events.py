@@ -10,7 +10,7 @@ class DeliveryUnitAssignedEvent(DeliveryUnitEvent):
     """Event for when a delivery entity is assigned to a driver."""
     def __init__(self, timestamp, delivery_unit_id, entity_type, entity_id, driver_id):
         super().__init__(timestamp, delivery_unit_id)
-        self.entity_type = entity_type  # "order" or "pair"
+        self.entity_type = entity_type  # EntityType.ORDER or EntityType.PAIR
         self.entity_id = entity_id
         self.driver_id = driver_id
         
