@@ -28,12 +28,13 @@ class DeliveryUnit:
         self.entity_type = EntityType.DELIVERY_UNIT
         self.driver = driver
         
-        # Generate ID based on entity type
+        # Generate ID based on delivery_entity's entity type
         # For consistency: DU-{entity_id}-{driver_id}
-        if hasattr(delivery_entity, 'pair_id'):
+        entity_type = delivery_entity.entity_type
+        if entity_type == EntityType.PAIR:
             # It's a pair: DU-P-O1_O2-D1
             self.unit_id = f"DU-{delivery_entity.pair_id}-{driver.driver_id}"
-        else:
+        else:  # Must be ORDER
             # It's a single order: DU-O1-D1
             self.unit_id = f"DU-{delivery_entity.order_id}-{driver.driver_id}"
         
