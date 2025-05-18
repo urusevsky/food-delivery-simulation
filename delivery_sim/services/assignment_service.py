@@ -8,6 +8,7 @@ from delivery_sim.events.delivery_unit_events import DeliveryUnitCompletedEvent,
 from delivery_sim.utils.location_utils import calculate_distance, locations_are_equal
 from delivery_sim.utils.validation_utils import log_entity_not_found
 from delivery_sim.utils.logging_system import get_logger
+from delivery_sim.utils.entity_type_utils import EntityType
 
 class AssignmentService:
     """
@@ -85,7 +86,7 @@ class AssignmentService:
             return
             
         # Pass validated entity to operation
-        self.attempt_immediate_assignment_from_delivery_entity(order, "order")
+        self.attempt_immediate_assignment_from_delivery_entity(order)
     
     def handle_pair_created(self, event):
         """
@@ -104,7 +105,7 @@ class AssignmentService:
             return
             
         # Pass validated entity to operation
-        self.attempt_immediate_assignment_from_delivery_entity(pair, "pair")
+        self.attempt_immediate_assignment_from_delivery_entity(pair)
     
     def handle_pairing_failed(self, event):
         """
@@ -123,7 +124,7 @@ class AssignmentService:
             return
             
         # Pass validated entity to operation
-        self.attempt_immediate_assignment_from_delivery_entity(order, "order")
+        self.attempt_immediate_assignment_from_delivery_entity(order)
     
     def handle_driver_login(self, event):
         """
@@ -165,7 +166,7 @@ class AssignmentService:
     
     # ===== Operations =====
     
-    def attempt_immediate_assignment_from_delivery_entity(self, delivery_entity, entity_type):
+    def attempt_immediate_assignment_from_delivery_entity(self, delivery_entity):
         """
         Try to find an available driver for a delivery entity.
         
@@ -174,13 +175,16 @@ class AssignmentService:
         
         Args:
             delivery_entity: The order or pair to assign
-            entity_type: Type of entity ("order" or "pair")
             
         Returns:
             bool: True if assignment succeeded, False otherwise
         """
-        entity_id = delivery_entity.order_id if entity_type == "order" else delivery_entity.pair_id
+        # Get entity type directly from the entity
+        entity_type = delivery_entity.entity_type
+        entity_id = delivery_entity.order_id if entity_type == EntityType.ORDER else delivery_entity.pair_id
+        
         self.logger.debug(f"[t={self.env.now:.2f}] Attempting immediate assignment for {entity_type} {entity_id}")
+    
         
         # Business logic: Check for available drivers
         available_drivers = self.driver_repository.find_available_drivers()
@@ -319,6 +323,10 @@ class AssignmentService:
         if driver.state != DriverState.AVAILABLE:
             self.logger.validation(f"[t={self.env.now:.2f}] Critical error: Driver {driver.driver_id} not available when creating assignment")
             return None
+        
+        # Get entity type once
+        entity_type = entity.entity_type
+        entity_id = entity.order_id if entity_type == EntityType.ORDER else entity.pair_id
             
         # Create delivery unit
         self.logger.debug(f"[t={self.env.now:.2f}] Creating delivery unit for assignment of driver {driver.driver_id} to "
@@ -343,12 +351,12 @@ class AssignmentService:
         # Add to repository
         self.delivery_unit_repository.add(delivery_unit)
         
-        # Update entity state
-        if hasattr(entity, 'order_id'):  # It's an order
+        # Update entity state based on type
+        if entity_type == EntityType.ORDER:
             entity.transition_to(OrderState.ASSIGNED, self.event_dispatcher, self.env)
             entity.delivery_unit = delivery_unit
             self.logger.debug(f"[t={self.env.now:.2f}] Updated order {entity.order_id} state to ASSIGNED")
-        else:  # It's a pair
+        else:  # Must be PAIR
             entity.transition_to(PairState.ASSIGNED, self.event_dispatcher, self.env)
             entity.delivery_unit = delivery_unit
             # Also update constituent orders
@@ -357,21 +365,21 @@ class AssignmentService:
             entity.order2.transition_to(OrderState.ASSIGNED, self.event_dispatcher, self.env)
             entity.order2.delivery_unit = delivery_unit
             self.logger.debug(f"[t={self.env.now:.2f}] Updated pair {entity.pair_id} state to ASSIGNED")
-        
+    
         # Update driver state
         driver.transition_to(DriverState.DELIVERING, self.event_dispatcher, self.env)
         driver.current_delivery_unit = delivery_unit
         self.logger.debug(f"[t={self.env.now:.2f}] Updated driver {driver.driver_id} state to DELIVERING")
         
         # Dispatch event
-        entity_type = "order" if hasattr(entity, 'order_id') else "pair"
-        entity_id = entity.order_id if entity_type == "order" else entity.pair_id
+        # Convert our EntityType constant to string format expected by the event
+        entity_type_str = "order" if entity_type == EntityType.ORDER else "pair"
         
         self.logger.simulation_event(f"[t={self.env.now:.2f}] Dispatching DeliveryUnitAssignedEvent for unit {delivery_unit.unit_id}")
         self.event_dispatcher.dispatch(DeliveryUnitAssignedEvent(
             timestamp=self.env.now,
             delivery_unit_id=delivery_unit.unit_id,
-            entity_type=entity_type,
+            entity_type=entity_type_str,  # Event still uses string format
             entity_id=entity_id,
             driver_id=driver.driver_id
         ))
@@ -405,11 +413,12 @@ class AssignmentService:
         throughput_component = self.config.throughput_factor * num_orders
         
         # Calculate age component (fairness)
-        if hasattr(entity, 'pair_id'):  # It's a pair
+        entity_type = entity.entity_type
+        if entity_type == EntityType.PAIR:
             arrival_time = min(entity.order1.arrival_time, entity.order2.arrival_time)
-        else:  # It's an order
+        else:  # Must be ORDER
             arrival_time = entity.arrival_time
-        
+
         age_minutes = self.env.now - arrival_time
         age_discount = self.config.age_factor * age_minutes
         
@@ -445,13 +454,15 @@ class AssignmentService:
         Returns:
             float: Total travel distance/time cost
         """
-        if hasattr(delivery_entity, 'order_id'):  # It's an order
+        entity_type = delivery_entity.entity_type
+        
+        if entity_type == EntityType.ORDER:
             cost = calculate_distance(driver.location, delivery_entity.restaurant_location) + \
                 calculate_distance(delivery_entity.restaurant_location, delivery_entity.customer_location)
                 
             self.logger.debug(f"[t={self.env.now:.2f}] Calculated base cost for single order {delivery_entity.order_id}: {cost:.2f}")
             return cost
-        else:  # It's a pair
+        else:  # Must be PAIR
             # First leg is from driver to first pickup location
             cost = calculate_distance(driver.location, delivery_entity.optimal_sequence[0]) + \
                 delivery_entity.optimal_cost
