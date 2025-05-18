@@ -42,18 +42,3 @@ def get_entity_type_from_id(entity_id):
     
     return None
 
-
-def get_delivery_unit_content_type(delivery_unit):
-    """
-    Get the type of entity contained in a delivery unit.
-    
-    Args:
-        delivery_unit: A DeliveryUnit object
-        
-    Returns:
-        str: EntityType.ORDER, EntityType.PAIR, or None
-    """
-    if not hasattr(delivery_unit, 'delivery_entity'):
-        return None
-    
-    return delivery_unit.delivery_entity.entity_type
