@@ -82,12 +82,12 @@ class DeliveryService:
             return
         
         # Validate delivery entity (order or pair)
-        if entity_type == "order":
+        if entity_type == EntityType.ORDER:
             entity = self.order_repository.find_by_id(entity_id)
             if not entity:
                 self.logger.validation(f"[t={self.env.now:.2f}] Order {entity_id} not found, cannot start delivery")
                 return
-        else:  # entity_type == "pair"
+        else:  # entity_type == EntityType.PAIR
             entity = self.pair_repository.find_by_id(entity_id)
             if not entity:
                 self.logger.validation(f"[t={self.env.now:.2f}] Pair {entity_id} not found, cannot start delivery")

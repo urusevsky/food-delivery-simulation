@@ -250,12 +250,15 @@ class AssignmentService:
         # Find best entity for this driver
         best_entity, adjusted_cost, cost_components = self._find_best_match(driver, delivery_candidates)
         
-        # Determine entity type and ID for logging
-        entity_type = "order" if hasattr(best_entity, 'order_id') else "pair"
-        entity_id = best_entity.order_id if entity_type == "order" else best_entity.pair_id
-        
+        # Get entity type directly from the entity
+        entity_type = best_entity.entity_type 
+        entity_id = best_entity.order_id if entity_type == EntityType.ORDER else best_entity.pair_id
+
+        # For logging messages where we still use string representation
+        entity_type_str = "order" if entity_type == EntityType.ORDER else "pair"
+
         self.logger.debug(f"[t={self.env.now:.2f}] Best match for driver {driver.driver_id}: "
-                        f"{entity_type} {entity_id} with adjusted cost {adjusted_cost:.2f} "
+                        f"{entity_type_str} {entity_id} with adjusted cost {adjusted_cost:.2f} "
                         f"(base: {cost_components['base_cost']:.2f}, throughput: {cost_components['throughput_component']:.2f}, "
                         f"age: {cost_components['age_discount']:.2f})")
         
@@ -287,9 +290,13 @@ class AssignmentService:
         best_adjusted_cost = float('inf')
         best_components = None
         
+        # Determine entity type for role assignment
+        fixed_entity_type = fixed_entity.entity_type
+        is_driver = fixed_entity_type == EntityType.DRIVER
+        
         for candidate in candidates:
             # Determine which is the driver and which is the entity
-            if hasattr(fixed_entity, 'driver_id'):
+            if is_driver:
                 driver = fixed_entity
                 entity = candidate
             else:
@@ -330,8 +337,8 @@ class AssignmentService:
             
         # Create delivery unit
         self.logger.debug(f"[t={self.env.now:.2f}] Creating delivery unit for assignment of driver {driver.driver_id} to "
-                        f"{'order' if hasattr(entity, 'order_id') else 'pair'} "
-                        f"{entity.order_id if hasattr(entity, 'order_id') else entity.pair_id}")
+                        f"{entity_type} "  # Use entity_type directly
+                        f"{entity_id}")    # Use entity_id already computed
         
         delivery_unit = DeliveryUnit(entity, driver, self.env.now)
         delivery_unit.assignment_path = assignment_path
@@ -372,14 +379,11 @@ class AssignmentService:
         self.logger.debug(f"[t={self.env.now:.2f}] Updated driver {driver.driver_id} state to DELIVERING")
         
         # Dispatch event
-        # Convert our EntityType constant to string format expected by the event
-        entity_type_str = "order" if entity_type == EntityType.ORDER else "pair"
-        
         self.logger.simulation_event(f"[t={self.env.now:.2f}] Dispatching DeliveryUnitAssignedEvent for unit {delivery_unit.unit_id}")
         self.event_dispatcher.dispatch(DeliveryUnitAssignedEvent(
             timestamp=self.env.now,
             delivery_unit_id=delivery_unit.unit_id,
-            entity_type=entity_type_str,  # Event still uses string format
+            entity_type=entity_type,  
             entity_id=entity_id,
             driver_id=driver.driver_id
         ))
@@ -405,15 +409,17 @@ class AssignmentService:
         Returns:
             tuple: (adjusted_cost, components_dictionary)
         """
+        # Get entity type once
+        entity_type = entity.entity_type
+
         # Calculate base delivery cost
         base_cost = self.calculate_base_delivery_cost(driver, entity)
         
         # Calculate throughput component
-        num_orders = 2 if hasattr(entity, 'pair_id') else 1
+        num_orders = 2 if entity_type == EntityType.PAIR else 1
         throughput_component = self.config.throughput_factor * num_orders
         
         # Calculate age component (fairness)
-        entity_type = entity.entity_type
         if entity_type == EntityType.PAIR:
             arrival_time = min(entity.order1.arrival_time, entity.order2.arrival_time)
         else:  # Must be ORDER
@@ -565,8 +571,8 @@ class AssignmentService:
         
         for entity in waiting_entities:
             row = []
-            entity_type = "order" if hasattr(entity, 'order_id') else "pair"
-            entity_id = entity.order_id if entity_type == "order" else entity.pair_id
+            entity_type = entity.entity_type
+            entity_id = entity.order_id if entity_type == EntityType.ORDER else entity.pair_id
             
             for driver in available_drivers:
                 adjusted_cost, _ = self.calculate_adjusted_cost(driver, entity)
