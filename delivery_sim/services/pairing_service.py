@@ -168,7 +168,11 @@ class PairingService:
         
         # Add to repository
         self.pair_repository.add(pair)
-        
+
+        # Set bidirectional references 
+        order1.pair = pair
+        order2.pair = pair
+
         # Update order states - assuming transition_to logs its own actions
         order1.transition_to(OrderState.PAIRED, self.event_dispatcher, self.env)
         order2.transition_to(OrderState.PAIRED, self.event_dispatcher, self.env)
