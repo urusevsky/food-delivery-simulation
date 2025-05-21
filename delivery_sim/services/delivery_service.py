@@ -1,4 +1,4 @@
-from delivery_sim.entities.states import OrderState, DriverState, DeliveryUnitState
+from delivery_sim.entities.states import OrderState, PairState, DriverState, DeliveryUnitState
 from delivery_sim.events.delivery_unit_events import DeliveryUnitCompletedEvent, DeliveryUnitAssignedEvent
 from delivery_sim.utils.location_utils import calculate_distance, locations_are_equal
 from delivery_sim.utils.logging_system import get_logger
@@ -258,6 +258,7 @@ class DeliveryService:
                                f"to customer at time {self.env.now}")
                 
                 if is_complete:
+                    pair.transition_to(PairState.COMPLETED, self.event_dispatcher, self.env)
                     self.logger.info(f"[t={self.env.now:.2f}] All orders in Pair {pair.pair_id} have been delivered")
     
     def _complete_delivery_unit(self, driver, delivery_unit):
