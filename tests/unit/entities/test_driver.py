@@ -76,22 +76,6 @@ def test_location_update():
     
     assert driver.location == new_location
 
-def test_can_logout():
-    """Test the logout capability determination."""
-    driver = Driver("D1", [0, 0], 100, 120)
-    
-    # Driver should be able to log out when AVAILABLE
-    assert driver.can_logout() is True
-    
-    # Driver should not be able to log out when DELIVERING
-    driver.transition_to(DriverState.DELIVERING)
-    assert driver.can_logout() is False
-    
-    # Driver should not be able to log out when OFFLINE (already logged out)
-    driver = Driver("D2", [0, 0], 100, 120)
-    driver.transition_to(DriverState.OFFLINE)
-    assert driver.can_logout() is False
-
 def test_driver_state_change_dispatches_event():
     """Test that state changes generate events when a dispatcher is provided."""
     # Setup

@@ -123,13 +123,6 @@ class Driver:
         self.location = new_location
         self.logger.debug(f"Driver {self.driver_id} location updated from {old_location} to {new_location}")
     
-    def can_logout(self):
-        """Check if this driver can log out (must be in AVAILABLE state)."""
-        can_logout = self.state == DriverState.AVAILABLE
-        if not can_logout:
-            self.logger.debug(f"Driver {self.driver_id} cannot log out: current state is {self.state}")
-        return can_logout
-    
     def __str__(self):
         """String representation of the driver"""
         return f"Driver(id={self.driver_id}, state={self.state}, location={self.location})"
