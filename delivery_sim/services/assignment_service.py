@@ -145,7 +145,10 @@ class AssignmentService:
         self.attempt_immediate_assignment_from_driver(driver)
     
     def handle_driver_available_for_assignment(self, event):
-        """Handler for when a driver becomes available - validates and routes to operation."""
+        """
+        Handler for DriverAvailableForAssignmentEvent(when a driver becomes available after delivery completion)
+        Validates the driver and attempts immediate assignment if valid.
+        """
         
         # Log event handling
         self.logger.simulation_event(f"[t={self.env.now:.2f}] Handling DriverAvailableForAssignmentEvent for unit {event.delivery_unit_id} by driver {event.driver_id}")
