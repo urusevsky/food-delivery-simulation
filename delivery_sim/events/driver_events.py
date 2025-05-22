@@ -32,19 +32,6 @@ class DriverLoggedOutEvent(DriverEvent):
         self.login_time = login_time
         self.total_service_time = timestamp - login_time
 
-class DriverLogoutAttemptEvent(DriverEvent):
-    """Event for when the system attempts to log out a driver at their intended time."""
-    
-    def __init__(self, timestamp, driver_id):
-        """
-        Initialize a driver logout attempt event.
-        
-        Args:
-            timestamp: When this event occurred
-            driver_id: ID of the driver who might log out
-        """
-        super().__init__(timestamp, driver_id)
-
 class DriverStateChangedEvent(DriverEvent):
     """Event for when a driver's state changes."""
     
