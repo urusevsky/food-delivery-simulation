@@ -78,3 +78,14 @@ class DriverLocationUpdatedEvent(DriverEvent):
         super().__init__(timestamp, driver_id)
         self.old_location = old_location
         self.new_location = new_location
+
+class DriverAvailableForAssignmentEvent(Event):
+    """
+    Event indicating a driver has completed a delivery and is eligible for new assignments.
+    
+    This event is only dispatched after verifying the driver hasn't reached their
+    intended logout time, ensuring assignment attempts only happen for eligible drivers.
+    """
+    def __init__(self, timestamp, driver_id):
+        super().__init__(timestamp)
+        self.driver_id = driver_id        

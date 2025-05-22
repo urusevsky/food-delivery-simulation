@@ -3,8 +3,8 @@ from delivery_sim.entities.states import OrderState, DriverState, PairState
 from delivery_sim.entities.delivery_unit import DeliveryUnit
 from delivery_sim.events.order_events import OrderCreatedEvent
 from delivery_sim.events.pair_events import PairCreatedEvent, PairingFailedEvent
-from delivery_sim.events.driver_events import DriverLoggedInEvent
-from delivery_sim.events.delivery_unit_events import DeliveryUnitCompletedEvent, DeliveryUnitAssignedEvent
+from delivery_sim.events.driver_events import DriverLoggedInEvent, DriverAvailableForAssignmentEvent
+from delivery_sim.events.delivery_unit_events import DeliveryUnitAssignedEvent
 from delivery_sim.utils.location_utils import calculate_distance
 from delivery_sim.utils.logging_system import get_logger
 from delivery_sim.utils.entity_type_utils import EntityType
@@ -59,8 +59,8 @@ class AssignmentService:
         self.logger.simulation_event(f"[t={self.env.now:.2f}] Registering handler for DriverLoggedInEvent")
         event_dispatcher.register(DriverLoggedInEvent, self.handle_driver_login)
         
-        self.logger.simulation_event(f"[t={self.env.now:.2f}] Registering handler for DeliveryUnitCompletedEvent")
-        event_dispatcher.register(DeliveryUnitCompletedEvent, self.handle_delivery_completed)
+        self.logger.simulation_event(f"[t={self.env.now:.2f}] Registering handler for DriverAvailableForAssignmentEvent")
+        event_dispatcher.register(DriverAvailableForAssignmentEvent, self.handle_driver_available_for_assignment)
         
         # Start the periodic assignment process
         self.logger.info(f"[t={self.env.now:.2f}] Starting periodic assignment process with interval {config.periodic_interval} minutes")
@@ -144,13 +144,11 @@ class AssignmentService:
         # Pass validated entity to operation
         self.attempt_immediate_assignment_from_driver(driver)
     
-    def handle_delivery_completed(self, event):
-        """
-        Handler for DeliveryUnitCompletedEvent.
-        Validates the driver and attempts immediate assignment if valid.
-        """
+    def handle_driver_available_for_assignment(self, event):
+        """Handler for when a driver becomes available - validates and routes to operation."""
+        
         # Log event handling
-        self.logger.simulation_event(f"[t={self.env.now:.2f}] Handling DeliveryUnitCompletedEvent for unit {event.delivery_unit_id} by driver {event.driver_id}")
+        self.logger.simulation_event(f"[t={self.env.now:.2f}] Handling DriverAvailableForAssignmentEvent for unit {event.delivery_unit_id} by driver {event.driver_id}")
         
         # Validate driver exists
         driver_id = event.driver_id

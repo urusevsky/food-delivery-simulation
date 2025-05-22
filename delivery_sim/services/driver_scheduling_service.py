@@ -1,5 +1,5 @@
 from delivery_sim.entities.states import DriverState
-from delivery_sim.events.driver_events import DriverLoggedInEvent, DriverLogoutAttemptEvent, DriverLoggedOutEvent
+from delivery_sim.events.driver_events import DriverLoggedInEvent, DriverAvailableForAssignmentEvent, DriverLoggedOutEvent
 from delivery_sim.events.delivery_unit_events import DeliveryUnitCompletedEvent
 from delivery_sim.utils.logging_system import get_logger
 
@@ -24,8 +24,6 @@ class DriverSchedulingService:
         self.logger.simulation_event(f"[t={self.env.now:.2f}] Registering handler for DeliveryUnitCompletedEvent")
         self.event_dispatcher.register(DeliveryUnitCompletedEvent, self.handle_delivery_completed)
         
-        self.logger.simulation_event(f"[t={self.env.now:.2f}] Registering handler for DriverLogoutAttemptEvent")
-        self.event_dispatcher.register(DriverLogoutAttemptEvent, self.handle_driver_logout_attempt)
     
     # ===== Event Handlers (Entry Points) =====
     
@@ -77,31 +75,8 @@ class DriverSchedulingService:
             return
         
         # Pass validated entity to operation
-        self.check_overdue_logout(driver, timestamp)
-    
-    def handle_driver_logout_attempt(self, event):
-        """
-        Handler for scheduled logout attempts at a driver's intended time.
-        
-        Args:
-            event: The DriverLogoutAttemptEvent
-        """
-        # Log event handling
-        self.logger.simulation_event(f"[t={self.env.now:.2f}] Handling DriverLogoutAttemptEvent for driver {event.driver_id}")
-        
-        # Extract identifiers from event
-        driver_id = event.driver_id
-        timestamp = event.timestamp
-        
-        # Validate driver exists
-        driver = self.driver_repository.find_by_id(driver_id)
-        if not driver:
-            self.logger.validation(f"[t={self.env.now:.2f}] Driver {driver_id} not found, cannot attempt logout")
-            return
-        
-        # Pass validated entity to operation
-        self.attempt_driver_logout(driver, timestamp)
-    
+        self.evaluate_driver_availability_after_delivery(driver, event.timestamp)
+      
     # ===== Operations (Business Logic) =====
     
     def schedule_driver_logout(self, driver_id, intended_logout_time):
@@ -115,75 +90,62 @@ class DriverSchedulingService:
         self.logger.info(f"[t={self.env.now:.2f}] Scheduling logout for driver {driver_id} at time {intended_logout_time:.2f}")
         self.env.process(self._driver_logout_process(driver_id, intended_logout_time))
     
-    def check_overdue_logout(self, driver, current_time):
-        """
-        Check if a driver should log out after completing a delivery.
-        
-        This operation assumes the driver has been validated and focuses on business logic.
-        
-        Args:
-            driver: The validated Driver object
-            current_time: Current simulation time
-        """
-        # Business logic: Check if driver is past intended logout time
+    def evaluate_driver_availability_after_delivery(self, driver, current_time):
+        """Operation: Determine if driver should log out or become available for assignment."""
         if current_time >= driver.intended_logout_time:
-            self.logger.info(f"[t={self.env.now:.2f}] Driver {driver.driver_id} has exceeded intended logout time, attempting immediate logout")
-            
-            # Dispatch logout attempt event
-            self.logger.simulation_event(f"[t={self.env.now:.2f}] Dispatching DriverLogoutAttemptEvent for driver {driver.driver_id}")
-            self.event_dispatcher.dispatch(DriverLogoutAttemptEvent(
+            # Driver is overdue - execute immediate logout
+            self.execute_driver_logout(driver, current_time, "overdue")
+        else:
+            # Driver is eligible for assignment - notify assignment service
+            self.logger.info(f"[t={self.env.now:.2f}] Driver {driver.driver_id} available for new assignments")
+            self.event_dispatcher.dispatch(DriverAvailableForAssignmentEvent(
                 timestamp=current_time,
                 driver_id=driver.driver_id
             ))
-        else:
-            self.logger.debug(f"[t={self.env.now:.2f}] Driver {driver.driver_id} has not reached intended logout time yet")
-    
-    def attempt_driver_logout(self, driver, timestamp):
-        """
-        Attempt to log out a driver if they're available.
+
+    def evaluate_scheduled_logout(self, driver_id, current_time):
+        """Operation: Evaluate what to do when a driver's intended logout time arrives."""
+        # Validate driver exists (following light handler pattern even in operations)
+        driver = self.driver_repository.find_by_id(driver_id)
+        if not driver:
+            self.logger.validation(f"[t={self.env.now:.2f}] Driver {driver_id} not found during scheduled logout evaluation")
+            return
         
-        This operation assumes the driver has been validated and focuses on business logic.
+        # Check driver state and take appropriate action
+        if driver.state == DriverState.AVAILABLE:
+            # Driver is idle - log them out immediately
+            self.logger.info(f"[t={self.env.now:.2f}] Driver {driver.driver_id} is available at intended logout time, executing logout")
+            self.execute_driver_logout(driver, current_time, "scheduled")
+            
+        else: # driver.state == DriverState.DELIVERING
+            # Driver is busy - note this but don't interrupt their delivery
+            self.logger.info(f"[t={self.env.now:.2f}] Driver {driver.driver_id} is delivering at intended logout time, logout deferred until delivery completion")
+            
+
+    def execute_driver_logout(self, driver, timestamp, logout_reason):
+        """Operation: Execute the logout procedure (shared by different logout paths)."""
+        self.logger.info(f"[t={self.env.now:.2f}] Logging out driver {driver.driver_id} ({logout_reason})")
+        driver.transition_to(DriverState.OFFLINE, self.event_dispatcher, self.env)
         
-        Args:
-            driver: The validated Driver object
-            timestamp: Current simulation time
-            
-        Returns:
-            bool: True if driver logged out successfully, False otherwise
-        """
-        # Business logic: Check if driver can log out
-        if driver.can_logout():
-            # Update driver state
-            self.logger.info(f"[t={self.env.now:.2f}] Logging out driver {driver.driver_id}")
-            driver.transition_to(DriverState.OFFLINE, self.event_dispatcher, self.env)
-            
-            # Dispatch completion event
-            self.logger.simulation_event(f"[t={self.env.now:.2f}] Dispatching DriverLoggedOutEvent for driver {driver.driver_id}")
-            self.event_dispatcher.dispatch(DriverLoggedOutEvent(
-                timestamp=timestamp,
-                driver_id=driver.driver_id,
-                final_location=driver.location,
-                login_time=driver.login_time
-            ))
-            
-            return True
-        else:
-            self.logger.info(f"[t={self.env.now:.2f}] Cannot log out driver {driver.driver_id}: current state is {driver.state}")
-            return False
-    
+        self.event_dispatcher.dispatch(DriverLoggedOutEvent(
+            timestamp=timestamp,
+            driver_id=driver.driver_id,
+            final_location=driver.location,
+            login_time=driver.login_time
+        ))
+
     # SimPy process (internal method)
     def _driver_logout_process(self, driver_id, intended_logout_time):
-        """SimPy process that schedules a logout attempt at the intended time."""
-        self.logger.debug(f"[t={self.env.now:.2f}] Started driver logout process for driver {driver_id} with intended logout at {intended_logout_time:.2f}")
+        """SimPy process that waits until intended logout time and evaluates driver state."""
+        self.logger.debug(f"[t={self.env.now:.2f}] Started logout monitoring process for driver {driver_id}")
         
+        # Wait until the intended logout time arrives
         time_until_logout = intended_logout_time - self.env.now
         if time_until_logout > 0:
             self.logger.debug(f"[t={self.env.now:.2f}] Waiting {time_until_logout:.2f} minutes until driver {driver_id}'s logout time")
             yield self.env.timeout(time_until_logout)
         
+        # When intended logout time arrives, evaluate what to do
         self.logger.debug(f"[t={self.env.now:.2f}] Driver {driver_id}'s intended logout time reached")
-        self.logger.simulation_event(f"[t={self.env.now:.2f}] Dispatching DriverLogoutAttemptEvent for driver {driver_id}")
-        self.event_dispatcher.dispatch(DriverLogoutAttemptEvent(
-            timestamp=self.env.now,
-            driver_id=driver_id
-        ))
+        self.evaluate_scheduled_logout(driver_id, self.env.now)
+
