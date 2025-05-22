@@ -151,7 +151,7 @@ class AssignmentService:
         """
         
         # Log event handling
-        self.logger.simulation_event(f"[t={self.env.now:.2f}] Handling DriverAvailableForAssignmentEvent for unit {event.delivery_unit_id} by driver {event.driver_id}")
+        self.logger.simulation_event(f"[t={self.env.now:.2f}] Handling DriverAvailableForAssignmentEvent for driver {event.driver_id}")
         
         # Validate driver exists
         driver_id = event.driver_id
