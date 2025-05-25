@@ -37,6 +37,7 @@ from delivery_sim.entities.driver import Driver
 from delivery_sim.entities.pair import Pair
 from delivery_sim.entities.states import OrderState, DriverState, PairState
 from delivery_sim.utils.entity_type_utils import EntityType
+from delivery_sim.utils.location_utils import calculate_distance
 
 
 class TestPeriodicAssignmentOptimization:
@@ -199,6 +200,19 @@ class TestPeriodicAssignmentOptimization:
         pair1 = Pair(order3, order4, env.now)
         pair1.entity_type = EntityType.PAIR
         pair1.state = PairState.CREATED
+        # Initialize optimal_sequence and optimal_cost for pair1 
+        # Assuming order3 and order4 share the same restaurant for this pair.
+        # A plausible sequence: Restaurant -> Customer of order3 -> Customer of order4
+        pair1.optimal_sequence = [
+            order3.restaurant_location, 
+            order3.customer_location, 
+            order4.customer_location
+        ]
+        pair1.optimal_cost = (
+            calculate_distance(order3.restaurant_location, order3.customer_location) +
+            calculate_distance(order3.customer_location, order4.customer_location)
+        )
+
         pair_repo.add(pair1)
         
         # Available drivers (should be collected)
