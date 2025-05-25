@@ -1,4 +1,4 @@
-# tests/integration/test_order_creation_pairing.py
+# tests/integration/test_order_arrival_pairing_integration.py
 import pytest
 import simpy
 from unittest.mock import patch, Mock
