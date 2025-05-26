@@ -1,20 +1,19 @@
 class StructuralConfig:
     """Configuration for fixed infrastructure elements of the simulation."""
     
-def __init__(self, 
-             delivery_area_size,  # km (square area)
-             num_restaurants,
-             driver_speed):       # km per minute
-    
-    self.delivery_area_size = delivery_area_size
-    self.num_restaurants = num_restaurants
-    self.driver_speed = driver_speed
+    def __init__(self, 
+                 delivery_area_size,  # km (square area)
+                 num_restaurants,
+                 driver_speed):       # km per minute
+        
+        self.delivery_area_size = delivery_area_size
+        self.num_restaurants = num_restaurants
+        self.driver_speed = driver_speed
         
     def __str__(self):
         """String representation for debugging and logging."""
         return (f"StructuralConfig(area_size={self.delivery_area_size}km, "
                 f"restaurants={self.num_restaurants})")
-
 
 class OperationalConfig:
     """Configuration for dynamic operational elements of the simulation."""
