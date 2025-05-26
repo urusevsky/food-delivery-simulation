@@ -277,6 +277,9 @@ class DeliveryService:
         self.logger.info(f"[t={self.env.now:.2f}] Completing delivery unit {delivery_unit.unit_id}")
         delivery_unit.transition_to(DeliveryUnitState.COMPLETED, self.event_dispatcher, self.env)
         
+        # Clear the current delivery reference (this line is missing)
+        driver.current_delivery = None
+
         # Add to driver's completed deliveries
         driver.completed_deliveries.append(delivery_unit)
         
