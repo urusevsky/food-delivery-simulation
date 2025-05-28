@@ -17,7 +17,7 @@ def main():
     # Create structural configuration
     structural_config = StructuralConfig(
         delivery_area_size=10,  # 10 km x 10 km area
-        num_restaurants=20,
+        num_restaurants=10,
         driver_speed=0.5  # 0.5 km per minute (30 km/h)
     )
 
@@ -47,8 +47,8 @@ def main():
 
     # Create experiment configuration
     experiment_config = ExperimentConfig(
-        simulation_duration=480,  # 8 hours
-        warmup_period=120,        # 2 hour warm-up
+        simulation_duration=100,  # 8 hours
+        warmup_period=0,        # 2 hour warm-up
         num_replications=1,       # single replication for now
         master_seed=42,           # seed for reproducibility
         metrics_collection_interval=5,  # collect metrics every 5 minutes
