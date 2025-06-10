@@ -16,20 +16,6 @@ class StructuralRNGManager:
         """
         self.structural_seed = structural_seed
         self.rng = np.random.RandomState(structural_seed)
-        
-    def generate_uniform(self, low, high, size=None):
-        """
-        Generate uniformly distributed random numbers.
-        
-        Args:
-            low: Lower bound
-            high: Upper bound
-            size: Output shape (optional)
-            
-        Returns:
-            Uniform random samples
-        """
-        return self.rng.uniform(low, high, size)
 
 class OperationalRNGManager:
     """
