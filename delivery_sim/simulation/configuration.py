@@ -1,3 +1,5 @@
+# delivery_sim/simulation/configuration.py
+
 class StructuralConfig:
     """Configuration for fixed infrastructure elements of the simulation."""
     
@@ -150,19 +152,100 @@ class LoggingConfig:
                 if isinstance(level, str):
                     self.component_levels[component] = get_level_from_name(level)
 
+class ScoringConfig:
+    """
+    Configuration for the priority scoring system.
+    
+    Separates infrastructure reality from business policy as outlined
+    in the Priority Scoring System design document.
+    """
+    
+    def __init__(self, 
+                 # Business policy parameters (constant across configurations)
+                 max_distance_ratio_multiplier=2.0,
+                 max_acceptable_wait=30.0,
+                 max_orders_per_trip=2,
+                 
+                 # Strategic weights (business preferences)
+                 weight_distance=1/3,
+                 weight_throughput=1/3,
+                 weight_fairness=1/3,
+                 
+                 # Typical distance calculation settings
+                 typical_distance_samples=1000):
+        
+        # Validate weights sum to 1 (with tolerance for floating point precision)
+        total_weight = weight_distance + weight_throughput + weight_fairness
+        if abs(total_weight - 1.0) > 0.001:
+            raise ValueError(f"Weights must sum to 1.0, got {total_weight}")
+        
+        # Business policy parameters
+        self.max_distance_ratio_multiplier = max_distance_ratio_multiplier
+        self.max_acceptable_wait = max_acceptable_wait
+        self.max_orders_per_trip = max_orders_per_trip
+        
+        # Strategic weights
+        self.weight_distance = weight_distance
+        self.weight_throughput = weight_throughput
+        self.weight_fairness = weight_fairness
+        
+        # Calculation settings
+        self.typical_distance_samples = typical_distance_samples
+    
+    def __str__(self):
+        """String representation for debugging and logging."""
+        return (f"ScoringConfig("
+                f"weights=({self.weight_distance:.3f},{self.weight_throughput:.3f},{self.weight_fairness:.3f}), "
+                f"max_ratio={self.max_distance_ratio_multiplier}, "
+                f"max_wait={self.max_acceptable_wait}min)")
+
+class FlatConfig:
+    """
+    A wrapper class that presents a flat interface for configuration attributes.
+    
+    This allows services to access attributes without knowing which config 
+    object they belong to, simplifying service implementation.
+    """
+    def __init__(self, structural_config, operational_config, experiment_config, 
+                 logging_config, scoring_config):
+        self.structural_config = structural_config
+        self.operational_config = operational_config
+        self.experiment_config = experiment_config
+        self.logging_config = logging_config
+        self.scoring_config = scoring_config
+    
+    def __getattr__(self, name):
+        # Try to find the attribute in each config object
+        for config in [self.operational_config, self.structural_config, 
+                      self.experiment_config, self.logging_config, 
+                      self.scoring_config]:
+            if hasattr(config, name):
+                return getattr(config, name)
+        
+        raise AttributeError(f"'FlatConfig' object has no attribute '{name}'")
+
 class SimulationConfig:
     """Complete configuration for a simulation experiment."""
     
     def __init__(self, structural_config, operational_config, 
-                 experiment_config, logging_config=None):
+                 experiment_config, logging_config, scoring_config):
         self.structural_config = structural_config
         self.operational_config = operational_config
         self.experiment_config = experiment_config
-        self.logging_config = logging_config or LoggingConfig()
+        self.logging_config = logging_config
+        self.scoring_config = scoring_config
+        
+        # Create flat config for convenient service access
+        self.flat_config = FlatConfig(
+            structural_config, operational_config, experiment_config,
+            logging_config, scoring_config
+        )
     
     def __str__(self):
         """String representation for debugging and logging."""
         return (f"SimulationConfig:\n"
                 f"  {self.structural_config}\n"
                 f"  {self.operational_config}\n"
-                f"  {self.experiment_config}")
+                f"  {self.experiment_config}\n"
+                f"  {self.logging_config}\n"
+                f"  {self.scoring_config}")
