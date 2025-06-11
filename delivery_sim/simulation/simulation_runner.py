@@ -17,30 +17,6 @@ from delivery_sim.utils.id_generator import PrefixedIdGenerator
 from delivery_sim.utils.logging_system import get_logger, configure_logging
 
 
-class FlatConfig:
-    """
-    A wrapper class that presents a flat interface for configuration attributes.
-    
-    This allows services to access attributes without knowing which config 
-    object they belong to, simplifying service implementation.
-    """
-    def __init__(self, structural_config, operational_config, experiment_config):
-        self.structural_config = structural_config
-        self.operational_config = operational_config
-        self.experiment_config = experiment_config
-    
-    def __getattr__(self, name):
-        # Try to find the attribute in each config object
-        if hasattr(self.operational_config, name):
-            return getattr(self.operational_config, name)
-        elif hasattr(self.structural_config, name):
-            return getattr(self.structural_config, name)
-        elif hasattr(self.experiment_config, name):
-            return getattr(self.experiment_config, name)
-        else:
-            raise AttributeError(f"'FlatConfig' object has no attribute '{name}'")
-
-
 class SimulationRunner:
     """
     Orchestrates the initialization and execution of the food delivery simulation.
@@ -48,23 +24,18 @@ class SimulationRunner:
     This class handles setting up all necessary components, connecting them
     appropriately, and running the simulation for the specified duration.
     """
-    def __init__(self, config):
+    def __init__(self, simulation_config):
         # Get a logger instance specific to this component
         self.logger = get_logger("simulation.runner")
         
         # Store the hierarchical configuration
-        self.config = config
+        self.config = simulation_config
         
         # Create a flat config wrapper for services
-        self.flat_config = FlatConfig(
-            config.structural_config,
-            config.operational_config,
-            config.experiment_config
-        )
+        self.flat_config = simulation_config.flat_config  # Easy access
         
         # Configure logging based on config
-        if hasattr(config, 'logging_config'):
-            configure_logging(config.logging_config)
+        configure_logging(simulation_config.logging_config)
         
         # Log initialization
         self.logger.info("SimulationRunner initialized")
