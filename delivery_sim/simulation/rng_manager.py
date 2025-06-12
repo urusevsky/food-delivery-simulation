@@ -1,4 +1,13 @@
+# delivery_sim/simulation/rng_manager.py
+"""
+Simplified RNG Managers for Clean Seed Management
+
+Both managers take the same master_seed and handle their own seed transformations
+for mathematical independence while maintaining semantic consistency.
+"""
+
 import numpy as np
+
 
 class StructuralRNGManager:
     """
@@ -7,15 +16,17 @@ class StructuralRNGManager:
     These elements are fixed infrastructure that remain constant across replications
     but may vary between different structural configurations.
     """
-    def __init__(self, structural_seed):
+    
+    def __init__(self, master_seed):
         """
-        Initialize the structural RNG manager with a seed.
+        Initialize structural RNG with master seed.
         
         Args:
-            structural_seed: Seed for structural random generation
+            master_seed: Base seed for all randomness in the experiment
         """
-        self.structural_seed = structural_seed
-        self.rng = np.random.RandomState(structural_seed)
+        self.master_seed = master_seed
+        self.rng = np.random.RandomState(master_seed)
+
 
 class OperationalRNGManager:
     """
@@ -24,22 +35,29 @@ class OperationalRNGManager:
     Maintains separate random streams for different process types to ensure
     independence while enabling Common Random Numbers (CRN) across configurations.
     """
-    def __init__(self, base_seed, replication_number=0):
+    
+    def __init__(self, master_seed, replication_number=0):
         """
-        Initialize operational random streams for a specific replication.
+        Initialize operational RNG with independent streams.
         
         Args:
-            base_seed: Base seed for the experiment
-            replication_number: Current replication number (default: 0)
+            master_seed: Base seed for all randomness in the experiment
+            replication_number: Replication index for stream separation
         """
+        self.master_seed = master_seed
+        self.replication_number = replication_number
+        
         # Create independent streams for each random process
+        # Uses large offsets to ensure mathematical independence
+        base_offset = replication_number * 10000
+        
         self.streams = {
-            'order_arrivals': np.random.RandomState(base_seed + replication_number * 10000 + 1),
-            'driver_arrivals': np.random.RandomState(base_seed + replication_number * 10000 + 2),
-            'service_duration': np.random.RandomState(base_seed + replication_number * 10000 + 3),
-            'customer_locations': np.random.RandomState(base_seed + replication_number * 10000 + 4),
-            'driver_initial_locations': np.random.RandomState(base_seed + replication_number * 10000 + 5),
-            'restaurant_selection': np.random.RandomState(base_seed + replication_number * 10000 + 6)
+            'order_arrivals': np.random.RandomState(master_seed + base_offset + 1),
+            'driver_arrivals': np.random.RandomState(master_seed + base_offset + 2),
+            'service_duration': np.random.RandomState(master_seed + base_offset + 3),
+            'customer_locations': np.random.RandomState(master_seed + base_offset + 4),
+            'driver_initial_locations': np.random.RandomState(master_seed + base_offset + 5),
+            'restaurant_selection': np.random.RandomState(master_seed + base_offset + 6)
         }
     
     def get_stream(self, process_name):
@@ -56,5 +74,11 @@ class OperationalRNGManager:
             ValueError: If process name is unknown
         """
         if process_name not in self.streams:
-            raise ValueError(f"Unknown process: {process_name}")
+            available_streams = ', '.join(self.streams.keys())
+            raise ValueError(f"Unknown process: {process_name}. Available: {available_streams}")
+        
         return self.streams[process_name]
+    
+    def get_available_streams(self):
+        """Get list of available stream names."""
+        return list(self.streams.keys())
