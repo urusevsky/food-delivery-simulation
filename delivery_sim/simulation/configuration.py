@@ -73,54 +73,11 @@ class OperationalConfig:
 
 
 class ExperimentConfig:
-    """Configuration for experimental parameters and data collection."""
+    def __init__(self, simulation_duration, num_replications, master_seed):
+        self.simulation_duration = simulation_duration  # minutes
+        self.num_replications = num_replications        # 1 for single replication
+        self.master_seed = master_seed                  # base seed for all randomness
     
-    def __init__(self,
-                 simulation_duration,            # minutes
-                 warmup_period,                  # minutes to exclude from statistics
-                 num_replications,               # number of independent simulation runs
-                 master_seed,                    # primary seed controlling all randomness
-                 metrics_collection_interval,    # minutes between metric snapshots
-                 event_recording_enabled):       # whether to record detailed events
-        
-        self.simulation_duration = simulation_duration
-        self.warmup_period = warmup_period
-        self.num_replications = num_replications
-        self.master_seed = master_seed  # Renamed from random_seed for clarity
-        self.metrics_collection_interval = metrics_collection_interval
-        self.event_recording_enabled = event_recording_enabled
-    
-    def generate_structural_seed(self):
-        """
-        Deterministically derive the structural seed from the master seed.
-        
-        This seed controls fixed infrastructure elements like restaurant locations
-        that remain constant across replications but may vary between configurations.
-        
-        Returns:
-            int: Derived structural seed
-        """
-        return self.master_seed * 17 + 31  # Simple but effective derivation
-    
-    def generate_operational_base_seed(self):
-        """
-        Deterministically derive the operational base seed from the master seed.
-        
-        This seed serves as the base for all operational random processes,
-        which are further diversified by replication number.
-        
-        Returns:
-            int: Derived operational base seed
-        """
-        return self.master_seed * 23 + 41  # Different formula from structural
-    
-    def __str__(self):
-        """String representation for debugging and logging."""
-        return (f"ExperimentConfig("
-                f"duration={self.simulation_duration}min, "
-                f"warmup={self.warmup_period}min, "
-                f"replications={self.num_replications}, "
-                f"master_seed={self.master_seed})")
 
 class LoggingConfig:
     """Configuration for logging system behavior."""
