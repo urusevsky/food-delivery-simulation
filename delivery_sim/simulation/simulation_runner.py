@@ -257,6 +257,7 @@ class SimulationRunner:
                 driver_repository=self.driver_repository,
                 pair_repository=self.pair_repository,
                 delivery_unit_repository=self.delivery_unit_repository,
+                priority_scorer=self.priority_scorer,  # Pass the priority scorer!
                 config=self.config.flat_config
             ),
             
