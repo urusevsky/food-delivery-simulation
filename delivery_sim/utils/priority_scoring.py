@@ -7,6 +7,8 @@ driver-entity assignment opportunities based on distance efficiency,
 throughput optimization, and fairness considerations.
 
 Configuration is handled by ScoringConfig in configuration.py.
+Infrastructure analysis (like typical_distance calculation) is now handled 
+by the infrastructure_analysis module for better separation of concerns.
 """
 
 import numpy as np
@@ -15,54 +17,13 @@ from delivery_sim.utils.entity_type_utils import EntityType
 from delivery_sim.utils.logging_system import get_logger
 
 
-class TypicalDistanceCalculator:
-    """
-    Calculates infrastructure-derived normalizers through Monte Carlo sampling.
-    """
-    
-    @staticmethod
-    def calculate_typical_distance(restaurant_repository, area_size, structural_rng, sample_size=1000):
-        """
-        Derives the characteristic single-order delivery distance
-        for a given infrastructure through Monte Carlo sampling.
-        
-        Args:
-            restaurant_repository: Repository containing restaurant locations
-            area_size: Size of the square delivery area
-            structural_rng: StructuralRNGManager for reproducible sampling
-            sample_size: Number of samples for Monte Carlo estimation
-            
-        Returns:
-            float: Typical distance for this geographic configuration
-        """
-        samples = []
-        restaurants = restaurant_repository.find_all()
-        
-        for _ in range(sample_size):
-            # Sample driver location (uniform in delivery area)
-            driver_loc = structural_rng.rng.uniform(0, area_size, size=2).tolist()
-            
-            # Sample restaurant (uniform selection)
-            restaurant = structural_rng.rng.choice(restaurants)
-            
-            # Sample customer location (uniform in delivery area)
-            customer_loc = structural_rng.rng.uniform(0, area_size, size=2).tolist()
-            
-            # Calculate full delivery distance
-            distance = (
-                calculate_distance(driver_loc, restaurant.location) +
-                calculate_distance(restaurant.location, customer_loc)
-            )
-            samples.append(distance)
-        
-        # Use median for robustness to outliers
-        typical_distance = np.median(samples)
-        return typical_distance
-
-
 class PriorityScorer:
     """
     Main scoring system that evaluates driver-entity assignment opportunities.
+    
+    This scorer is designed to be reusable across multiple replications by separating
+    infrastructure-derived parameters (calculated once) from environment-specific
+    components (updated per replication).
     """
     
     def __init__(self, scoring_config, typical_distance, env):
@@ -71,13 +32,15 @@ class PriorityScorer:
         
         Args:
             scoring_config: ScoringConfig instance from configuration.py
-            typical_distance: Calculated typical distance for this infrastructure
-            env: SimPy environment for logging
+            typical_distance: Pre-calculated typical distance for this infrastructure
+            env: SimPy environment for this replication
         """
         self.config = scoring_config
         self.typical_distance = typical_distance
         self.env = env
         self.logger = get_logger()
+        
+        self.logger.debug(f"PriorityScorer initialized with typical_distance={typical_distance:.3f}km")
     
     def calculate_priority_score(self, driver, entity):
         """
@@ -131,67 +94,81 @@ class PriorityScorer:
         
         Uses two-step normalization for relational measures:
         1. Contextualization: actual_distance / typical_distance  
-        2. Performance assessment: apply universal standard
+        2. Performance evaluation: good performance = low distance ratios
         """
-        actual_distance = self._calculate_total_distance(driver, entity)
+        total_distance = self._calculate_total_distance(driver, entity)
+        distance_ratio = total_distance / self.typical_distance
         
-        # Step 1: Contextualization (acknowledge geographical reality)
-        distance_ratio = actual_distance / self.typical_distance
+        # Transform to score: ratio of 1.0 = score of 1.0 (perfect)
+        # Ratios above max_distance_ratio_multiplier = score of 0.0 (unacceptable)
+        max_ratio = self.config.max_distance_ratio_multiplier
         
-        # Step 2: Performance assessment (apply universal standard)
-        # max(0, ...) ensures score doesn't go below 0
-        distance_score = max(0, 1 - distance_ratio / self.config.max_distance_ratio_multiplier)
+        if distance_ratio <= 1.0:
+            # Better than typical: score above baseline
+            score = 1.0
+        elif distance_ratio >= max_ratio:
+            # Unacceptably long: minimum score
+            score = 0.0
+        else:
+            # Linear interpolation between 1.0 and 0.0
+            score = 1.0 - (distance_ratio - 1.0) / (max_ratio - 1.0)
         
-        return distance_score
+        return max(0.0, min(1.0, score))
     
     def _calculate_throughput_score(self, entity):
         """
-        Calculate throughput value score (0-1, higher = better).
+        Calculate throughput optimization score (0-1, higher = better).
         
-        Direct normalization since order count is absolute measure.
+        Absolute measure - same meaning regardless of geography.
         """
         num_orders = self._get_order_count(entity)
-        throughput_score = num_orders / self.config.max_orders_per_trip
+        max_orders = self.config.max_orders_per_trip
         
-        return throughput_score
+        # Linear scaling: more orders = higher score
+        score = (num_orders - 1) / (max_orders - 1) if max_orders > 1 else 0.0
+        
+        return max(0.0, min(1.0, score))
     
     def _calculate_fairness_score(self, entity):
         """
-        Calculate fairness (wait time) score (0-1, higher urgency = higher score).
+        Calculate fairness score (0-1, higher = better for shorter waits).
         
-        Direct normalization since time is absolute measure.
+        Absolute measure - same meaning regardless of geography.
         """
         wait_time = self._calculate_wait_time(entity)
+        max_wait = self.config.max_acceptable_wait
         
-        # min(1.0, ...) ensures score doesn't exceed 1
-        fairness_score = min(1.0, wait_time / self.config.max_acceptable_wait)
+        # Transform to score: no wait = 1.0, max_wait = 0.0
+        if wait_time <= 0:
+            score = 1.0
+        elif wait_time >= max_wait:
+            score = 0.0
+        else:
+            score = 1.0 - (wait_time / max_wait)
         
-        return fairness_score
+        return max(0.0, min(1.0, score))
     
     def _calculate_total_distance(self, driver, entity):
-        """Calculate total delivery distance for driver-entity assignment."""
-        if entity.entity_type == EntityType.ORDER:
-            # Driver -> Restaurant -> Customer
-            driver_to_restaurant = calculate_distance(
-                driver.current_location, entity.restaurant_location
+        """Calculate total travel distance for this assignment."""
+        if entity.entity_type == EntityType.PAIR:
+            # Driver → Restaurant1 → Customer1 → Restaurant2 → Customer2
+            distance = (
+                calculate_distance(driver.location, entity.order1.restaurant.location) +
+                calculate_distance(entity.order1.restaurant.location, entity.order1.customer_location) +
+                calculate_distance(entity.order1.customer_location, entity.order2.restaurant.location) +
+                calculate_distance(entity.order2.restaurant.location, entity.order2.customer_location)
             )
-            restaurant_to_customer = calculate_distance(
-                entity.restaurant_location, entity.customer_location
-            )
-            return driver_to_restaurant + restaurant_to_customer
-        
-        elif entity.entity_type == EntityType.PAIR:
-            # Use pre-calculated optimal route for pairs
-            driver_to_start = calculate_distance(
-                driver.current_location, entity.optimal_sequence[0]
-            )
-            return driver_to_start + entity.optimal_cost
-        
         else:
-            raise ValueError(f"Unknown entity type: {entity.entity_type}")
+            # Driver → Restaurant → Customer
+            distance = (
+                calculate_distance(driver.location, entity.restaurant.location) +
+                calculate_distance(entity.restaurant.location, entity.customer_location)
+            )
+        
+        return distance
     
     def _get_order_count(self, entity):
-        """Get number of orders in this delivery entity."""
+        """Get number of orders in this entity."""
         return 2 if entity.entity_type == EntityType.PAIR else 1
     
     def _calculate_wait_time(self, entity):
@@ -206,24 +183,28 @@ class PriorityScorer:
         return wait_time_minutes
 
 
-def create_priority_scorer(restaurant_repository, area_size, structural_rng, env, scoring_config):
+def create_priority_scorer(infrastructure_characteristics, scoring_config, env):
     """
-    Factory function to create a PriorityScorer with calculated typical_distance.
+    Factory function to create a PriorityScorer for a specific replication.
+    
+    This creates a variant component that uses pre-calculated infrastructure characteristics
+    but is bound to a specific simulation environment.
     
     Args:
-        restaurant_repository: Repository containing restaurant locations
-        area_size: Size of the square delivery area
-        structural_rng: StructuralRNGManager for reproducible random sampling
-        env: SimPy environment
+        infrastructure_characteristics: Dict containing 'typical_distance' and other metrics
         scoring_config: ScoringConfig instance from configuration.py
+        env: SimPy environment for this replication
         
     Returns:
-        PriorityScorer: Configured scoring system
+        PriorityScorer: Configured scoring system for this replication
     """
-    # Calculate typical distance for this infrastructure
-    typical_distance = TypicalDistanceCalculator.calculate_typical_distance(
-        restaurant_repository, area_size, structural_rng, scoring_config.typical_distance_samples
+    typical_distance = infrastructure_characteristics['typical_distance']
+    
+    # Create scorer bound to this replication's environment
+    scorer = PriorityScorer(
+        scoring_config=scoring_config,
+        typical_distance=typical_distance,
+        env=env
     )
     
-    # Create and return scorer directly
-    return PriorityScorer(scoring_config, typical_distance, env)
+    return scorer
