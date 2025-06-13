@@ -1,3 +1,13 @@
+# tests/unit/entities/test_delivery_unit.py
+"""
+Updated tests for DeliveryUnit entity with priority scoring system.
+
+Changes from adjusted cost system:
+- assignment_costs → assignment_scores  
+- Updated expected dictionary keys to match priority scoring components
+- Updated test values to reflect 0-1 score ranges and 0-100 priority scores
+"""
+
 import pytest
 import simpy
 from delivery_sim.entities.delivery_unit import DeliveryUnit
@@ -26,20 +36,21 @@ def test_delivery_unit_creation_with_single_order():
     # ASSERT - Verify all properties are initialized correctly
     assert delivery_unit.delivery_entity is order, "DeliveryUnit should reference the order"
     assert delivery_unit.driver is driver, "DeliveryUnit should reference the driver"
-    assert delivery_unit.unit_id == "DU-O123-D1", "Unit ID should follow pattern DU-O-{order_id}-{driver_id}"
+    assert delivery_unit.unit_id == "DU-O123-D1", "Unit ID should follow pattern DU-{order_id}-{driver_id}"
     assert delivery_unit.state == DeliveryUnitState.IN_PROGRESS, "Initial state should be IN_PROGRESS"
     assert delivery_unit.assignment_time == assignment_time, "Assignment time should match provided value"
     assert delivery_unit.completion_time is None, "Completion time should be None initially"
     assert delivery_unit.entity_type == EntityType.DELIVERY_UNIT
     
-    # Verify assignment decision information is initialized
+    # Verify assignment decision information is initialized (priority scoring system)
     assert delivery_unit.assignment_path is None
-    assert isinstance(delivery_unit.assignment_costs, dict)
-    assert all(key in delivery_unit.assignment_costs for key in [
-        "base_cost", "throughput_factor", "throughput_discount", 
-        "age_factor", "age_discount", "adjusted_cost"
+    assert isinstance(delivery_unit.assignment_scores, dict)
+    assert all(key in delivery_unit.assignment_scores for key in [
+        "distance_score", "throughput_score", "fairness_score", 
+        "combined_score_0_1", "priority_score_0_100", "total_distance",
+        "num_orders", "wait_time_minutes"
     ])
-    assert all(value is None for value in delivery_unit.assignment_costs.values())
+    assert all(value is None for value in delivery_unit.assignment_scores.values())
 
 # Test Group 2: Testing DeliveryUnit initialization for pairs
 def test_delivery_unit_creation_with_pair():
@@ -60,7 +71,7 @@ def test_delivery_unit_creation_with_pair():
     # ASSERT - Verify the unit ID follows the correct pattern for pairs
     assert delivery_unit.delivery_entity is pair, "DeliveryUnit should reference the pair"
     assert delivery_unit.driver is driver, "DeliveryUnit should reference the driver"
-    assert delivery_unit.unit_id == "DU-P-O101_O102-D2", "Unit ID should follow pattern DU-P-{pair_id}-{driver_id}"
+    assert delivery_unit.unit_id == "DU-P-O101_O102-D2", "Unit ID should follow pattern DU-{pair_id}-{driver_id}"
     assert delivery_unit.state == DeliveryUnitState.IN_PROGRESS, "Initial state should be IN_PROGRESS"
     assert delivery_unit.assignment_time == assignment_time, "Assignment time should match provided value"
 
@@ -157,32 +168,38 @@ def test_state_change_generates_event():
     assert event.new_state == DeliveryUnitState.COMPLETED
     assert event.timestamp == env.now
 
-# Test Group 5: Testing assignment cost recording
-def test_assignment_cost_recording():
+# Test Group 5: Testing assignment score recording (updated for priority scoring)
+def test_assignment_score_recording():
     """
-    Test that assignment costs can be properly recorded in the delivery unit.
-    This is important for tracking the decision-making process.
+    Test that assignment scores can be properly recorded in the delivery unit.
+    This is important for tracking the decision-making process with priority scoring.
     """
     # ARRANGE
     order = Order("O123", [0, 0], [2, 3], 100)
     driver = Driver("D1", [0, 0], 100, 120)
     delivery_unit = DeliveryUnit(order, driver, 110)
     
-    # ACT - Set assignment costs (typically done by AssignmentService)
-    delivery_unit.assignment_costs = {
-        "base_cost": 5.0,
-        "throughput_factor": 1.5,
-        "throughput_discount": 1.5,
-        "age_factor": 0.1,
-        "age_discount": 0.5,
-        "adjusted_cost": 3.0  # 5.0 - 1.5 - 0.5
+    # ACT - Set assignment scores (typically done by AssignmentService)
+    delivery_unit.assignment_scores = {
+        "distance_score": 0.75,        # 75% distance efficiency
+        "throughput_score": 0.0,       # Single order (baseline)
+        "fairness_score": 0.90,        # 90% fairness (short wait)
+        "combined_score_0_1": 0.55,    # Weighted combination
+        "priority_score_0_100": 55.0,  # Final priority score
+        "total_distance": 8.5,         # Actual distance in km
+        "num_orders": 1,               # Number of orders
+        "wait_time_minutes": 3.0       # Wait time
     }
     
-    # ASSERT - Verify costs are recorded correctly
-    assert delivery_unit.assignment_costs["base_cost"] == 5.0
-    assert delivery_unit.assignment_costs["throughput_discount"] == 1.5
-    assert delivery_unit.assignment_costs["age_discount"] == 0.5
-    assert delivery_unit.assignment_costs["adjusted_cost"] == 3.0
+    # ASSERT - Verify scores are recorded correctly
+    assert delivery_unit.assignment_scores["distance_score"] == 0.75
+    assert delivery_unit.assignment_scores["throughput_score"] == 0.0
+    assert delivery_unit.assignment_scores["fairness_score"] == 0.90
+    assert delivery_unit.assignment_scores["combined_score_0_1"] == 0.55
+    assert delivery_unit.assignment_scores["priority_score_0_100"] == 55.0
+    assert delivery_unit.assignment_scores["total_distance"] == 8.5
+    assert delivery_unit.assignment_scores["num_orders"] == 1
+    assert delivery_unit.assignment_scores["wait_time_minutes"] == 3.0
 
 # Test Group 6: Testing assignment path recording
 def test_assignment_path_recording():
@@ -218,10 +235,10 @@ def test_delivery_unit_with_minimal_data():
     # ACT - Create delivery unit without setting optional fields
     delivery_unit = DeliveryUnit(order, driver, 110)
     
-    # ASSERT - Verify it works without assignment costs or path set
+    # ASSERT - Verify it works without assignment scores or path set
     assert delivery_unit.state == DeliveryUnitState.IN_PROGRESS
     assert delivery_unit.assignment_path is None
-    assert all(value is None for value in delivery_unit.assignment_costs.values())
+    assert all(value is None for value in delivery_unit.assignment_scores.values())
     
     # Should still be able to transition state
     delivery_unit.transition_to(DeliveryUnitState.COMPLETED)
