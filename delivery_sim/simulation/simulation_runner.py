@@ -23,7 +23,8 @@ from delivery_sim.services.delivery_service import DeliveryService
 from delivery_sim.services.driver_scheduling_service import DriverSchedulingService
 from delivery_sim.utils.id_generator import PrefixedIdGenerator
 from delivery_sim.utils.logging_system import get_logger, configure_logging
-
+from delivery_sim.utils.infrastructure_analysis import analyze_infrastructure
+from delivery_sim.utils.priority_scoring import create_priority_scorer
 
 class SimulationRunner:
     """
@@ -154,32 +155,30 @@ class SimulationRunner:
         """Perform infrastructure analysis (expensive Monte Carlo sampling)."""
         self.logger.debug("Analyzing infrastructure characteristics...")
         
-        # Placeholder for future infrastructure analysis integration
-        # This is where the expensive typical_distance calculation will go
-        area_size = self.config.structural_config.delivery_area_size
-        restaurant_count = len(self.restaurant_repository.find_all())
+        # Get scoring config if available for analysis parameters
+        scoring_config = getattr(self.config, 'scoring_config', None)
         
-        # Simple placeholder calculation for now
-        estimated_typical_distance = area_size * 0.5  # Rough estimate
-        
-        self.infrastructure_characteristics = {
-            'area_size': area_size,
-            'restaurant_count': restaurant_count,
-            'estimated_typical_distance': estimated_typical_distance
-        }
+        # Perform comprehensive infrastructure analysis
+        self.infrastructure_characteristics = analyze_infrastructure(
+            restaurant_repository=self.restaurant_repository,
+            structural_config=self.config.structural_config,
+            structural_rng=self.structural_rng,
+            scoring_config=scoring_config
+        )
         
         self.logger.info(f"Infrastructure analysis complete: {self.infrastructure_characteristics}")
     
     def _create_priority_scorer(self):
         """Create reusable priority scorer."""
-        self.logger.debug("Creating reusable priority scorer...")
+        self.logger.debug("Priority scorer will be created per replication (variant component)")
         
-        # Placeholder for future priority scorer integration
-        self.priority_scorer = None
-        
+        # Priority scorer is now variant - no creation here
+        # Just validate that scoring config is available if needed
         if hasattr(self.config, 'scoring_config') and self.config.scoring_config:
-            self.logger.debug("Scoring configuration detected - ready for future priority scorer integration")
-    
+            self.logger.debug("Scoring configuration available - priority scorer will be created per replication")
+        else:
+            self.logger.debug("No scoring configuration provided - priority scorer disabled")
+
     def _create_id_generators(self):
         """Create consistent ID generators."""
         self.logger.debug("Creating ID generators...")
@@ -213,9 +212,13 @@ class SimulationRunner:
         self.pair_repository = PairRepository()
         self.delivery_unit_repository = DeliveryUnitRepository()
         
-        # 4. Update priority scorer for this replication's environment (when implemented)
-        if self.priority_scorer:
-            self.priority_scorer.set_environment(self.env)
+        # 4. Create priority scorer for this replication
+        self.priority_scorer = create_priority_scorer(
+                infrastructure_characteristics=self.infrastructure_characteristics,
+                scoring_config=self.config.scoring_config,
+                env=self.env
+            )
+        self.logger.debug(f"Priority scorer created for replication {replication_number}")
         
         # 5. Create services (connect invariant logic to variant environment)
         self._create_services()
