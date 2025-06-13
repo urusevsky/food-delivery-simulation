@@ -383,7 +383,7 @@ class AssignmentService:
             tuple: (best_match, best_score, best_components) or (None, 0.0, None) if no candidates
         """
         best_match = None
-        best_priority_score = 0.0  # Start with lowest possible score
+        best_priority_score = -1  # Sentinel value, below any possible real score
         best_components = None
         
         # Determine entity type for role assignment
