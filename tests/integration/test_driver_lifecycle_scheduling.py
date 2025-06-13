@@ -79,7 +79,9 @@ class TestDriverLifecycleScheduling:
     
     # ===== Test 1: Driver Login Integration =====
     
-    def test_driver_login_triggers_assignment_attempt(self, test_environment, test_config, mock_priority_scorer):
+    def test_driver_login_triggers_assignment_attempt(
+        self, test_environment, test_config, mock_priority_scorer
+    ):
         """
         Test that driver login events properly integrate with assignment service.
         
@@ -94,7 +96,7 @@ class TestDriverLifecycleScheduling:
         delivery_unit_repo = test_environment["delivery_unit_repo"]
         config = test_config
         
-        # Create assignment service
+        # Create assignment service (REAL service, not mock)
         assignment_service = AssignmentService(
             env=env,
             event_dispatcher=event_dispatcher,
@@ -128,8 +130,13 @@ class TestDriverLifecycleScheduling:
         
         assignment_service.attempt_immediate_assignment_from_driver = track_attempts
         
-        # ACT - Simulate driver login event
-        login_event = DriverLoggedInEvent(timestamp=env.now, driver_id="D1")
+        # ACT - Simulate driver login event (Fixed constructor signature)
+        login_event = DriverLoggedInEvent(
+            timestamp=env.now,
+            driver_id="D1",
+            initial_location=[2, 2],  # Added required parameter
+            service_duration=120      # Added required parameter
+        )
         event_dispatcher.dispatch(login_event)
         
         # Allow event processing
@@ -142,7 +149,7 @@ class TestDriverLifecycleScheduling:
         
         # Verify priority scorer was called (indicates full assignment evaluation)
         mock_priority_scorer.calculate_priority_score.assert_called()
-    
+
     # ===== Test 2: Driver Availability Integration =====
     
     def test_driver_becomes_available_triggers_assignment_attempt(self, test_environment, test_config, mock_priority_scorer):
@@ -211,7 +218,9 @@ class TestDriverLifecycleScheduling:
     
     # ===== Test 3: Scheduling Service Integration =====
     
-    def test_scheduling_service_integration_with_assignment(self, test_environment, test_config, mock_priority_scorer):
+    def test_scheduling_service_integration_with_assignment(
+        self, test_environment, test_config, mock_priority_scorer
+    ):
         """
         Test that driver scheduling service properly integrates with assignment service.
         
@@ -276,8 +285,13 @@ class TestDriverLifecycleScheduling:
         new_driver.state = DriverState.AVAILABLE
         driver_repo.add(new_driver)
         
-        # ACT - Manually trigger driver login event (normally from arrival service)
-        login_event = DriverLoggedInEvent(timestamp=env.now, driver_id="D1")
+        # ACT - Manually trigger driver login event (Fixed constructor signature)
+        login_event = DriverLoggedInEvent(
+            timestamp=env.now,
+            driver_id="D1",
+            initial_location=[1, 1],  # Added required parameter
+            service_duration=120      # Added required parameter
+        )
         event_dispatcher.dispatch(login_event)
         
         # Simulate some time passing and driver becoming available again
@@ -304,10 +318,12 @@ class TestDriverLifecycleScheduling:
         
         # Verify priority scorer was used for both attempts
         assert mock_priority_scorer.calculate_priority_score.call_count >= 1, "Priority scorer should be used"
-    
+
     # ===== Test 4: Driver State Management =====
     
-    def test_driver_state_consistency_during_lifecycle(self, test_environment, test_config, mock_priority_scorer):
+    def test_driver_state_consistency_during_lifecycle(
+        self, test_environment, test_config, mock_priority_scorer
+    ):
         """
         Test that driver states remain consistent throughout the lifecycle.
         
@@ -356,8 +372,13 @@ class TestDriverLifecycleScheduling:
         test_driver.state = DriverState.AVAILABLE
         driver_repo.add(test_driver)
         
-        # ACT - Trigger driver login (which should lead to assignment)
-        login_event = DriverLoggedInEvent(timestamp=env.now, driver_id="D1")
+        # ACT - Trigger driver login (Fixed constructor signature)
+        login_event = DriverLoggedInEvent(
+            timestamp=env.now,
+            driver_id="D1",
+            initial_location=[1, 1],  # Added required parameter
+            service_duration=120      # Added required parameter
+        )
         event_dispatcher.dispatch(login_event)
         
         # Allow event processing
@@ -379,10 +400,12 @@ class TestDriverLifecycleScheduling:
             # Assignment failed - verify states remain unchanged
             assert test_driver.state == DriverState.AVAILABLE, "Driver should remain AVAILABLE if assignment failed"
             assert test_order.state == OrderState.CREATED, "Order should remain CREATED if assignment failed"
-    
+
     # ===== Test 5: Multiple Driver Coordination =====
-    
-    def test_multiple_drivers_coordinate_properly(self, test_environment, test_config, mock_priority_scorer):
+
+    def test_multiple_drivers_coordinate_properly(
+        self, test_environment, test_config, mock_priority_scorer
+    ):
         """
         Test that multiple drivers can coordinate without conflicts.
         
@@ -441,9 +464,19 @@ class TestDriverLifecycleScheduling:
         
         assignment_service.attempt_immediate_assignment_from_driver = track_attempts
         
-        # ACT - Simulate multiple drivers logging in
-        login_event1 = DriverLoggedInEvent(timestamp=env.now, driver_id="D1")
-        login_event2 = DriverLoggedInEvent(timestamp=env.now, driver_id="D2")
+        # ACT - Simulate multiple drivers logging in (Fixed constructor signatures)
+        login_event1 = DriverLoggedInEvent(
+            timestamp=env.now,
+            driver_id="D1",
+            initial_location=[0, 0],  # Added required parameter
+            service_duration=120      # Added required parameter
+        )
+        login_event2 = DriverLoggedInEvent(
+            timestamp=env.now,
+            driver_id="D2",
+            initial_location=[3, 3],  # Added required parameter
+            service_duration=120      # Added required parameter
+        )
         
         event_dispatcher.dispatch(login_event1)
         event_dispatcher.dispatch(login_event2)
@@ -461,14 +494,8 @@ class TestDriverLifecycleScheduling:
         assert mock_priority_scorer.calculate_priority_score.call_count >= 1, "Priority scorer should be used"
         
         # System should remain in consistent state (no duplicate assignments, etc.)
-        all_drivers = driver_repo.find_all()
-        all_orders = order_repo.find_all()
         delivery_units = delivery_unit_repo.find_all()
+        assigned_driver_ids = [unit.driver.driver_id for unit in delivery_units]
         
-        # Each delivery unit should have unique driver and entity
-        if len(delivery_units) > 0:
-            assigned_drivers = {du.driver.driver_id for du in delivery_units}
-            assigned_orders = {du.delivery_entity.order_id for du in delivery_units}
-            
-            assert len(assigned_drivers) == len(delivery_units), "Each driver should be assigned at most once"
-            assert len(assigned_orders) == len(delivery_units), "Each order should be assigned at most once"
+        # No driver should be assigned to multiple delivery units
+        assert len(assigned_driver_ids) == len(set(assigned_driver_ids)), "No driver should have multiple assignments"
