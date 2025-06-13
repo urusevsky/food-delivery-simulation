@@ -8,7 +8,8 @@ class DeliveryUnit:
     Represents the assignment contract between a driver and a delivery entity.
     
     DeliveryUnit captures the relationship created when a driver is assigned
-    to deliver either a single order or a pair of orders.
+    to deliver either a single order or a pair of orders, including the 
+    priority scoring rationale behind the assignment decision.
     """
     
     def __init__(self, delivery_entity, driver, assignment_time):
@@ -43,15 +44,17 @@ class DeliveryUnit:
         self.assignment_time = assignment_time
         self.completion_time = None
         
-        # Assignment decision information
+        # Assignment decision information (priority scoring system)
         self.assignment_path = None  # "immediate" or "periodic"
-        self.assignment_costs = {
-            "base_cost": None,        # Raw distance cost
-            "throughput_factor": None,  # Lambda value used
-            "throughput_discount": None,  # Discount for delivering multiple orders
-            "age_factor": None,       # Mu value used
-            "age_discount": None,     # Discount for waiting time
-            "adjusted_cost": None     # Final cost used in decision
+        self.assignment_scores = {
+            "distance_score": None,        # Distance efficiency score (0-1)
+            "throughput_score": None,      # Throughput optimization score (0-1) 
+            "fairness_score": None,        # Fairness/wait time score (0-1)
+            "combined_score_0_1": None,    # Weighted combination (0-1)
+            "priority_score_0_100": None,  # Final score (0-100)
+            "total_distance": None,        # Actual distance in km
+            "num_orders": None,            # Number of orders in this delivery
+            "wait_time_minutes": None      # Wait time for this assignment
         }
         
         # Log creation
