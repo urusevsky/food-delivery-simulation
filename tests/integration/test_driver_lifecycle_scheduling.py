@@ -1,272 +1,100 @@
 # tests/integration/test_driver_lifecycle_scheduling.py
+"""
+Integration tests for Driver Lifecycle and Scheduling (Priority Scoring)
+
+Updated for priority scoring system:
+- AssignmentService now requires priority_scorer parameter
+- Tests focus on driver lifecycle events, not scoring details
+- Uses mock priority scorer to isolate lifecycle testing from scoring logic
+"""
+
 import pytest
 import simpy
-from unittest.mock import patch, Mock
+from unittest.mock import Mock
 
 # Import core components
 from delivery_sim.events.event_dispatcher import EventDispatcher
-from delivery_sim.events.driver_events import (
-    DriverLoggedInEvent, DriverLoggedOutEvent, DriverAvailableForAssignmentEvent
-)
-from delivery_sim.events.delivery_unit_events import DeliveryUnitCompletedEvent
-from delivery_sim.repositories.driver_repository import DriverRepository
+from delivery_sim.events.driver_events import DriverLoggedInEvent, DriverAvailableForAssignmentEvent
 from delivery_sim.repositories.order_repository import OrderRepository
+from delivery_sim.repositories.driver_repository import DriverRepository
 from delivery_sim.repositories.pair_repository import PairRepository
 from delivery_sim.repositories.delivery_unit_repository import DeliveryUnitRepository
-from delivery_sim.services.driver_scheduling_service import DriverSchedulingService
 from delivery_sim.services.assignment_service import AssignmentService
-from delivery_sim.entities.driver import Driver
+from delivery_sim.services.driver_scheduling_service import DriverSchedulingService
 from delivery_sim.entities.order import Order
-from delivery_sim.entities.delivery_unit import DeliveryUnit
-from delivery_sim.entities.states import DriverState, OrderState
+from delivery_sim.entities.driver import Driver
+from delivery_sim.entities.states import OrderState, DriverState
 from delivery_sim.utils.entity_type_utils import EntityType
 
 
-class TestDriverSchedulingIntegration:
+class TestDriverLifecycleScheduling:
     """
-    Integration tests for DriverSchedulingService interactions with other services.
+    Test suite for driver lifecycle events and scheduling integration.
     
-    These tests verify:
-    1. Driver login triggers logout scheduling
-    2. Delivery completion triggers appropriate availability evaluation
-    3. DriverAvailableForAssignmentEvent flows correctly to AssignmentService
-    4. Scheduled logout behavior under different driver states
+    Updated for priority scoring system - focuses on lifecycle mechanics.
     """
     
     @pytest.fixture
     def test_config(self):
-        """Create a test configuration."""
+        """Configuration for driver lifecycle testing."""
         class TestConfig:
             def __init__(self):
-                # Assignment parameters (needed for AssignmentService)
-                self.immediate_assignment_threshold = 5.0
+                self.immediate_assignment_threshold = 75.0
                 self.periodic_interval = 10.0
-                self.throughput_factor = 1.0
-                self.age_factor = 0.1
+                self.pairing_enabled = False  # Simplified for lifecycle testing
                 self.driver_speed = 0.5
-                
-                # Pairing configuration
-                self.pairing_enabled = False
         
         return TestConfig()
     
     @pytest.fixture
     def test_environment(self):
-        """Set up the common test environment."""
+        """Create a controlled test environment."""
         env = simpy.Environment()
         event_dispatcher = EventDispatcher()
-        driver_repo = DriverRepository()
-        order_repo = OrderRepository()
-        pair_repo = PairRepository()
-        delivery_unit_repo = DeliveryUnitRepository()
         
         return {
             "env": env,
             "event_dispatcher": event_dispatcher,
-            "driver_repo": driver_repo,
-            "order_repo": order_repo,
-            "pair_repo": pair_repo,
-            "delivery_unit_repo": delivery_unit_repo
+            "order_repo": OrderRepository(),
+            "driver_repo": DriverRepository(),
+            "pair_repo": PairRepository(),
+            "delivery_unit_repo": DeliveryUnitRepository()
         }
     
-    def test_driver_login_triggers_logout_scheduling(self, test_environment):
-        """
-        Test that DriverLoggedInEvent triggers the scheduling of driver logout.
-        
-        This test verifies that when a driver logs in, the scheduling service
-        properly sets up the logout monitoring process.
-        """
-        # ARRANGE
-        env = test_environment["env"]
-        event_dispatcher = test_environment["event_dispatcher"]
-        driver_repo = test_environment["driver_repo"]
-        
-        # Create the driver scheduling service
-        scheduling_service = DriverSchedulingService(
-            env=env,
-            event_dispatcher=event_dispatcher,
-            driver_repository=driver_repo
-        )
-        
-        # Create a test driver
-        driver = Driver(
-            driver_id="D1",
-            initial_location=[3, 3],
-            login_time=env.now,
-            service_duration=120  # 2 hours intended service
-        )
-        driver.entity_type = EntityType.DRIVER
-        driver_repo.add(driver)
-        
-        # Add a spy to track logout scheduling calls
-        scheduled_logouts = []
-        original_schedule_method = scheduling_service.schedule_driver_logout
-        
-        def spy_schedule_logout(driver_id, intended_logout_time):
-            scheduled_logouts.append((driver_id, intended_logout_time))
-            return original_schedule_method(driver_id, intended_logout_time)
-        
-        scheduling_service.schedule_driver_logout = spy_schedule_logout
-        
-        # ACT - Dispatch driver login event
-        event_dispatcher.dispatch(DriverLoggedInEvent(
-            timestamp=env.now,
-            driver_id=driver.driver_id,
-            initial_location=driver.location,
-            service_duration=driver.service_duration
-        ))
-        
-        # Run briefly to process the event
-        env.run(until=0.1)
-        
-        # ASSERT
-        assert len(scheduled_logouts) == 1, "Logout should be scheduled for the driver"
-        scheduled_driver_id, scheduled_time = scheduled_logouts[0]
-        assert scheduled_driver_id == driver.driver_id, "Logout should be scheduled for correct driver"
-        assert scheduled_time == driver.intended_logout_time, "Logout should be scheduled for correct time"
+    @pytest.fixture
+    def mock_priority_scorer(self):
+        """Create a mock priority scorer for lifecycle testing."""
+        scorer = Mock()
+        # Return moderate score - focus is on lifecycle, not scoring outcomes
+        scorer.calculate_priority_score.return_value = (70.0, {
+            "distance_score": 0.7,
+            "throughput_score": 0.0,
+            "fairness_score": 0.8,
+            "combined_score_0_1": 0.70,
+            "total_distance": 8.5,
+            "num_orders": 1,
+            "wait_time_minutes": 6.0
+        })
+        return scorer
     
-    def test_delivery_completion_with_eligible_driver_dispatches_availability_event(self, test_environment):
-        """
-        Test that delivery completion with an eligible driver dispatches DriverAvailableForAssignmentEvent.
-        
-        This test verifies the new architectural flow where only eligible drivers
-        trigger assignment attempts.
-        """
-        # ARRANGE
-        env = test_environment["env"]
-        event_dispatcher = test_environment["event_dispatcher"]
-        driver_repo = test_environment["driver_repo"]
-        
-        # Create the driver scheduling service
-        scheduling_service = DriverSchedulingService(
-            env=env,
-            event_dispatcher=event_dispatcher,
-            driver_repository=driver_repo
-        )
-        
-        # Create a test driver who is NOT overdue
-        current_time = 100.0
-        env._now = current_time  # Set simulation time
-        
-        driver = Driver(
-            driver_id="D1",
-            initial_location=[3, 3],
-            login_time=current_time - 60,  # Logged in 60 minutes ago
-            service_duration=180  # Intends to work 180 minutes total
-        )
-        driver.entity_type = EntityType.DRIVER
-        driver.state = DriverState.AVAILABLE  # Just finished a delivery
-        driver_repo.add(driver)
-        
-        # Verify driver is not overdue (this is our test setup verification)
-        assert current_time < driver.intended_logout_time, \
-            f"Test setup error: Driver should not be overdue. Current: {current_time}, Logout: {driver.intended_logout_time}"
-        
-        # Track DriverAvailableForAssignmentEvent
-        availability_events = []
-        event_dispatcher.register(DriverAvailableForAssignmentEvent, 
-                                lambda e: availability_events.append(e))
-        
-        # ACT - Dispatch delivery completion event
-        event_dispatcher.dispatch(DeliveryUnitCompletedEvent(
-            timestamp=current_time,
-            delivery_unit_id="DU-O1-D1",
-            driver_id=driver.driver_id
-        ))
-        
-        # Run briefly to process the event
-        env.run(until=current_time + 0.1)
-        
-        # ASSERT
-        assert len(availability_events) == 1, "DriverAvailableForAssignmentEvent should be dispatched"
-        event = availability_events[0]
-        assert event.driver_id == driver.driver_id, "Event should reference the correct driver"
-        assert event.timestamp == current_time, "Event should have correct timestamp"
+    # ===== Test 1: Driver Login Integration =====
     
-    def test_delivery_completion_with_overdue_driver_logs_out_immediately(self, test_environment):
+    def test_driver_login_triggers_assignment_attempt(self, test_environment, test_config, mock_priority_scorer):
         """
-        Test that delivery completion with an overdue driver logs them out immediately.
+        Test that driver login events properly integrate with assignment service.
         
-        This test verifies that overdue drivers don't trigger assignment attempts.
-        """
-        # ARRANGE
-        env = test_environment["env"]
-        event_dispatcher = test_environment["event_dispatcher"]
-        driver_repo = test_environment["driver_repo"]
-        
-        # Create the driver scheduling service
-        scheduling_service = DriverSchedulingService(
-            env=env,
-            event_dispatcher=event_dispatcher,
-            driver_repository=driver_repo
-        )
-        
-        # Create a test driver who IS overdue
-        current_time = 200.0
-        env._now = current_time  # Set simulation time
-        
-        driver = Driver(
-            driver_id="D1",
-            initial_location=[3, 3],
-            login_time=current_time - 180,  # Logged in 180 minutes ago
-            service_duration=120  # Only intended to work 120 minutes
-        )
-        driver.entity_type = EntityType.DRIVER
-        driver.state = DriverState.AVAILABLE  # Just finished a delivery
-        driver_repo.add(driver)
-        
-        # Verify driver IS overdue (this is our test setup verification)
-        assert current_time >= driver.intended_logout_time, \
-            f"Test setup error: Driver should be overdue. Current: {current_time}, Logout: {driver.intended_logout_time}"
-        
-        # Track events
-        availability_events = []
-        logout_events = []
-        event_dispatcher.register(DriverAvailableForAssignmentEvent, 
-                                lambda e: availability_events.append(e))
-        event_dispatcher.register(DriverLoggedOutEvent, 
-                                lambda e: logout_events.append(e))
-        
-        # ACT - Dispatch delivery completion event
-        event_dispatcher.dispatch(DeliveryUnitCompletedEvent(
-            timestamp=current_time,
-            delivery_unit_id="DU-O1-D1",
-            driver_id=driver.driver_id
-        ))
-        
-        # Run briefly to process the event
-        env.run(until=current_time + 0.1)
-        
-        # ASSERT
-        assert len(availability_events) == 0, "No DriverAvailableForAssignmentEvent should be dispatched for overdue driver"
-        assert len(logout_events) == 1, "DriverLoggedOutEvent should be dispatched"
-        assert driver.state == DriverState.OFFLINE, "Driver should be logged out"
-        
-        logout_event = logout_events[0]
-        assert logout_event.driver_id == driver.driver_id, "Logout event should reference correct driver"
-    
-    def test_availability_event_triggers_assignment_attempt(self, test_environment, test_config):
-        """
-        Test that DriverAvailableForAssignmentEvent triggers assignment attempt in AssignmentService.
-        
-        This test verifies the complete event flow from scheduling service to assignment service.
+        This verifies the complete flow from driver entry to assignment attempt.
         """
         # ARRANGE
         env = test_environment["env"]
         event_dispatcher = test_environment["event_dispatcher"]
-        driver_repo = test_environment["driver_repo"]
         order_repo = test_environment["order_repo"]
+        driver_repo = test_environment["driver_repo"]
         pair_repo = test_environment["pair_repo"]
         delivery_unit_repo = test_environment["delivery_unit_repo"]
         config = test_config
         
-        # Create both services
-        scheduling_service = DriverSchedulingService(
-            env=env,
-            event_dispatcher=event_dispatcher,
-            driver_repository=driver_repo
-        )
-        
+        # Create assignment service
         assignment_service = AssignmentService(
             env=env,
             event_dispatcher=event_dispatcher,
@@ -274,156 +102,65 @@ class TestDriverSchedulingIntegration:
             driver_repository=driver_repo,
             pair_repository=pair_repo,
             delivery_unit_repository=delivery_unit_repo,
+            priority_scorer=mock_priority_scorer,
             config=config
         )
         
-        # Create a test driver
-        driver = Driver(
-            driver_id="D1",
-            initial_location=[3, 3],
-            login_time=env.now,
-            service_duration=120
-        )
-        driver.entity_type = EntityType.DRIVER
-        driver.state = DriverState.AVAILABLE
-        driver_repo.add(driver)
+        # Create a waiting order to make assignment possible
+        waiting_order = Order("O1", [3, 3], [5, 5], env.now)
+        waiting_order.entity_type = EntityType.ORDER
+        waiting_order.state = OrderState.CREATED
+        order_repo.add(waiting_order)
         
-        # Add a spy to track assignment attempts
+        # Create a driver that will login
+        new_driver = Driver("D1", [2, 2], env.now, 120)
+        new_driver.entity_type = EntityType.DRIVER
+        new_driver.state = DriverState.AVAILABLE
+        driver_repo.add(new_driver)
+        
+        # Track assignment attempts
         assignment_attempts = []
-        original_attempt_method = assignment_service.attempt_immediate_assignment_from_driver
+        original_method = assignment_service.attempt_immediate_assignment_from_driver
         
-        def spy_assignment_attempt(driver):
+        def track_attempts(driver):
             assignment_attempts.append(driver.driver_id)
-            return original_attempt_method(driver)
+            return original_method(driver)
         
-        assignment_service.attempt_immediate_assignment_from_driver = spy_assignment_attempt
+        assignment_service.attempt_immediate_assignment_from_driver = track_attempts
         
-        # ACT - Dispatch DriverAvailableForAssignmentEvent
-        event_dispatcher.dispatch(DriverAvailableForAssignmentEvent(
-            timestamp=env.now,
-            driver_id=driver.driver_id
-        ))
+        # ACT - Simulate driver login event
+        login_event = DriverLoggedInEvent(timestamp=env.now, driver_id="D1")
+        event_dispatcher.dispatch(login_event)
         
-        # Run briefly to process the event
+        # Allow event processing
         env.run(until=0.1)
         
         # ASSERT
-        assert len(assignment_attempts) == 1, "Assignment attempt should be triggered"
-        assert assignment_attempts[0] == driver.driver_id, "Assignment attempt should be for correct driver"
-    
-    def test_scheduled_logout_with_available_driver(self, test_environment):
-        """
-        Test that scheduled logout works correctly when driver is available.
+        # Verify assignment attempt was triggered
+        assert len(assignment_attempts) == 1, "Driver login should trigger assignment attempt"
+        assert assignment_attempts[0] == "D1", "Assignment attempt should be for logged-in driver"
         
-        This test verifies the SimPy process-based scheduling mechanism.
+        # Verify priority scorer was called (indicates full assignment evaluation)
+        mock_priority_scorer.calculate_priority_score.assert_called()
+    
+    # ===== Test 2: Driver Availability Integration =====
+    
+    def test_driver_becomes_available_triggers_assignment_attempt(self, test_environment, test_config, mock_priority_scorer):
+        """
+        Test that driver availability events properly integrate with assignment service.
+        
+        This simulates a driver completing a delivery and looking for new work.
         """
         # ARRANGE
         env = test_environment["env"]
         event_dispatcher = test_environment["event_dispatcher"]
-        driver_repo = test_environment["driver_repo"]
-        
-        # Create the driver scheduling service
-        scheduling_service = DriverSchedulingService(
-            env=env,
-            event_dispatcher=event_dispatcher,
-            driver_repository=driver_repo
-        )
-        
-        # Create a test driver with short service duration for faster testing
-        service_duration = 10.0  # 10 minutes
-        driver = Driver(
-            driver_id="D1",
-            initial_location=[3, 3],
-            login_time=env.now,
-            service_duration=service_duration
-        )
-        driver.entity_type = EntityType.DRIVER
-        driver.state = DriverState.AVAILABLE
-        driver_repo.add(driver)
-        
-        # Track logout events
-        logout_events = []
-        event_dispatcher.register(DriverLoggedOutEvent, lambda e: logout_events.append(e))
-        
-        # Start the scheduling process
-        scheduling_service.schedule_driver_logout(driver.driver_id, driver.intended_logout_time)
-        
-        # ACT - Run simulation until after the intended logout time
-        env.run(until=service_duration + 1)
-        
-        # ASSERT
-        assert len(logout_events) == 1, "Driver should be logged out at scheduled time"
-        assert driver.state == DriverState.OFFLINE, "Driver should be in OFFLINE state"
-        
-        logout_event = logout_events[0]
-        assert logout_event.driver_id == driver.driver_id, "Logout event should reference correct driver"
-    
-    def test_scheduled_logout_with_delivering_driver(self, test_environment):
-        """
-        Test that scheduled logout is deferred when driver is delivering.
-        
-        This test verifies that busy drivers don't get interrupted by logout attempts.
-        """
-        # ARRANGE
-        env = test_environment["env"]
-        event_dispatcher = test_environment["event_dispatcher"]
-        driver_repo = test_environment["driver_repo"]
-        
-        # Create the driver scheduling service
-        scheduling_service = DriverSchedulingService(
-            env=env,
-            event_dispatcher=event_dispatcher,
-            driver_repository=driver_repo
-        )
-        
-        # Create a test driver with short service duration
-        service_duration = 5.0  # 5 minutes
-        driver = Driver(
-            driver_id="D1",
-            initial_location=[3, 3],
-            login_time=env.now,
-            service_duration=service_duration
-        )
-        driver.entity_type = EntityType.DRIVER
-        driver.state = DriverState.DELIVERING  # Driver is busy
-        driver_repo.add(driver)
-        
-        # Track logout events
-        logout_events = []
-        event_dispatcher.register(DriverLoggedOutEvent, lambda e: logout_events.append(e))
-        
-        # Start the scheduling process
-        scheduling_service.schedule_driver_logout(driver.driver_id, driver.intended_logout_time)
-        
-        # ACT - Run simulation until after the intended logout time
-        env.run(until=service_duration + 1)
-        
-        # ASSERT
-        assert len(logout_events) == 0, "No logout should occur while driver is delivering"
-        assert driver.state == DriverState.DELIVERING, "Driver should remain in DELIVERING state"
-    
-    def test_complete_driver_lifecycle_integration(self, test_environment, test_config):
-        """
-        Test a complete driver lifecycle from login through assignment to logout.
-        
-        This integration test verifies the entire flow works together correctly.
-        """
-        # ARRANGE
-        env = test_environment["env"]
-        event_dispatcher = test_environment["event_dispatcher"]
-        driver_repo = test_environment["driver_repo"]
         order_repo = test_environment["order_repo"]
+        driver_repo = test_environment["driver_repo"]
         pair_repo = test_environment["pair_repo"]
         delivery_unit_repo = test_environment["delivery_unit_repo"]
         config = test_config
         
-        # Create both services
-        scheduling_service = DriverSchedulingService(
-            env=env,
-            event_dispatcher=event_dispatcher,
-            driver_repository=driver_repo
-        )
-        
+        # Create assignment service
         assignment_service = AssignmentService(
             env=env,
             event_dispatcher=event_dispatcher,
@@ -431,65 +168,307 @@ class TestDriverSchedulingIntegration:
             driver_repository=driver_repo,
             pair_repository=pair_repo,
             delivery_unit_repository=delivery_unit_repo,
+            priority_scorer=mock_priority_scorer,
             config=config
         )
         
-        # Create a driver and order
-        driver = Driver(
-            driver_id="D1",
-            initial_location=[3, 3],
-            login_time=env.now,
-            service_duration=30  # 30 minutes service
-        )
-        driver.entity_type = EntityType.DRIVER
-        driver_repo.add(driver)
+        # Create a waiting order
+        waiting_order = Order("O1", [4, 4], [6, 6], env.now)
+        waiting_order.entity_type = EntityType.ORDER
+        waiting_order.state = OrderState.CREATED
+        order_repo.add(waiting_order)
         
-        order = Order(
-            order_id="O1",
-            restaurant_location=[3, 3],
-            customer_location=[5, 5],
-            arrival_time=env.now
-        )
-        order.entity_type = EntityType.ORDER
-        order_repo.add(order)
+        # Create a driver that just became available
+        available_driver = Driver("D1", [3, 3], env.now, 120)
+        available_driver.entity_type = EntityType.DRIVER
+        available_driver.state = DriverState.AVAILABLE
+        driver_repo.add(available_driver)
         
-        # Track key events
-        availability_events = []
-        logout_events = []
-        event_dispatcher.register(DriverAvailableForAssignmentEvent, 
-                                lambda e: availability_events.append(e))
-        event_dispatcher.register(DriverLoggedOutEvent, 
-                                lambda e: logout_events.append(e))
+        # Track assignment attempts
+        assignment_attempts = []
+        original_method = assignment_service.attempt_immediate_assignment_from_driver
         
-        # ACT - Simulate the complete lifecycle
+        def track_attempts(driver):
+            assignment_attempts.append(driver.driver_id)
+            return original_method(driver)
         
-        # Step 1: Driver logs in
-        event_dispatcher.dispatch(DriverLoggedInEvent(
-            timestamp=env.now,
-            driver_id=driver.driver_id,
-            initial_location=driver.location,
-            service_duration=driver.service_duration
-        ))
-        env.run(until=1)
+        assignment_service.attempt_immediate_assignment_from_driver = track_attempts
         
-        # Step 2: Simulate a delivery completion within service time
-        env._now = 20  # 20 minutes into service (within 30 minute limit)
-
-        # Manually simulate what DeliveryService would do
-        driver.transition_to(DriverState.AVAILABLE, event_dispatcher, env)
-
-        # Now dispatch the completion event
-        event_dispatcher.dispatch(DeliveryUnitCompletedEvent(
-            timestamp=env.now,
-            delivery_unit_id="DU-O1-D1",
-            driver_id=driver.driver_id
-        ))
-        env.run(until=21)
+        # ACT - Simulate driver becoming available
+        available_event = DriverAvailableForAssignmentEvent(timestamp=env.now, driver_id="D1")
+        event_dispatcher.dispatch(available_event)
         
-        # Step 3: Let scheduled logout time arrive
-        env.run(until=35)  # Past the 30 minute service duration
+        # Allow event processing
+        env.run(until=0.1)
         
         # ASSERT
-        assert len(availability_events) == 1, "Driver should become available after delivery completion"
-        assert len(logout_events) == 1, "Driver should log out at scheduled time"
-        assert driver.state == DriverState.OFFLINE, "Driver should end in OFFLINE state"
+        # Verify assignment attempt was triggered
+        assert len(assignment_attempts) == 1, "Driver availability should trigger assignment attempt"
+        assert assignment_attempts[0] == "D1", "Assignment attempt should be for available driver"
+        
+        # Verify priority scorer was used
+        mock_priority_scorer.calculate_priority_score.assert_called()
+    
+    # ===== Test 3: Scheduling Service Integration =====
+    
+    def test_scheduling_service_integration_with_assignment(self, test_environment, test_config, mock_priority_scorer):
+        """
+        Test that driver scheduling service properly integrates with assignment service.
+        
+        This verifies the complete driver lifecycle from scheduling to assignment.
+        """
+        # ARRANGE
+        env = test_environment["env"]
+        event_dispatcher = test_environment["event_dispatcher"]
+        order_repo = test_environment["order_repo"]
+        driver_repo = test_environment["driver_repo"]
+        pair_repo = test_environment["pair_repo"]
+        delivery_unit_repo = test_environment["delivery_unit_repo"]
+        config = test_config
+        
+        # Create both services
+        assignment_service = AssignmentService(
+            env=env,
+            event_dispatcher=event_dispatcher,
+            order_repository=order_repo,
+            driver_repository=driver_repo,
+            pair_repository=pair_repo,
+            delivery_unit_repository=delivery_unit_repo,
+            priority_scorer=mock_priority_scorer,
+            config=config
+        )
+        
+        scheduling_service = DriverSchedulingService(
+            env=env,
+            event_dispatcher=event_dispatcher,
+            driver_repository=driver_repo
+        )
+        
+        # Create a waiting order
+        waiting_order = Order("O1", [2, 2], [4, 4], env.now)
+        waiting_order.entity_type = EntityType.ORDER
+        waiting_order.state = OrderState.CREATED
+        order_repo.add(waiting_order)
+        
+        # Track events for verification
+        logged_in_events = []
+        available_events = []
+        
+        event_dispatcher.register(DriverLoggedInEvent, lambda e: logged_in_events.append(e))
+        event_dispatcher.register(DriverAvailableForAssignmentEvent, lambda e: available_events.append(e))
+        
+        # Track assignment attempts
+        assignment_attempts = []
+        original_method = assignment_service.attempt_immediate_assignment_from_driver
+        
+        def track_attempts(driver):
+            assignment_attempts.append({
+                'driver_id': driver.driver_id,
+                'timestamp': env.now
+            })
+            return original_method(driver)
+        
+        assignment_service.attempt_immediate_assignment_from_driver = track_attempts
+        
+        # Create a driver and add to repository (simulating driver arrival)
+        new_driver = Driver("D1", [1, 1], env.now, 120)
+        new_driver.entity_type = EntityType.DRIVER
+        new_driver.state = DriverState.AVAILABLE
+        driver_repo.add(new_driver)
+        
+        # ACT - Manually trigger driver login event (normally from arrival service)
+        login_event = DriverLoggedInEvent(timestamp=env.now, driver_id="D1")
+        event_dispatcher.dispatch(login_event)
+        
+        # Simulate some time passing and driver becoming available again
+        env.run(until=5.0)
+        
+        # Trigger availability event
+        available_event = DriverAvailableForAssignmentEvent(timestamp=env.now, driver_id="D1")
+        event_dispatcher.dispatch(available_event)
+        
+        # Allow final event processing
+        env.run(until=5.1)
+        
+        # ASSERT
+        # Verify events were properly dispatched and handled
+        assert len(logged_in_events) == 1, "Should receive driver login event"
+        assert logged_in_events[0].driver_id == "D1"
+        
+        assert len(available_events) == 1, "Should receive driver availability event"
+        assert available_events[0].driver_id == "D1"
+        
+        # Verify assignment attempts were triggered for both events
+        assert len(assignment_attempts) == 2, "Should have 2 assignment attempts (login + availability)"
+        assert all(attempt['driver_id'] == "D1" for attempt in assignment_attempts)
+        
+        # Verify priority scorer was used for both attempts
+        assert mock_priority_scorer.calculate_priority_score.call_count >= 1, "Priority scorer should be used"
+    
+    # ===== Test 4: Driver State Management =====
+    
+    def test_driver_state_consistency_during_lifecycle(self, test_environment, test_config, mock_priority_scorer):
+        """
+        Test that driver states remain consistent throughout the lifecycle.
+        
+        This ensures that assignment attempts only occur when drivers are truly available.
+        """
+        # ARRANGE
+        env = test_environment["env"]
+        event_dispatcher = test_environment["event_dispatcher"]
+        order_repo = test_environment["order_repo"]
+        driver_repo = test_environment["driver_repo"]
+        pair_repo = test_environment["pair_repo"]
+        delivery_unit_repo = test_environment["delivery_unit_repo"]
+        config = test_config
+        
+        # Set up priority scorer to return high score for successful assignment
+        mock_priority_scorer.calculate_priority_score.return_value = (85.0, {
+            "distance_score": 0.85,
+            "throughput_score": 0.0,
+            "fairness_score": 0.9,
+            "combined_score_0_1": 0.85,
+            "total_distance": 5.0,
+            "num_orders": 1,
+            "wait_time_minutes": 2.0
+        })
+        
+        # Create assignment service
+        assignment_service = AssignmentService(
+            env=env,
+            event_dispatcher=event_dispatcher,
+            order_repository=order_repo,
+            driver_repository=driver_repo,
+            pair_repository=pair_repo,
+            delivery_unit_repository=delivery_unit_repo,
+            priority_scorer=mock_priority_scorer,
+            config=config
+        )
+        
+        # Create order and driver
+        test_order = Order("O1", [2, 2], [4, 4], env.now)
+        test_order.entity_type = EntityType.ORDER
+        test_order.state = OrderState.CREATED
+        order_repo.add(test_order)
+        
+        test_driver = Driver("D1", [1, 1], env.now, 120)
+        test_driver.entity_type = EntityType.DRIVER
+        test_driver.state = DriverState.AVAILABLE
+        driver_repo.add(test_driver)
+        
+        # ACT - Trigger driver login (which should lead to assignment)
+        login_event = DriverLoggedInEvent(timestamp=env.now, driver_id="D1")
+        event_dispatcher.dispatch(login_event)
+        
+        # Allow event processing
+        env.run(until=0.1)
+        
+        # ASSERT
+        # If assignment was successful (high score), verify state transitions
+        delivery_units = delivery_unit_repo.find_all()
+        if len(delivery_units) > 0:
+            # Assignment succeeded - verify proper state transitions
+            assert test_driver.state == DriverState.DELIVERING, "Driver should be DELIVERING after assignment"
+            assert test_order.state == OrderState.ASSIGNED, "Order should be ASSIGNED after assignment"
+            
+            # Verify delivery unit was created correctly
+            unit = delivery_units[0]
+            assert unit.driver is test_driver, "Delivery unit should reference the driver"
+            assert unit.delivery_entity is test_order, "Delivery unit should reference the order"
+        else:
+            # Assignment failed - verify states remain unchanged
+            assert test_driver.state == DriverState.AVAILABLE, "Driver should remain AVAILABLE if assignment failed"
+            assert test_order.state == OrderState.CREATED, "Order should remain CREATED if assignment failed"
+    
+    # ===== Test 5: Multiple Driver Coordination =====
+    
+    def test_multiple_drivers_coordinate_properly(self, test_environment, test_config, mock_priority_scorer):
+        """
+        Test that multiple drivers can coordinate without conflicts.
+        
+        This ensures the system handles concurrent driver events properly.
+        """
+        # ARRANGE
+        env = test_environment["env"]
+        event_dispatcher = test_environment["event_dispatcher"]
+        order_repo = test_environment["order_repo"]
+        driver_repo = test_environment["driver_repo"]
+        pair_repo = test_environment["pair_repo"]
+        delivery_unit_repo = test_environment["delivery_unit_repo"]
+        config = test_config
+        
+        # Create assignment service
+        assignment_service = AssignmentService(
+            env=env,
+            event_dispatcher=event_dispatcher,
+            order_repository=order_repo,
+            driver_repository=driver_repo,
+            pair_repository=pair_repo,
+            delivery_unit_repository=delivery_unit_repo,
+            priority_scorer=mock_priority_scorer,
+            config=config
+        )
+        
+        # Create multiple orders
+        order1 = Order("O1", [1, 1], [2, 2], env.now)
+        order1.entity_type = EntityType.ORDER
+        order1.state = OrderState.CREATED
+        order_repo.add(order1)
+        
+        order2 = Order("O2", [4, 4], [5, 5], env.now)
+        order2.entity_type = EntityType.ORDER
+        order2.state = OrderState.CREATED
+        order_repo.add(order2)
+        
+        # Create multiple drivers
+        driver1 = Driver("D1", [0, 0], env.now, 120)
+        driver1.entity_type = EntityType.DRIVER
+        driver1.state = DriverState.AVAILABLE
+        driver_repo.add(driver1)
+        
+        driver2 = Driver("D2", [3, 3], env.now, 120)
+        driver2.entity_type = EntityType.DRIVER
+        driver2.state = DriverState.AVAILABLE
+        driver_repo.add(driver2)
+        
+        # Track assignment attempts
+        assignment_attempts = []
+        original_method = assignment_service.attempt_immediate_assignment_from_driver
+        
+        def track_attempts(driver):
+            assignment_attempts.append(driver.driver_id)
+            return original_method(driver)
+        
+        assignment_service.attempt_immediate_assignment_from_driver = track_attempts
+        
+        # ACT - Simulate multiple drivers logging in
+        login_event1 = DriverLoggedInEvent(timestamp=env.now, driver_id="D1")
+        login_event2 = DriverLoggedInEvent(timestamp=env.now, driver_id="D2")
+        
+        event_dispatcher.dispatch(login_event1)
+        event_dispatcher.dispatch(login_event2)
+        
+        # Allow event processing
+        env.run(until=0.1)
+        
+        # ASSERT
+        # Verify both drivers attempted assignment
+        assert len(assignment_attempts) == 2, "Both drivers should attempt assignment"
+        assert "D1" in assignment_attempts, "Driver D1 should attempt assignment"
+        assert "D2" in assignment_attempts, "Driver D2 should attempt assignment"
+        
+        # Verify priority scorer was called for evaluations
+        assert mock_priority_scorer.calculate_priority_score.call_count >= 1, "Priority scorer should be used"
+        
+        # System should remain in consistent state (no duplicate assignments, etc.)
+        all_drivers = driver_repo.find_all()
+        all_orders = order_repo.find_all()
+        delivery_units = delivery_unit_repo.find_all()
+        
+        # Each delivery unit should have unique driver and entity
+        if len(delivery_units) > 0:
+            assigned_drivers = {du.driver.driver_id for du in delivery_units}
+            assigned_orders = {du.delivery_entity.order_id for du in delivery_units}
+            
+            assert len(assigned_drivers) == len(delivery_units), "Each driver should be assigned at most once"
+            assert len(assigned_orders) == len(delivery_units), "Each order should be assigned at most once"

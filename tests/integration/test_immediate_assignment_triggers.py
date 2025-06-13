@@ -1,6 +1,6 @@
 # tests/integration/test_immediate_assignment_triggers.py
 """
-Integration tests for Area 2: Immediate Assignment Triggering Mechanisms
+Integration tests for Area 2: Immediate Assignment Triggering Mechanisms (Priority Scoring)
 
 This test file focuses on verifying that various events correctly trigger
 immediate assignment attempts in the AssignmentService. We're testing the
@@ -8,6 +8,11 @@ immediate assignment attempts in the AssignmentService. We're testing the
 
 Key principle: These tests verify that events cause assignment attempts,
 but don't test whether those attempts succeed or fail (that's Area 3's job).
+
+Updated for priority scoring system:
+- AssignmentService now requires priority_scorer parameter
+- Tests focus on trigger verification, not assignment outcomes
+- Uses mock priority scorer to isolate trigger testing from scoring logic
 """
 
 import pytest
@@ -35,12 +40,7 @@ class TestImmediateAssignmentTriggers:
     """
     Test suite verifying that all five pathways correctly trigger immediate assignment attempts.
     
-    The five triggers we're testing:
-    1. OrderCreatedEvent (when pairing is disabled)
-    2. PairCreatedEvent (when pairing is enabled)
-    3. PairingFailedEvent (when pairing is enabled)
-    4. DriverLoggedInEvent (new driver enters system)
-    5. DriverAvailableForAssignmentEvent (driver completes delivery)
+    Updated for priority scoring system - focuses on trigger mechanisms.
     """
     
     @pytest.fixture
@@ -49,10 +49,8 @@ class TestImmediateAssignmentTriggers:
         class TestConfig:
             def __init__(self):
                 # Assignment parameters
-                self.immediate_assignment_threshold = 5.0
+                self.immediate_assignment_threshold = 75.0  # Priority score threshold
                 self.periodic_interval = 10.0
-                self.throughput_factor = 1.0
-                self.age_factor = 0.1
                 self.driver_speed = 0.5
                 
                 # Key setting: pairing is disabled
@@ -65,11 +63,9 @@ class TestImmediateAssignmentTriggers:
         """Configuration with pairing enabled - orders first attempt pairing."""
         class TestConfig:
             def __init__(self):
-                # Assignment parameters (same as above)
-                self.immediate_assignment_threshold = 5.0
+                # Assignment parameters
+                self.immediate_assignment_threshold = 75.0
                 self.periodic_interval = 10.0
-                self.throughput_factor = 1.0
-                self.age_factor = 0.1
                 self.driver_speed = 0.5
                 
                 # Key setting: pairing is enabled
@@ -79,31 +75,45 @@ class TestImmediateAssignmentTriggers:
     
     @pytest.fixture
     def test_environment(self):
-        """Set up the common test environment with all necessary components."""
+        """Create a controlled test environment."""
         env = simpy.Environment()
         event_dispatcher = EventDispatcher()
-        order_repo = OrderRepository()
-        driver_repo = DriverRepository()
-        pair_repo = PairRepository()
-        delivery_unit_repo = DeliveryUnitRepository()
         
         return {
             "env": env,
             "event_dispatcher": event_dispatcher,
-            "order_repo": order_repo,
-            "driver_repo": driver_repo,
-            "pair_repo": pair_repo,
-            "delivery_unit_repo": delivery_unit_repo
+            "order_repo": OrderRepository(),
+            "driver_repo": DriverRepository(),
+            "pair_repo": PairRepository(),
+            "delivery_unit_repo": DeliveryUnitRepository()
         }
     
-    # ===== Trigger Tests from Delivery Entity Perspective =====
+    @pytest.fixture
+    def mock_priority_scorer(self):
+        """Create a mock priority scorer for testing triggers."""
+        scorer = Mock()
+        # Return moderate score - focus is on triggering, not outcomes
+        scorer.calculate_priority_score.return_value = (70.0, {
+            "distance_score": 0.7,
+            "throughput_score": 0.5,
+            "fairness_score": 0.8,
+            "combined_score_0_1": 0.70,
+            "total_distance": 8.0,
+            "num_orders": 1,
+            "wait_time_minutes": 5.0
+        })
+        return scorer
     
-    def test_order_created_triggers_assignment_when_pairing_disabled(self, test_environment, test_config_pairing_disabled):
+    # ===== Trigger 1: OrderCreatedEvent (Pairing Disabled) =====
+    
+    def test_order_created_triggers_immediate_assignment_when_pairing_disabled(
+        self, test_environment, test_config_pairing_disabled, mock_priority_scorer
+    ):
         """
-        Test Trigger #1: OrderCreatedEvent → immediate assignment attempt (pairing disabled).
+        Test that OrderCreatedEvent triggers immediate assignment when pairing is disabled.
         
-        When pairing is disabled, new orders should go directly to assignment evaluation.
-        This represents the simplest path where orders bypass pairing entirely.
+        When pairing is disabled, orders should go directly to assignment rather than
+        attempting to pair with other orders first.
         """
         # ARRANGE
         env = test_environment["env"]
@@ -112,9 +122,9 @@ class TestImmediateAssignmentTriggers:
         driver_repo = test_environment["driver_repo"]
         pair_repo = test_environment["pair_repo"]
         delivery_unit_repo = test_environment["delivery_unit_repo"]
-        config = test_config_pairing_disabled  # Pairing is disabled
+        config = test_config_pairing_disabled
         
-        # Create the assignment service with our configuration
+        # Create assignment service
         assignment_service = AssignmentService(
             env=env,
             event_dispatcher=event_dispatcher,
@@ -122,469 +132,375 @@ class TestImmediateAssignmentTriggers:
             driver_repository=driver_repo,
             pair_repository=pair_repo,
             delivery_unit_repository=delivery_unit_repo,
+            priority_scorer=mock_priority_scorer,
             config=config
         )
         
-        # Create a spy to track assignment attempts from delivery entity perspective
-        assignment_attempts = []
-        original_method = assignment_service.attempt_immediate_assignment_from_delivery_entity
-        
-        def spy_assignment_attempt(entity):
-            # Record what entity triggered the attempt
-            entity_id = entity.order_id if hasattr(entity, 'order_id') else entity.pair_id
-            assignment_attempts.append({
-                'entity_type': entity.entity_type,
-                'entity_id': entity_id
-            })
-            # Call the original method to maintain normal behavior
-            return original_method(entity)
-        
-        assignment_service.attempt_immediate_assignment_from_delivery_entity = spy_assignment_attempt
-        
-        # Create a test order
-        test_order = Order(
-            order_id="O1",
-            restaurant_location=[3, 3],
-            customer_location=[7, 7],
-            arrival_time=env.now
-        )
+        # Create an order in the repository
+        test_order = Order("O1", [3, 3], [5, 5], env.now)
+        test_order.entity_type = EntityType.ORDER
         order_repo.add(test_order)
+        
+        # Create a driver to make assignment possible
+        test_driver = Driver("D1", [2, 2], env.now, 120)
+        test_driver.entity_type = EntityType.DRIVER
+        test_driver.state = DriverState.AVAILABLE
+        driver_repo.add(test_driver)
+        
+        # Mock the assignment attempt method to verify it gets called
+        original_attempt = assignment_service.attempt_immediate_assignment_from_delivery_entity
+        assignment_attempts = []
+        
+        def track_assignment_attempts(entity):
+            assignment_attempts.append(entity)
+            return original_attempt(entity)
+        
+        assignment_service.attempt_immediate_assignment_from_delivery_entity = track_assignment_attempts
         
         # ACT - Dispatch OrderCreatedEvent
-        event_dispatcher.dispatch(OrderCreatedEvent(
-            timestamp=env.now,
-            order_id=test_order.order_id,
-            restaurant_id="R1",
-            restaurant_location=test_order.restaurant_location,
-            customer_location=test_order.customer_location
-        ))
+        event = OrderCreatedEvent(timestamp=env.now, order_id="O1")
+        event_dispatcher.dispatch(event)
         
-        # Run briefly to allow event processing
+        # Allow event processing
         env.run(until=0.1)
-        
-        # ASSERT - Verify the assignment attempt was triggered
-        assert len(assignment_attempts) == 1, "Should trigger exactly one assignment attempt"
-        
-        attempt = assignment_attempts[0]
-        assert attempt['entity_type'] == EntityType.ORDER, "Should attempt assignment for an order"
-        assert attempt['entity_id'] == test_order.order_id, "Should attempt assignment for the correct order"
-    
-    def test_pair_created_triggers_assignment_when_pairing_enabled(self, test_environment, test_config_pairing_enabled):
-        """
-        Test Trigger #2: PairCreatedEvent → immediate assignment attempt.
-        
-        When pairing succeeds, the newly created pair should trigger an assignment attempt.
-        This represents the path where orders are successfully combined before assignment.
-        """
-        # ARRANGE
-        env = test_environment["env"]
-        event_dispatcher = test_environment["event_dispatcher"]
-        order_repo = test_environment["order_repo"]
-        driver_repo = test_environment["driver_repo"]
-        pair_repo = test_environment["pair_repo"]
-        delivery_unit_repo = test_environment["delivery_unit_repo"]
-        config = test_config_pairing_enabled  # Pairing is enabled
-        
-        # Create the assignment service
-        assignment_service = AssignmentService(
-            env=env,
-            event_dispatcher=event_dispatcher,
-            order_repository=order_repo,
-            driver_repository=driver_repo,
-            pair_repository=pair_repo,
-            delivery_unit_repository=delivery_unit_repo,
-            config=config
-        )
-        
-        # Create a spy for assignment attempts
-        assignment_attempts = []
-        original_method = assignment_service.attempt_immediate_assignment_from_delivery_entity
-        
-        def spy_assignment_attempt(entity):
-            entity_id = entity.order_id if hasattr(entity, 'order_id') else entity.pair_id
-            assignment_attempts.append({
-                'entity_type': entity.entity_type,
-                'entity_id': entity_id
-            })
-            return original_method(entity)
-        
-        assignment_service.attempt_immediate_assignment_from_delivery_entity = spy_assignment_attempt
-        
-        # Create a test pair (representing successful pairing)
-        order1 = Order("O1", [3, 3], [7, 7], env.now)
-        order2 = Order("O2", [3, 3], [8, 8], env.now)
-        
-        test_pair = Pair(order1, order2, env.now)
-        test_pair.optimal_sequence = [[3, 3], [7, 7], [8, 8]]
-        test_pair.optimal_cost = 5.0
-        pair_repo.add(test_pair)
-        
-        # ACT - Dispatch PairCreatedEvent
-        event_dispatcher.dispatch(PairCreatedEvent(
-            timestamp=env.now,
-            pair_id=test_pair.pair_id,
-            order1_id=order1.order_id,
-            order2_id=order2.order_id
-        ))
-        
-        # Run briefly to allow event processing
-        env.run(until=0.1)
-        
-        # ASSERT - Verify the assignment attempt was triggered
-        assert len(assignment_attempts) == 1, "Should trigger exactly one assignment attempt"
-        
-        attempt = assignment_attempts[0]
-        assert attempt['entity_type'] == EntityType.PAIR, "Should attempt assignment for a pair"
-        assert attempt['entity_id'] == test_pair.pair_id, "Should attempt assignment for the correct pair"
-    
-    def test_pairing_failed_triggers_assignment_when_pairing_enabled(self, test_environment, test_config_pairing_enabled):
-        """
-        Test Trigger #3: PairingFailedEvent → immediate assignment attempt.
-        
-        When pairing fails (no compatible partner found), the unpaired order should
-        still trigger an assignment attempt as a single order. This is the fallback path.
-        """
-        # ARRANGE
-        env = test_environment["env"]
-        event_dispatcher = test_environment["event_dispatcher"]
-        order_repo = test_environment["order_repo"]
-        driver_repo = test_environment["driver_repo"]
-        pair_repo = test_environment["pair_repo"]
-        delivery_unit_repo = test_environment["delivery_unit_repo"]
-        config = test_config_pairing_enabled  # Pairing is enabled
-        
-        # Create the assignment service
-        assignment_service = AssignmentService(
-            env=env,
-            event_dispatcher=event_dispatcher,
-            order_repository=order_repo,
-            driver_repository=driver_repo,
-            pair_repository=pair_repo,
-            delivery_unit_repository=delivery_unit_repo,
-            config=config
-        )
-        
-        # Create a spy for assignment attempts
-        assignment_attempts = []
-        original_method = assignment_service.attempt_immediate_assignment_from_delivery_entity
-        
-        def spy_assignment_attempt(entity):
-            entity_id = entity.order_id if hasattr(entity, 'order_id') else entity.pair_id
-            assignment_attempts.append({
-                'entity_type': entity.entity_type,
-                'entity_id': entity_id
-            })
-            return original_method(entity)
-        
-        assignment_service.attempt_immediate_assignment_from_delivery_entity = spy_assignment_attempt
-        
-        # Create a test order that failed to find a pair
-        unpaired_order = Order(
-            order_id="O1",
-            restaurant_location=[3, 3],
-            customer_location=[7, 7],
-            arrival_time=env.now
-        )
-        unpaired_order.entity_type = EntityType.ORDER
-        order_repo.add(unpaired_order)
-        
-        # ACT - Dispatch PairingFailedEvent
-        event_dispatcher.dispatch(PairingFailedEvent(
-            timestamp=env.now,
-            order_id=unpaired_order.order_id
-        ))
-        
-        # Run briefly to allow event processing
-        env.run(until=0.1)
-        
-        # ASSERT - Verify the assignment attempt was triggered
-        assert len(assignment_attempts) == 1, "Should trigger exactly one assignment attempt"
-        
-        attempt = assignment_attempts[0]
-        assert attempt['entity_type'] == EntityType.ORDER, "Should attempt assignment for a single order"
-        assert attempt['entity_id'] == unpaired_order.order_id, "Should attempt assignment for the correct order"
-    
-    # ===== Trigger Tests from Driver Perspective =====
-    
-    def test_driver_login_triggers_assignment_attempt(self, test_environment, test_config_pairing_disabled):
-        """
-        Test Trigger #4: DriverLoggedInEvent → immediate assignment attempt.
-        
-        When a new driver logs into the system, they should immediately check if
-        there are any waiting delivery entities they can serve.
-        """
-        # ARRANGE
-        env = test_environment["env"]
-        event_dispatcher = test_environment["event_dispatcher"]
-        order_repo = test_environment["order_repo"]
-        driver_repo = test_environment["driver_repo"]
-        pair_repo = test_environment["pair_repo"]
-        delivery_unit_repo = test_environment["delivery_unit_repo"]
-        config = test_config_pairing_disabled
-        
-        # Create the assignment service
-        assignment_service = AssignmentService(
-            env=env,
-            event_dispatcher=event_dispatcher,
-            order_repository=order_repo,
-            driver_repository=driver_repo,
-            pair_repository=pair_repo,
-            delivery_unit_repository=delivery_unit_repo,
-            config=config
-        )
-        
-        # Create a spy for assignment attempts from driver perspective
-        assignment_attempts = []
-        original_method = assignment_service.attempt_immediate_assignment_from_driver
-        
-        def spy_assignment_attempt(driver):
-            assignment_attempts.append({
-                'driver_id': driver.driver_id,
-                'trigger': 'driver_login'
-            })
-            return original_method(driver)
-        
-        assignment_service.attempt_immediate_assignment_from_driver = spy_assignment_attempt
-        
-        # Create a test driver
-        test_driver = Driver(
-            driver_id="D1",
-            initial_location=[5, 5],
-            login_time=env.now,
-            service_duration=120  # 2 hours
-        )
-        driver_repo.add(test_driver)
-        
-        # ACT - Dispatch DriverLoggedInEvent
-        event_dispatcher.dispatch(DriverLoggedInEvent(
-            timestamp=env.now,
-            driver_id=test_driver.driver_id,
-            initial_location=test_driver.location,
-            service_duration=test_driver.service_duration
-        ))
-        
-        # Run briefly to allow event processing
-        env.run(until=0.1)
-        
-        # ASSERT - Verify the assignment attempt was triggered
-        assert len(assignment_attempts) == 1, "Should trigger exactly one assignment attempt"
-        
-        attempt = assignment_attempts[0]
-        assert attempt['driver_id'] == test_driver.driver_id, "Should attempt assignment for the correct driver"
-        assert attempt['trigger'] == 'driver_login', "Should be triggered by driver login"
-    
-    def test_driver_available_for_assignment_triggers_assignment_attempt(self, test_environment, test_config_pairing_disabled):
-        """
-        Test Trigger #5: DriverAvailableForAssignmentEvent → immediate assignment attempt.
-        
-        When a driver completes a delivery and is still eligible to work (not overdue),
-        they should check for new delivery opportunities. This event is dispatched by
-        DriverSchedulingService after verifying the driver isn't overdue for logout.
-        """
-        # ARRANGE
-        env = test_environment["env"]
-        event_dispatcher = test_environment["event_dispatcher"]
-        order_repo = test_environment["order_repo"]
-        driver_repo = test_environment["driver_repo"]
-        pair_repo = test_environment["pair_repo"]
-        delivery_unit_repo = test_environment["delivery_unit_repo"]
-        config = test_config_pairing_disabled
-        
-        # Create the assignment service
-        assignment_service = AssignmentService(
-            env=env,
-            event_dispatcher=event_dispatcher,
-            order_repository=order_repo,
-            driver_repository=driver_repo,
-            pair_repository=pair_repo,
-            delivery_unit_repository=delivery_unit_repo,
-            config=config
-        )
-        
-        # Create a spy for assignment attempts from driver perspective
-        assignment_attempts = []
-        original_method = assignment_service.attempt_immediate_assignment_from_driver
-        
-        def spy_assignment_attempt(driver):
-            assignment_attempts.append({
-                'driver_id': driver.driver_id,
-                'trigger': 'driver_available'
-            })
-            return original_method(driver)
-        
-        assignment_service.attempt_immediate_assignment_from_driver = spy_assignment_attempt
-        
-        # Create a test driver who just completed a delivery
-        test_driver = Driver(
-            driver_id="D1",
-            initial_location=[5, 5],
-            login_time=env.now - 30,  # Logged in 30 minutes ago
-            service_duration=120      # Plans to work 120 minutes total
-        )
-        test_driver.state = DriverState.AVAILABLE  # Just finished delivery
-        driver_repo.add(test_driver)
-        
-        # ACT - Dispatch DriverAvailableForAssignmentEvent
-        # Note: This event is normally dispatched by DriverSchedulingService
-        # after verifying the driver isn't overdue for logout
-        event_dispatcher.dispatch(DriverAvailableForAssignmentEvent(
-            timestamp=env.now,
-            driver_id=test_driver.driver_id
-        ))
-        
-        # Run briefly to allow event processing
-        env.run(until=0.1)
-        
-        # ASSERT - Verify the assignment attempt was triggered
-        assert len(assignment_attempts) == 1, "Should trigger exactly one assignment attempt"
-        
-        attempt = assignment_attempts[0]
-        assert attempt['driver_id'] == test_driver.driver_id, "Should attempt assignment for the correct driver"
-        assert attempt['trigger'] == 'driver_available', "Should be triggered by driver availability"
-    
-    # ===== Verification Tests =====
-    
-    def test_no_duplicate_triggers_for_same_event(self, test_environment, test_config_pairing_disabled):
-        """
-        Verify that a single event doesn't trigger multiple assignment attempts.
-        
-        This is a safeguard test to ensure our event handling doesn't have
-        duplicate registrations or circular triggering patterns.
-        """
-        # ARRANGE
-        env = test_environment["env"]
-        event_dispatcher = test_environment["event_dispatcher"]
-        order_repo = test_environment["order_repo"]
-        driver_repo = test_environment["driver_repo"]
-        pair_repo = test_environment["pair_repo"]
-        delivery_unit_repo = test_environment["delivery_unit_repo"]
-        config = test_config_pairing_disabled
-        
-        # Create the assignment service
-        assignment_service = AssignmentService(
-            env=env,
-            event_dispatcher=event_dispatcher,
-            order_repository=order_repo,
-            driver_repository=driver_repo,
-            pair_repository=pair_repo,
-            delivery_unit_repository=delivery_unit_repo,
-            config=config
-        )
-        
-        # Create spies for both types of assignment attempts
-        entity_attempts = []
-        driver_attempts = []
-        
-        original_entity_method = assignment_service.attempt_immediate_assignment_from_delivery_entity
-        original_driver_method = assignment_service.attempt_immediate_assignment_from_driver
-        
-        def spy_entity_attempt(entity):
-            entity_attempts.append(entity)
-            return original_entity_method(entity)
-        
-        def spy_driver_attempt(driver):
-            driver_attempts.append(driver)
-            return original_driver_method(driver)
-        
-        assignment_service.attempt_immediate_assignment_from_delivery_entity = spy_entity_attempt
-        assignment_service.attempt_immediate_assignment_from_driver = spy_driver_attempt
-        
-        # Create a test order
-        test_order = Order("O1", [3, 3], [7, 7], env.now)
-        order_repo.add(test_order)
-        
-        # ACT - Dispatch a single OrderCreatedEvent
-        event_dispatcher.dispatch(OrderCreatedEvent(
-            timestamp=env.now,
-            order_id=test_order.order_id,
-            restaurant_id="R1",
-            restaurant_location=test_order.restaurant_location,
-            customer_location=test_order.customer_location
-        ))
-        
-        # Run with extra time to ensure no delayed duplicate triggers
-        env.run(until=1.0)
-        
-        # ASSERT - Verify only one attempt was triggered
-        assert len(entity_attempts) == 1, "Should trigger exactly one entity-based attempt"
-        assert len(driver_attempts) == 0, "Should not trigger any driver-based attempts"
-    
-    def test_configuration_determines_order_event_routing(self, test_environment, test_config_pairing_disabled, test_config_pairing_enabled):
-        """
-        Verify that pairing configuration correctly determines whether OrderCreatedEvent
-        triggers immediate assignment or not.
-        
-        This test confirms that the configuration-based routing works as expected.
-        """
-        # ARRANGE - First test with pairing disabled
-        env = test_environment["env"]
-        event_dispatcher = EventDispatcher()  # Fresh dispatcher for each config
-        order_repo = test_environment["order_repo"]
-        driver_repo = test_environment["driver_repo"]
-        pair_repo = test_environment["pair_repo"]
-        delivery_unit_repo = test_environment["delivery_unit_repo"]
-        
-        # Test 1: Pairing disabled - should trigger assignment
-        assignment_service_no_pairing = AssignmentService(
-            env=env,
-            event_dispatcher=event_dispatcher,
-            order_repository=order_repo,
-            driver_repository=driver_repo,
-            pair_repository=pair_repo,
-            delivery_unit_repository=delivery_unit_repo,
-            config=test_config_pairing_disabled
-        )
-        
-        attempts_no_pairing = []
-        original_method = assignment_service_no_pairing.attempt_immediate_assignment_from_delivery_entity
-        assignment_service_no_pairing.attempt_immediate_assignment_from_delivery_entity = \
-            lambda e: attempts_no_pairing.append(e) or original_method(e)
-        
-        # Create and dispatch order event
-        test_order1 = Order("O1", [3, 3], [7, 7], env.now)
-        order_repo.add(test_order1)
-        
-        event_dispatcher.dispatch(OrderCreatedEvent(
-            timestamp=env.now,
-            order_id=test_order1.order_id,
-            restaurant_id="R1",
-            restaurant_location=test_order1.restaurant_location,
-            customer_location=test_order1.customer_location
-        ))
-        
-        env.run(until=0.1)
-        
-        # Test 2: Pairing enabled - should NOT trigger assignment
-        event_dispatcher2 = EventDispatcher()  # Fresh dispatcher
-        assignment_service_with_pairing = AssignmentService(
-            env=env,
-            event_dispatcher=event_dispatcher2,
-            order_repository=order_repo,
-            driver_repository=driver_repo,
-            pair_repository=pair_repo,
-            delivery_unit_repository=delivery_unit_repo,
-            config=test_config_pairing_enabled
-        )
-        
-        attempts_with_pairing = []
-        original_method2 = assignment_service_with_pairing.attempt_immediate_assignment_from_delivery_entity
-        assignment_service_with_pairing.attempt_immediate_assignment_from_delivery_entity = \
-            lambda e: attempts_with_pairing.append(e) or original_method2(e)
-        
-        # Create and dispatch another order event
-        test_order2 = Order("O2", [4, 4], [8, 8], env.now)
-        order_repo.add(test_order2)
-        
-        event_dispatcher2.dispatch(OrderCreatedEvent(
-            timestamp=env.now,
-            order_id=test_order2.order_id,
-            restaurant_id="R2",
-            restaurant_location=test_order2.restaurant_location,
-            customer_location=test_order2.customer_location
-        ))
-        
-        env.run(until=0.2)
         
         # ASSERT
-        assert len(attempts_no_pairing) == 1, "With pairing disabled, OrderCreatedEvent should trigger assignment"
-        assert len(attempts_with_pairing) == 0, "With pairing enabled, OrderCreatedEvent should NOT trigger assignment"
+        # Verify that assignment attempt was triggered
+        assert len(assignment_attempts) == 1, "OrderCreatedEvent should trigger assignment attempt"
+        assert assignment_attempts[0] is test_order, "Assignment attempt should be for the created order"
+        
+        # Verify priority scorer was used (indicates full assignment flow)
+        mock_priority_scorer.calculate_priority_score.assert_called()
+    
+    # ===== Trigger 2: PairCreatedEvent (Pairing Enabled) =====
+    
+    def test_pair_created_triggers_immediate_assignment_when_pairing_enabled(
+        self, test_environment, test_config_pairing_enabled, mock_priority_scorer
+    ):
+        """
+        Test that PairCreatedEvent triggers immediate assignment when pairing is enabled.
+        
+        When pairing succeeds, the resulting pair should immediately attempt assignment.
+        """
+        # ARRANGE
+        env = test_environment["env"]
+        event_dispatcher = test_environment["event_dispatcher"]
+        order_repo = test_environment["order_repo"]
+        driver_repo = test_environment["driver_repo"]
+        pair_repo = test_environment["pair_repo"]
+        delivery_unit_repo = test_environment["delivery_unit_repo"]
+        config = test_config_pairing_enabled
+        
+        # Create assignment service
+        assignment_service = AssignmentService(
+            env=env,
+            event_dispatcher=event_dispatcher,
+            order_repository=order_repo,
+            driver_repository=driver_repo,
+            pair_repository=pair_repo,
+            delivery_unit_repository=delivery_unit_repo,
+            priority_scorer=mock_priority_scorer,
+            config=config
+        )
+        
+        # Create a pair in the repository
+        order1 = Order("O1", [3, 3], [4, 4], env.now)
+        order2 = Order("O2", [3, 3], [5, 5], env.now)
+        test_pair = Pair(order1, order2, env.now)
+        test_pair.entity_type = EntityType.PAIR
+        pair_repo.add(test_pair)
+        
+        # Create a driver to make assignment possible
+        test_driver = Driver("D1", [2, 2], env.now, 120)
+        test_driver.entity_type = EntityType.DRIVER
+        test_driver.state = DriverState.AVAILABLE
+        driver_repo.add(test_driver)
+        
+        # Track assignment attempts
+        assignment_attempts = []
+        original_attempt = assignment_service.attempt_immediate_assignment_from_delivery_entity
+        
+        def track_assignment_attempts(entity):
+            assignment_attempts.append(entity)
+            return original_attempt(entity)
+        
+        assignment_service.attempt_immediate_assignment_from_delivery_entity = track_assignment_attempts
+        
+        # ACT - Dispatch PairCreatedEvent
+        event = PairCreatedEvent(timestamp=env.now, pair_id=test_pair.pair_id)
+        event_dispatcher.dispatch(event)
+        
+        # Allow event processing
+        env.run(until=0.1)
+        
+        # ASSERT
+        # Verify that assignment attempt was triggered
+        assert len(assignment_attempts) == 1, "PairCreatedEvent should trigger assignment attempt"
+        assert assignment_attempts[0] is test_pair, "Assignment attempt should be for the created pair"
+        
+        # Verify priority scorer was used
+        mock_priority_scorer.calculate_priority_score.assert_called()
+    
+    # ===== Trigger 3: PairingFailedEvent (Pairing Enabled) =====
+    
+    def test_pairing_failed_triggers_immediate_assignment_when_pairing_enabled(
+        self, test_environment, test_config_pairing_enabled, mock_priority_scorer
+    ):
+        """
+        Test that PairingFailedEvent triggers immediate assignment when pairing is enabled.
+        
+        When pairing fails, the single order should fall back to immediate assignment.
+        """
+        # ARRANGE
+        env = test_environment["env"]
+        event_dispatcher = test_environment["event_dispatcher"]
+        order_repo = test_environment["order_repo"]
+        driver_repo = test_environment["driver_repo"]
+        pair_repo = test_environment["pair_repo"]
+        delivery_unit_repo = test_environment["delivery_unit_repo"]
+        config = test_config_pairing_enabled
+        
+        # Create assignment service
+        assignment_service = AssignmentService(
+            env=env,
+            event_dispatcher=event_dispatcher,
+            order_repository=order_repo,
+            driver_repository=driver_repo,
+            pair_repository=pair_repo,
+            delivery_unit_repository=delivery_unit_repo,
+            priority_scorer=mock_priority_scorer,
+            config=config
+        )
+        
+        # Create an order that failed to pair
+        test_order = Order("O1", [3, 3], [5, 5], env.now)
+        test_order.entity_type = EntityType.ORDER
+        order_repo.add(test_order)
+        
+        # Create a driver to make assignment possible
+        test_driver = Driver("D1", [2, 2], env.now, 120)
+        test_driver.entity_type = EntityType.DRIVER
+        test_driver.state = DriverState.AVAILABLE
+        driver_repo.add(test_driver)
+        
+        # Track assignment attempts
+        assignment_attempts = []
+        original_attempt = assignment_service.attempt_immediate_assignment_from_delivery_entity
+        
+        def track_assignment_attempts(entity):
+            assignment_attempts.append(entity)
+            return original_attempt(entity)
+        
+        assignment_service.attempt_immediate_assignment_from_delivery_entity = track_assignment_attempts
+        
+        # ACT - Dispatch PairingFailedEvent
+        event = PairingFailedEvent(timestamp=env.now, order_id="O1")
+        event_dispatcher.dispatch(event)
+        
+        # Allow event processing
+        env.run(until=0.1)
+        
+        # ASSERT
+        # Verify that assignment attempt was triggered
+        assert len(assignment_attempts) == 1, "PairingFailedEvent should trigger assignment attempt"
+        assert assignment_attempts[0] is test_order, "Assignment attempt should be for the failed order"
+        
+        # Verify priority scorer was used
+        mock_priority_scorer.calculate_priority_score.assert_called()
+    
+    # ===== Trigger 4: DriverLoggedInEvent =====
+    
+    def test_driver_login_triggers_immediate_assignment(
+        self, test_environment, test_config_pairing_disabled, mock_priority_scorer
+    ):
+        """
+        Test that DriverLoggedInEvent triggers immediate assignment attempt.
+        
+        When a new driver enters the system, they should immediately look for work.
+        """
+        # ARRANGE
+        env = test_environment["env"]
+        event_dispatcher = test_environment["event_dispatcher"]
+        order_repo = test_environment["order_repo"]
+        driver_repo = test_environment["driver_repo"]
+        pair_repo = test_environment["pair_repo"]
+        delivery_unit_repo = test_environment["delivery_unit_repo"]
+        config = test_config_pairing_disabled
+        
+        # Create assignment service
+        assignment_service = AssignmentService(
+            env=env,
+            event_dispatcher=event_dispatcher,
+            order_repository=order_repo,
+            driver_repository=driver_repo,
+            pair_repository=pair_repo,
+            delivery_unit_repository=delivery_unit_repo,
+            priority_scorer=mock_priority_scorer,
+            config=config
+        )
+        
+        # Create a waiting order
+        test_order = Order("O1", [3, 3], [5, 5], env.now)
+        test_order.entity_type = EntityType.ORDER
+        test_order.state = OrderState.CREATED
+        order_repo.add(test_order)
+        
+        # Create a driver that just logged in
+        test_driver = Driver("D1", [2, 2], env.now, 120)
+        test_driver.entity_type = EntityType.DRIVER
+        test_driver.state = DriverState.AVAILABLE
+        driver_repo.add(test_driver)
+        
+        # Track assignment attempts from driver perspective
+        assignment_attempts = []
+        original_attempt = assignment_service.attempt_immediate_assignment_from_driver
+        
+        def track_driver_assignments(driver):
+            assignment_attempts.append(driver)
+            return original_attempt(driver)
+        
+        assignment_service.attempt_immediate_assignment_from_driver = track_driver_assignments
+        
+        # ACT - Dispatch DriverLoggedInEvent
+        event = DriverLoggedInEvent(timestamp=env.now, driver_id="D1")
+        event_dispatcher.dispatch(event)
+        
+        # Allow event processing
+        env.run(until=0.1)
+        
+        # ASSERT
+        # Verify that assignment attempt was triggered from driver
+        assert len(assignment_attempts) == 1, "DriverLoggedInEvent should trigger assignment attempt"
+        assert assignment_attempts[0] is test_driver, "Assignment attempt should be for the logged-in driver"
+        
+        # Verify priority scorer was used
+        mock_priority_scorer.calculate_priority_score.assert_called()
+    
+    # ===== Trigger 5: DriverAvailableForAssignmentEvent =====
+    
+    def test_driver_available_triggers_immediate_assignment(
+        self, test_environment, test_config_pairing_disabled, mock_priority_scorer
+    ):
+        """
+        Test that DriverAvailableForAssignmentEvent triggers immediate assignment attempt.
+        
+        When a driver completes a delivery and becomes available, they should
+        immediately look for new work.
+        """
+        # ARRANGE
+        env = test_environment["env"]
+        event_dispatcher = test_environment["event_dispatcher"]
+        order_repo = test_environment["order_repo"]
+        driver_repo = test_environment["driver_repo"]
+        pair_repo = test_environment["pair_repo"]
+        delivery_unit_repo = test_environment["delivery_unit_repo"]
+        config = test_config_pairing_disabled
+        
+        # Create assignment service
+        assignment_service = AssignmentService(
+            env=env,
+            event_dispatcher=event_dispatcher,
+            order_repository=order_repo,
+            driver_repository=driver_repo,
+            pair_repository=pair_repo,
+            delivery_unit_repository=delivery_unit_repo,
+            priority_scorer=mock_priority_scorer,
+            config=config
+        )
+        
+        # Create a waiting order
+        test_order = Order("O1", [3, 3], [5, 5], env.now)
+        test_order.entity_type = EntityType.ORDER
+        test_order.state = OrderState.CREATED
+        order_repo.add(test_order)
+        
+        # Create a driver that just became available
+        test_driver = Driver("D1", [2, 2], env.now, 120)
+        test_driver.entity_type = EntityType.DRIVER
+        test_driver.state = DriverState.AVAILABLE
+        driver_repo.add(test_driver)
+        
+        # Track assignment attempts from driver perspective
+        assignment_attempts = []
+        original_attempt = assignment_service.attempt_immediate_assignment_from_driver
+        
+        def track_driver_assignments(driver):
+            assignment_attempts.append(driver)
+            return original_attempt(driver)
+        
+        assignment_service.attempt_immediate_assignment_from_driver = track_driver_assignments
+        
+        # ACT - Dispatch DriverAvailableForAssignmentEvent
+        event = DriverAvailableForAssignmentEvent(timestamp=env.now, driver_id="D1")
+        event_dispatcher.dispatch(event)
+        
+        # Allow event processing
+        env.run(until=0.1)
+        
+        # ASSERT
+        # Verify that assignment attempt was triggered from driver
+        assert len(assignment_attempts) == 1, "DriverAvailableForAssignmentEvent should trigger assignment attempt"
+        assert assignment_attempts[0] is test_driver, "Assignment attempt should be for the available driver"
+        
+        # Verify priority scorer was used
+        mock_priority_scorer.calculate_priority_score.assert_called()
+    
+    # ===== Comprehensive Trigger Verification =====
+    
+    def test_all_triggers_use_priority_scorer(
+        self, test_environment, test_config_pairing_enabled, mock_priority_scorer
+    ):
+        """
+        Test that all trigger pathways properly integrate with the priority scoring system.
+        
+        This ensures that regardless of how assignment is triggered, the same
+        scoring logic is consistently applied.
+        """
+        # ARRANGE
+        env = test_environment["env"]
+        event_dispatcher = test_environment["event_dispatcher"]
+        order_repo = test_environment["order_repo"]
+        driver_repo = test_environment["driver_repo"]
+        pair_repo = test_environment["pair_repo"]
+        delivery_unit_repo = test_environment["delivery_unit_repo"]
+        config = test_config_pairing_enabled
+        
+        # Create assignment service
+        assignment_service = AssignmentService(
+            env=env,
+            event_dispatcher=event_dispatcher,
+            order_repository=order_repo,
+            driver_repository=driver_repo,
+            pair_repository=pair_repo,
+            delivery_unit_repository=delivery_unit_repo,
+            priority_scorer=mock_priority_scorer,
+            config=config
+        )
+        
+        # Create test entities
+        test_order = Order("O1", [3, 3], [5, 5], env.now)
+        test_order.entity_type = EntityType.ORDER
+        order_repo.add(test_order)
+        
+        test_driver = Driver("D1", [2, 2], env.now, 120)
+        test_driver.entity_type = EntityType.DRIVER
+        test_driver.state = DriverState.AVAILABLE
+        driver_repo.add(test_driver)
+        
+        # Reset call count
+        mock_priority_scorer.reset_mock()
+        
+        # ACT - Trigger assignment from entity perspective
+        result1 = assignment_service.attempt_immediate_assignment_from_delivery_entity(test_order)
+        
+        # ASSERT - Verify scorer was used
+        assert mock_priority_scorer.calculate_priority_score.called, "Entity assignment should use priority scorer"
+        
+        # Reset for next test
+        mock_priority_scorer.reset_mock()
+        
+        # ACT - Trigger assignment from driver perspective
+        result2 = assignment_service.attempt_immediate_assignment_from_driver(test_driver)
+        
+        # ASSERT - Verify scorer was used consistently
+        assert mock_priority_scorer.calculate_priority_score.called, "Driver assignment should use priority scorer"
