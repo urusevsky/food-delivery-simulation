@@ -1,3 +1,16 @@
+# delivery_sim/services/assignment_service.py
+"""
+Assignment Service - Driver-Entity Assignment with Priority Scoring
+
+This service implements a hybrid assignment approach:
+1. Immediate assignment for clear opportunities
+2. Periodic global optimization using Hungarian algorithm
+
+Core change: Replaced adjusted cost framework with multi-criteria priority scoring
+for more principled assignment decisions.
+"""
+
+import numpy as np
 from scipy.optimize import linear_sum_assignment
 from delivery_sim.entities.states import OrderState, DriverState, PairState
 from delivery_sim.entities.delivery_unit import DeliveryUnit
@@ -9,19 +22,31 @@ from delivery_sim.utils.location_utils import calculate_distance
 from delivery_sim.utils.logging_system import get_logger
 from delivery_sim.utils.entity_type_utils import EntityType
 
+
 class AssignmentService:
     """
     Service responsible for assigning drivers to delivery entities (orders or pairs).
     
-    This service implements a hybrid assignment approach combining:
-    1. Immediate assignment for clear opportunities
-    2. Periodic global optimization for complex decisions
+    Uses priority scoring system to evaluate assignment opportunities based on:
+    - Distance efficiency (infrastructure-aware)
+    - Throughput optimization (orders per trip)
+    - Fairness considerations (wait time)
     """
     
     def __init__(self, env, event_dispatcher, order_repository, driver_repository, 
-                 pair_repository, delivery_unit_repository, config):
+                 pair_repository, delivery_unit_repository, priority_scorer, config):
         """
         Initialize the assignment service with its dependencies.
+        
+        Args:
+            env: SimPy environment
+            event_dispatcher: Central event dispatcher
+            order_repository: Repository for orders
+            driver_repository: Repository for drivers
+            pair_repository: Repository for pairs
+            delivery_unit_repository: Repository for delivery units
+            priority_scorer: PriorityScorer instance for assignment evaluation
+            config: Configuration object containing assignment parameters
         """
         # Get a logger instance specific to this component
         self.logger = get_logger("service.assignment")
@@ -33,14 +58,14 @@ class AssignmentService:
         self.driver_repository = driver_repository
         self.pair_repository = pair_repository
         self.delivery_unit_repository = delivery_unit_repository
+        self.priority_scorer = priority_scorer
         self.config = config
         
         # Log service initialization with configuration details
-        self.logger.info(f"[t={self.env.now:.2f}] AssignmentService initialized with configuration: "
+        self.logger.info(f"[t={self.env.now:.2f}] AssignmentService initialized with priority scoring system")
+        self.logger.info(f"[t={self.env.now:.2f}] Configuration: "
                         f"threshold={config.immediate_assignment_threshold}, "
-                        f"periodic_interval={config.periodic_interval} min, "
-                        f"throughput_factor={config.throughput_factor}, "
-                        f"age_factor={config.age_factor}")
+                        f"periodic_interval={config.periodic_interval} min")
         
         # Register event handlers based on pairing configuration
         if config.pairing_enabled:
@@ -71,104 +96,98 @@ class AssignmentService:
     def handle_order_created(self, event):
         """
         Handler for OrderCreatedEvent in single mode.
-        Validates the order and attempts immediate assignment if valid.
+        
+        Args:
+            event: OrderCreatedEvent containing order_id
         """
-        # Log event handling
         self.logger.simulation_event(f"[t={self.env.now:.2f}] Handling OrderCreatedEvent for order {event.order_id}")
         
-        # Validate order exists
-        order_id = event.order_id
-        order = self.order_repository.find_by_id(order_id)
-        
-        if not order:
-            self.logger.validation(f"[t={self.env.now:.2f}] Order {order_id} not found, cannot attempt assignment")
+        # Get the order from repository
+        order = self.order_repository.find_by_id(event.order_id)
+        if order is None:
+            self.logger.error(f"[t={self.env.now:.2f}] Order {event.order_id} not found in repository")
             return
-            
-        # Pass validated entity to operation
+        
+        # Attempt immediate assignment
         self.attempt_immediate_assignment_from_delivery_entity(order)
     
     def handle_pair_created(self, event):
         """
-        Handler for PairCreatedEvent in pair mode.
-        Validates the pair and attempts immediate assignment if valid.
+        Handler for PairCreatedEvent in pairing mode.
+        
+        Args:
+            event: PairCreatedEvent containing pair_id
         """
-        # Log event handling
         self.logger.simulation_event(f"[t={self.env.now:.2f}] Handling PairCreatedEvent for pair {event.pair_id}")
         
-        # Validate pair exists
-        pair_id = event.pair_id
-        pair = self.pair_repository.find_by_id(pair_id)
-        
-        if not pair:
-            self.logger.validation(f"[t={self.env.now:.2f}] Pair {pair_id} not found, cannot attempt assignment")
+        # Get the pair from repository
+        pair = self.pair_repository.find_by_id(event.pair_id)
+        if pair is None:
+            self.logger.error(f"[t={self.env.now:.2f}] Pair {event.pair_id} not found in repository")
             return
-            
-        # Pass validated entity to operation
+        
+        # Attempt immediate assignment
         self.attempt_immediate_assignment_from_delivery_entity(pair)
     
     def handle_pairing_failed(self, event):
         """
-        Handler for PairingFailedEvent in pair mode.
-        Validates the order and attempts immediate assignment if valid.
+        Handler for PairingFailedEvent - single order bypassed pairing.
+        
+        Args:
+            event: PairingFailedEvent containing order_id
         """
-        # Log event handling
         self.logger.simulation_event(f"[t={self.env.now:.2f}] Handling PairingFailedEvent for order {event.order_id}")
         
-        # Validate order exists
-        order_id = event.order_id
-        order = self.order_repository.find_by_id(order_id)
-        
-        if not order:
-            self.logger.validation(f"[t={self.env.now:.2f}] Order {order_id} not found, cannot attempt assignment")
+        # Get the order from repository
+        order = self.order_repository.find_by_id(event.order_id)
+        if order is None:
+            self.logger.error(f"[t={self.env.now:.2f}] Order {event.order_id} not found in repository")
             return
-            
-        # Pass validated entity to operation
+        
+        # Attempt immediate assignment of the single order
         self.attempt_immediate_assignment_from_delivery_entity(order)
     
     def handle_driver_login(self, event):
         """
         Handler for DriverLoggedInEvent.
-        Validates the driver and attempts immediate assignment if valid.
+        
+        Args:
+            event: DriverLoggedInEvent containing driver_id
         """
-        # Log event handling
         self.logger.simulation_event(f"[t={self.env.now:.2f}] Handling DriverLoggedInEvent for driver {event.driver_id}")
         
-        # Validate driver exists
-        driver_id = event.driver_id
-        driver = self.driver_repository.find_by_id(driver_id)
-        
-        if not driver:
-            self.logger.validation(f"[t={self.env.now:.2f}] Driver {driver_id} not found, cannot attempt assignment")
+        # Get the driver from repository
+        driver = self.driver_repository.find_by_id(event.driver_id)
+        if driver is None:
+            self.logger.error(f"[t={self.env.now:.2f}] Driver {event.driver_id} not found in repository")
             return
-            
-        # Pass validated entity to operation
+        
+        # Attempt immediate assignment from this new driver
         self.attempt_immediate_assignment_from_driver(driver)
     
     def handle_driver_available_for_assignment(self, event):
         """
-        Handler for DriverAvailableForAssignmentEvent(when a driver becomes available after delivery completion)
-        Validates the driver and attempts immediate assignment if valid.
-        """
+        Handler for DriverAvailableForAssignmentEvent.
         
-        # Log event handling
+        Args:
+            event: DriverAvailableForAssignmentEvent containing driver_id
+        """
         self.logger.simulation_event(f"[t={self.env.now:.2f}] Handling DriverAvailableForAssignmentEvent for driver {event.driver_id}")
         
-        # Validate driver exists
-        driver_id = event.driver_id
-        driver = self.driver_repository.find_by_id(driver_id)
-        
-        if not driver:
-            self.logger.validation(f"[t={self.env.now:.2f}] Driver {driver_id} not found, cannot attempt assignment")
+        # Get the driver from repository
+        driver = self.driver_repository.find_by_id(event.driver_id)
+        if driver is None:
+            self.logger.error(f"[t={self.env.now:.2f}] Driver {event.driver_id} not found in repository")
             return
-            
-        # Pass validated entity to operation
+        
+        # Attempt immediate assignment from this available driver
         self.attempt_immediate_assignment_from_driver(driver)
     
-    # ===== Operations =====
+    # ===== Assignment Operations =====
     
     def attempt_immediate_assignment_from_delivery_entity(self, delivery_entity):
         """
-        Try to find an available driver for a delivery entity.
+        Try to find a driver for a delivery entity immediately upon creation.
         
         This operation implements the business logic for immediate assignment decisions,
         determining if a clear opportunity exists to assign a driver immediately.
@@ -184,7 +203,6 @@ class AssignmentService:
         entity_id = delivery_entity.order_id if entity_type == EntityType.ORDER else delivery_entity.pair_id
         
         self.logger.debug(f"[t={self.env.now:.2f}] Attempting immediate assignment for {entity_type} {entity_id}")
-    
         
         # Business logic: Check for available drivers
         available_drivers = self.driver_repository.find_available_drivers()
@@ -196,84 +214,162 @@ class AssignmentService:
         self.logger.debug(f"[t={self.env.now:.2f}] Found {len(available_drivers)} available drivers for {entity_type} {entity_id}")
         
         # Find best driver for this entity
-        best_driver, adjusted_cost, cost_components = self._find_best_match(delivery_entity, available_drivers)
+        best_driver, priority_score, score_components = self._find_best_match(delivery_entity, available_drivers)
         
         self.logger.debug(f"[t={self.env.now:.2f}] Best match for {entity_type} {entity_id}: "
-                        f"driver {best_driver.driver_id} with adjusted cost {adjusted_cost:.2f} "
-                        f"(base: {cost_components['base_cost']:.2f}, throughput: {cost_components['throughput_component']:.2f}, "
-                        f"age: {cost_components['age_discount']:.2f})")
+                        f"driver {best_driver.driver_id} with priority score {priority_score:.2f} "
+                        f"(distance: {score_components['distance_score']:.3f}, "
+                        f"throughput: {score_components['throughput_score']:.3f}, "
+                        f"fairness: {score_components['fairness_score']:.3f})")
         
         # Business decision: Check if assignment meets threshold criteria
-        if adjusted_cost <= self.config.immediate_assignment_threshold:
+        if priority_score >= self.config.immediate_assignment_threshold:
             # Create the assignment
             self.logger.info(f"[t={self.env.now:.2f}] Immediate assignment: {entity_type} {entity_id} meets threshold "
-                           f"({adjusted_cost:.2f} <= {self.config.immediate_assignment_threshold})")
-            self._create_assignment(best_driver, delivery_entity, "immediate", cost_components)
+                           f"({priority_score:.2f} >= {self.config.immediate_assignment_threshold})")
+            self._create_assignment(best_driver, delivery_entity, "immediate", score_components)
             return True
         else:
-            # Business outcome: Cost exceeds immediate assignment threshold
-            self.logger.info(f"[t={self.env.now:.2f}] Immediate assignment deferred: {entity_type} {entity_id} exceeds threshold "
-                           f"({adjusted_cost:.2f} > {self.config.immediate_assignment_threshold})")
+            # Business outcome: Score below immediate assignment threshold
+            self.logger.info(f"[t={self.env.now:.2f}] Immediate assignment deferred: {entity_type} {entity_id} below threshold "
+                           f"({priority_score:.2f} < {self.config.immediate_assignment_threshold})")
             return False
     
     def attempt_immediate_assignment_from_driver(self, driver):
         """
         Try to find the best delivery entity for a newly available driver.
         
-        This operation implements the business logic for immediate assignment decisions
-        from the driver perspective, determining if there's a clear opportunity to 
-        assign the driver to a waiting order or pair.
-        
         Args:
-            driver: The driver who became available
+            driver: The driver to find work for
             
         Returns:
             bool: True if assignment succeeded, False otherwise
         """
         self.logger.debug(f"[t={self.env.now:.2f}] Attempting immediate assignment for driver {driver.driver_id}")
         
-        # Get unassigned delivery entities
-        unassigned_orders = self.order_repository.find_unassigned_orders()
-        unassigned_pairs = self.pair_repository.find_unassigned_pairs()
+        # Business logic: Collect all available delivery entities
+        waiting_entities = []
+        waiting_entities.extend(self.order_repository.find_by_state(OrderState.CREATED))
+        waiting_entities.extend(self.pair_repository.find_by_state(PairState.CREATED))
         
-        # Combine into a single list of candidates
-        delivery_candidates = unassigned_orders + unassigned_pairs
-        
-        # Business logic: Check if there are waiting delivery entities
-        if not delivery_candidates:
-            # Business outcome: No waiting delivery entities to assign
-            self.logger.debug(f"[t={self.env.now:.2f}] No waiting delivery entities for driver {driver.driver_id}, assignment deferred")
+        if not waiting_entities:
+            # Business outcome: No entities available for assignment
+            self.logger.debug(f"[t={self.env.now:.2f}] No waiting entities for driver {driver.driver_id}")
             return False
         
-        self.logger.debug(f"[t={self.env.now:.2f}] Found {len(delivery_candidates)} waiting delivery entities for driver {driver.driver_id}")
+        self.logger.debug(f"[t={self.env.now:.2f}] Found {len(waiting_entities)} waiting entities for driver {driver.driver_id}")
         
         # Find best entity for this driver
-        best_entity, adjusted_cost, cost_components = self._find_best_match(driver, delivery_candidates)
+        best_entity, priority_score, score_components = self._find_best_match(driver, waiting_entities)
         
-        # Get entity type directly from the entity
-        entity_type = best_entity.entity_type 
+        entity_type = best_entity.entity_type
         entity_id = best_entity.order_id if entity_type == EntityType.ORDER else best_entity.pair_id
-
-        # For logging messages where we still use string representation
-        entity_type_str = "order" if entity_type == EntityType.ORDER else "pair"
-
+        
         self.logger.debug(f"[t={self.env.now:.2f}] Best match for driver {driver.driver_id}: "
-                        f"{entity_type_str} {entity_id} with adjusted cost {adjusted_cost:.2f} "
-                        f"(base: {cost_components['base_cost']:.2f}, throughput: {cost_components['throughput_component']:.2f}, "
-                        f"age: {cost_components['age_discount']:.2f})")
+                        f"{entity_type} {entity_id} with priority score {priority_score:.2f}")
         
         # Business decision: Check if assignment meets threshold criteria
-        if adjusted_cost <= self.config.immediate_assignment_threshold:
+        if priority_score >= self.config.immediate_assignment_threshold:
             # Create the assignment
             self.logger.info(f"[t={self.env.now:.2f}] Immediate assignment: driver {driver.driver_id} to {entity_type} {entity_id} meets threshold "
-                           f"({adjusted_cost:.2f} <= {self.config.immediate_assignment_threshold})")
-            self._create_assignment(driver, best_entity, "immediate", cost_components)
+                           f"({priority_score:.2f} >= {self.config.immediate_assignment_threshold})")
+            self._create_assignment(driver, best_entity, "immediate", score_components)
             return True
         else:
-            # Business outcome: Cost exceeds immediate assignment threshold
-            self.logger.info(f"[t={self.env.now:.2f}] Immediate assignment deferred: driver {driver.driver_id} to {entity_type} {entity_id} exceeds threshold "
-                           f"({adjusted_cost:.2f} > {self.config.immediate_assignment_threshold})")
+            # Business outcome: Score below immediate assignment threshold
+            self.logger.info(f"[t={self.env.now:.2f}] Immediate assignment deferred: driver {driver.driver_id} to {entity_type} {entity_id} below threshold "
+                           f"({priority_score:.2f} < {self.config.immediate_assignment_threshold})")
             return False
+    
+    # ===== Periodic Assignment Process =====
+    
+    def _periodic_assignment_process(self):
+        """SimPy process for periodic global optimization."""
+        interval = self.config.periodic_interval
+        
+        while True:
+            # Wait for the next periodic assignment interval
+            yield self.env.timeout(interval)
+            
+            # Perform periodic assignment
+            self.perform_periodic_assignment()
+    
+    def perform_periodic_assignment(self):
+        """
+        Perform periodic global optimization using Hungarian algorithm.
+        
+        This method collects all waiting entities and available drivers,
+        then uses optimization to find the globally optimal assignments.
+        """
+        self.logger.debug(f"[t={self.env.now:.2f}] Starting periodic assignment optimization")
+        
+        # Collect entities waiting for assignment
+        waiting_entities = []
+        waiting_entities.extend(self.order_repository.find_by_state(OrderState.CREATED))
+        waiting_entities.extend(self.pair_repository.find_by_state(PairState.CREATED))
+        
+        # Collect available drivers
+        available_drivers = self.driver_repository.find_available_drivers()
+        
+        self.logger.debug(f"[t={self.env.now:.2f}] Periodic optimization: {len(waiting_entities)} entities, {len(available_drivers)} drivers")
+        
+        # Check if optimization is needed
+        if not waiting_entities or not available_drivers:
+            self.logger.debug(f"[t={self.env.now:.2f}] Periodic optimization skipped: insufficient entities or drivers")
+            return
+        
+        # Generate score matrix for optimization
+        score_matrix = self._generate_score_matrix(waiting_entities, available_drivers)
+        
+        # Apply Hungarian algorithm (maximize scores)
+        row_indices, col_indices = linear_sum_assignment(score_matrix, maximize=True)
+        
+        # Log the optimization results
+        self.logger.info(f"[t={self.env.now:.2f}] Periodic optimization completed: {len(row_indices)} assignments identified")
+        
+        # Execute the optimal assignments
+        assignments_created = 0
+        for row, col in zip(row_indices, col_indices):
+            entity = waiting_entities[row]
+            driver = available_drivers[col]
+            
+            # Calculate full score information for record keeping
+            priority_score, score_components = self.priority_scorer.calculate_priority_score(driver, entity)
+            
+            # Create the assignment (detailed logging happens inside this method)
+            delivery_unit = self._create_assignment(driver, entity, "periodic", score_components)
+            if delivery_unit:
+                assignments_created += 1
+        
+        self.logger.info(f"[t={self.env.now:.2f}] Periodic optimization execution completed: {assignments_created} assignments created")
+    
+    def _generate_score_matrix(self, waiting_entities, available_drivers):
+        """
+        Generate score matrix for Hungarian algorithm optimization.
+        
+        Args:
+            waiting_entities: List of unassigned orders and pairs
+            available_drivers: List of available drivers
+            
+        Returns:
+            numpy.ndarray: 2D matrix of priority scores
+        """
+        score_matrix = []
+        
+        for entity in waiting_entities:
+            row = []
+            entity_type = entity.entity_type
+            entity_id = entity.order_id if entity_type == EntityType.ORDER else entity.pair_id
+            
+            for driver in available_drivers:
+                priority_score, _ = self.priority_scorer.calculate_priority_score(driver, entity)
+                row.append(priority_score)
+                
+                self.logger.debug(f"[t={self.env.now:.2f}] Score matrix entry: {entity_type} {entity_id} to driver {driver.driver_id} = {priority_score:.2f}")
+            
+            score_matrix.append(row)
+        
+        return np.array(score_matrix)
     
     def _find_best_match(self, fixed_entity, candidates):
         """
@@ -284,10 +380,10 @@ class AssignmentService:
             candidates: List of potential matches (drivers or delivery entities)
         
         Returns:
-            tuple: (best_match, best_cost, best_components) or (None, float('inf'), None) if no candidates
+            tuple: (best_match, best_score, best_components) or (None, 0.0, None) if no candidates
         """
         best_match = None
-        best_adjusted_cost = float('inf')
+        best_priority_score = 0.0  # Start with lowest possible score
         best_components = None
         
         # Determine entity type for role assignment
@@ -303,17 +399,18 @@ class AssignmentService:
                 driver = candidate
                 entity = fixed_entity
             
-            # Calculate adjusted cost
-            adjusted_cost, components = self.calculate_adjusted_cost(driver, entity)
+            # Calculate priority score
+            priority_score, components = self.priority_scorer.calculate_priority_score(driver, entity)
             
-            if adjusted_cost < best_adjusted_cost:
-                best_adjusted_cost = adjusted_cost
+            # Higher scores are better (opposite of cost minimization)
+            if priority_score > best_priority_score:
+                best_priority_score = priority_score
                 best_match = candidate
                 best_components = components
         
-        return best_match, best_adjusted_cost, best_components
+        return best_match, best_priority_score, best_components
     
-    def _create_assignment(self, driver, entity, assignment_path, cost_components):
+    def _create_assignment(self, driver, entity, assignment_path, score_components):
         """
         Create a delivery unit and update entity states.
         
@@ -321,7 +418,7 @@ class AssignmentService:
             driver: The driver to assign
             entity: The order or pair to assign
             assignment_path: How this assignment was made ('immediate' or 'periodic')
-            cost_components: Dictionary with cost calculation components
+            score_components: Dictionary with score calculation components
             
         Returns:
             DeliveryUnit: The created delivery unit
@@ -337,22 +434,21 @@ class AssignmentService:
             
         # Create delivery unit
         self.logger.debug(f"[t={self.env.now:.2f}] Creating delivery unit for assignment of driver {driver.driver_id} to "
-                        f"{entity_type} "  # Use entity_type directly
-                        f"{entity_id}")    # Use entity_id already computed
+                        f"{entity_type} {entity_id}")
         
         delivery_unit = DeliveryUnit(entity, driver, self.env.now)
         delivery_unit.assignment_path = assignment_path
         
-        # Record cost components
-        delivery_unit.assignment_costs = {
-            "base_cost": cost_components["base_cost"],
-            "throughput_factor": self.config.throughput_factor,
-            "throughput_discount": cost_components["throughput_component"],
-            "age_factor": self.config.age_factor,
-            "age_discount": cost_components["age_discount"],
-            "adjusted_cost": cost_components["base_cost"] - 
-                             cost_components["throughput_component"] - 
-                             cost_components["age_discount"]
+        # Record score components (replacing old cost storage)
+        delivery_unit.assignment_scores = {
+            "distance_score": score_components["distance_score"],
+            "throughput_score": score_components["throughput_score"],
+            "fairness_score": score_components["fairness_score"],
+            "combined_score_0_1": score_components["combined_score_0_1"],
+            "priority_score_0_100": score_components["combined_score_0_1"] * 100,
+            "total_distance": score_components["total_distance"],
+            "num_orders": score_components["num_orders"],
+            "wait_time_minutes": score_components["wait_time_minutes"]
         }
         
         # Add to repository
@@ -372,7 +468,7 @@ class AssignmentService:
             entity.order2.transition_to(OrderState.ASSIGNED, self.event_dispatcher, self.env)
             entity.order2.delivery_unit = delivery_unit
             self.logger.debug(f"[t={self.env.now:.2f}] Updated pair {entity.pair_id} state to ASSIGNED")
-    
+        
         # Update driver state
         driver.transition_to(DriverState.DELIVERING, self.event_dispatcher, self.env)
         driver.current_delivery_unit = delivery_unit
@@ -391,195 +487,7 @@ class AssignmentService:
         # Log assignment completion
         self.logger.info(f"[t={self.env.now:.2f}] Created {assignment_path} assignment: "
                        f"Driver {driver.driver_id} assigned to {entity_type} {entity_id} "
-                       f"(base cost: {cost_components['base_cost']:.2f}, "
-                       f"adjusted cost: {delivery_unit.assignment_costs['adjusted_cost']:.2f})")
+                       f"(priority score: {delivery_unit.assignment_scores['priority_score_0_100']:.2f}, "
+                       f"distance: {score_components['total_distance']:.2f}km)")
         
         return delivery_unit
-    
-    def calculate_adjusted_cost(self, driver, entity):
-        """
-        Calculate adjusted cost using weighted objective function.
-        
-        Adjusted Cost = base_cost - throughput_factor * num_orders - age_factor * age
-        
-        Args:
-            driver: The driver being evaluated
-            entity: The order or pair being evaluated
-            
-        Returns:
-            tuple: (adjusted_cost, components_dictionary)
-        """
-        # Get entity type once
-        entity_type = entity.entity_type
-
-        # Calculate base delivery cost
-        base_cost = self.calculate_base_delivery_cost(driver, entity)
-        
-        # Calculate throughput component
-        num_orders = 2 if entity_type == EntityType.PAIR else 1
-        throughput_component = self.config.throughput_factor * num_orders
-        
-        # Calculate age component (fairness)
-        if entity_type == EntityType.PAIR:
-            arrival_time = min(entity.order1.arrival_time, entity.order2.arrival_time)
-        else:  # Must be ORDER
-            arrival_time = entity.arrival_time
-
-        age_minutes = self.env.now - arrival_time
-        age_discount = self.config.age_factor * age_minutes
-        
-        # Calculate adjusted cost
-        adjusted_cost = base_cost - throughput_component - age_discount
-        
-        self.logger.debug(f"[t={self.env.now:.2f}] Calculated adjusted cost: {adjusted_cost:.2f} "
-                        f"(base: {base_cost:.2f}, throughput: {throughput_component:.2f}, age: {age_discount:.2f})")
-        
-        # Return cost and components for logging
-        components = {
-            "base_cost": base_cost,
-            "num_orders": num_orders,
-            "throughput_component": throughput_component,
-            "age_minutes": age_minutes,
-            "age_discount": age_discount
-        }
-        
-        return adjusted_cost, components
-    
-    def calculate_base_delivery_cost(self, driver, delivery_entity):
-        """
-        Calculate the base travel cost for a potential delivery assignment.
-        
-        This represents the actual distance/time the driver would need to travel:
-        - For single orders: driver location → restaurant → customer
-        - For pairs: driver location → first location in optimal sequence → rest of sequence
-        
-        Args:
-            driver: The driver being evaluated
-            delivery_entity: The order or pair being evaluated
-            
-        Returns:
-            float: Total travel distance/time cost
-        """
-        entity_type = delivery_entity.entity_type
-        
-        if entity_type == EntityType.ORDER:
-            cost = calculate_distance(driver.location, delivery_entity.restaurant_location) + \
-                calculate_distance(delivery_entity.restaurant_location, delivery_entity.customer_location)
-                
-            self.logger.debug(f"[t={self.env.now:.2f}] Calculated base cost for single order {delivery_entity.order_id}: {cost:.2f}")
-            return cost
-        else:  # Must be PAIR
-            # First leg is from driver to first pickup location
-            cost = calculate_distance(driver.location, delivery_entity.optimal_sequence[0]) + \
-                delivery_entity.optimal_cost
-                
-            self.logger.debug(f"[t={self.env.now:.2f}] Calculated base cost for pair {delivery_entity.pair_id}: {cost:.2f}")
-            return cost
-    
-    def _periodic_assignment_process(self):
-        """SimPy process that runs the periodic global optimization."""
-        # Counter for epoch logging
-        epoch_count = 0
-        
-        while True:
-            yield self.env.timeout(self.config.periodic_interval)
-            
-            epoch_count += 1
-            self.logger.info(f"[t={self.env.now:.2f}] Starting periodic assignment optimization (epoch {epoch_count})")
-            self.perform_periodic_assignment(epoch_count)
-    
-    def perform_periodic_assignment(self, epoch_count=0):
-        """
-        Apply global optimization to find optimal assignments for all waiting entities.
-        
-        This method implements the periodic assignment path, which considers all 
-        available drivers and waiting delivery entities to find the system-wide 
-        optimal assignment pattern.
-        """
-        # Get unassigned delivery entities
-        unassigned_orders = self.order_repository.find_unassigned_orders()
-        unassigned_pairs = self.pair_repository.find_unassigned_pairs()
-        
-        # Combine into a single list
-        waiting_entities = unassigned_orders + unassigned_pairs
-        
-        # Get available drivers
-        available_drivers = self.driver_repository.find_available_drivers()
-        
-        # Log periodic optimization attempt and system state
-        self.logger.info(f"[t={self.env.now:.2f}] Periodic optimization: "
-                       f"{len(waiting_entities)} waiting delivery entities, {len(available_drivers)} available drivers")
-        
-        # Exit if we don't have both drivers and waiting entities
-        if not waiting_entities:
-            self.logger.info(f"[t={self.env.now:.2f}] Periodic optimization skipped: No waiting delivery entities to assign")
-            return
-        
-        if not available_drivers:
-            self.logger.info(f"[t={self.env.now:.2f}] Periodic optimization skipped: No available drivers")
-            return
-        
-        # Log information about potential assignment imbalance
-        if len(waiting_entities) > len(available_drivers):
-            self.logger.debug(f"[t={self.env.now:.2f}] Assignment imbalance: {len(waiting_entities) - len(available_drivers)} "
-                            f"waiting delivery entities will remain unassigned after periodic optimization")
-        elif len(available_drivers) > len(waiting_entities):
-            self.logger.debug(f"[t={self.env.now:.2f}] Assignment imbalance: {len(available_drivers) - len(waiting_entities)} "
-                            f"drivers will remain unassigned after periodic optimization")
-        else:
-            self.logger.debug(f"[t={self.env.now:.2f}] Balanced assignment: Equal number of waiting delivery entities and available drivers")
-        
-        # Generate cost matrix
-        self.logger.debug(f"[t={self.env.now:.2f}] Generating cost matrix for {len(waiting_entities)} entities and {len(available_drivers)} drivers")
-        cost_matrix = self._generate_cost_matrix(waiting_entities, available_drivers)
-        
-        # Use Hungarian algorithm to find optimal assignment
-        self.logger.debug(f"[t={self.env.now:.2f}] Running Hungarian algorithm to find optimal assignment")
-        row_indices, col_indices = linear_sum_assignment(cost_matrix)
-        
-        # Log the optimization results
-        self.logger.info(f"[t={self.env.now:.2f}] Periodic optimization completed: {len(row_indices)} assignments identified")
-        
-        # Execute the optimal assignments
-        assignments_created = 0
-        for row, col in zip(row_indices, col_indices):
-            entity = waiting_entities[row]
-            driver = available_drivers[col]
-            
-            # Calculate full cost information for record keeping
-            _, cost_components = self.calculate_adjusted_cost(driver, entity)
-            
-            # Create the assignment (detailed logging happens inside this method)
-            delivery_unit = self._create_assignment(driver, entity, "periodic", cost_components)
-            if delivery_unit:
-                assignments_created += 1
-        
-        self.logger.info(f"[t={self.env.now:.2f}] Periodic optimization execution completed: {assignments_created} assignments created")
-    
-    def _generate_cost_matrix(self, waiting_entities, available_drivers):
-        """
-        Generate cost matrix for Hungarian algorithm.
-        
-        Args:
-            waiting_entities: List of unassigned orders and pairs
-            available_drivers: List of available drivers
-            
-        Returns:
-            list: 2D matrix of adjusted costs
-        """
-        cost_matrix = []
-        
-        for entity in waiting_entities:
-            row = []
-            entity_type = entity.entity_type
-            entity_id = entity.order_id if entity_type == EntityType.ORDER else entity.pair_id
-            
-            for driver in available_drivers:
-                adjusted_cost, _ = self.calculate_adjusted_cost(driver, entity)
-                row.append(adjusted_cost)
-                
-                self.logger.debug(f"[t={self.env.now:.2f}] Cost matrix entry: {entity_type} {entity_id} to driver {driver.driver_id} = {adjusted_cost:.2f}")
-            
-            cost_matrix.append(row)
-        
-        return cost_matrix
