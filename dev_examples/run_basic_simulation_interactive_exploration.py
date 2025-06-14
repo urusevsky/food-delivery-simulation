@@ -6,6 +6,10 @@
 # %% Import and Setup
 """
 Cell 1: Import necessary modules and set up logging
+
+IMPORTANT: If you modify any files in delivery_sim/, you MUST restart and re-run 
+this cell to pick up the changes. Python caches imported modules and won't 
+automatically reload them when source files change.
 """
 # Add project root to Python path so we can import delivery_sim
 import sys
