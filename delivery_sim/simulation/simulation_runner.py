@@ -142,7 +142,7 @@ class SimulationRunner:
         restaurants = self._generate_restaurants(
             count=self.config.structural_config.num_restaurants,
             area_size=self.config.structural_config.delivery_area_size,
-            rng=self.structural_rng
+            rng=self.structural_rng.rng
         )
         
         for restaurant in restaurants:
