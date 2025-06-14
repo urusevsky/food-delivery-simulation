@@ -37,9 +37,7 @@ class OperationalConfig:
                  max_service_duration,             # minutes
                  
                  # Assignment parameters
-                 throughput_factor,                # km per additional order
-                 age_factor,                       # km per minute waiting
-                 immediate_assignment_threshold,   # km (adjusted cost)
+                 immediate_assignment_threshold,   # priority score threshold
                  periodic_interval):               # minutes between optimizations
 
         # Arrival process parameters
@@ -58,8 +56,6 @@ class OperationalConfig:
         self.max_service_duration = max_service_duration
         
         # Assignment logic parameters
-        self.throughput_factor = throughput_factor
-        self.age_factor = age_factor
         self.immediate_assignment_threshold = immediate_assignment_threshold
         self.periodic_interval = periodic_interval
     
