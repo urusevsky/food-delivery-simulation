@@ -14,7 +14,7 @@ class Order:
     def __init__(self, order_id, restaurant_location, customer_location, arrival_time):
         """Initialize a new order with its basic properties."""
         # Get a logger instance
-        self.logger = get_logger("entity.order")
+        self.logger = get_logger("entities.order")
         
         # Basic properties
         self.order_id = order_id

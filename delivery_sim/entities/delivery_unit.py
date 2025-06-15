@@ -22,7 +22,7 @@ class DeliveryUnit:
             assignment_time: When this assignment was made
         """
         # Get a logger instance
-        self.logger = get_logger("entity.delivery_unit")
+        self.logger = get_logger("entities.delivery_unit")
         
         # Core relationships
         self.delivery_entity = delivery_entity

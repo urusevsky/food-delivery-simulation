@@ -19,7 +19,7 @@ class Driver:
             service_duration: How long driver intends to offer service
         """
         # Get a logger instance
-        self.logger = get_logger("entity.driver")
+        self.logger = get_logger("entities.driver")
         
         # Basic properties
         self.driver_id = driver_id

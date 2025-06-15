@@ -14,7 +14,7 @@ class Pair:
     def __init__(self, order1, order2, creation_time):
         """Initialize a new pair from two orders."""
         # Get a logger instance
-        self.logger = get_logger("entity.pair")
+        self.logger = get_logger("entities.pair")
         
         # Core identification
         # Updated format: P-O1_O2 (using underscore to separate order IDs)
