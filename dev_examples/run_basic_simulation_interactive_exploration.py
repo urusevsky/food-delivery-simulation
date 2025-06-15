@@ -30,19 +30,22 @@ print("✓ Imports successful")
 Cell 2: Configure logging for clean interactive output
 Suppress noisy components, show only what we care about
 """
-# Base configuration: suppress everything by default
+# Base configuration: handler must accept DEBUG level to show component messages
 logging_config = LoggingConfig(
-    console_level="ERROR",     # High threshold - suppresses most noise
+    console_level="DEBUG",     # Handler accepts DEBUG messages
     file_level="DEBUG",        # Detailed file logs if needed
-    log_to_file=False          # Set True to create log files
+    log_to_file=False,         # Set True to create log files
+    component_levels={
+        # Set most components to ERROR (suppressed)
+        "services": "ERROR",
+        "entities": "ERROR", 
+        "utils": "ERROR",
+        # Enable only simulation.runner
+        "simulation.runner": "DEBUG"
+    }
 )
 
 configure_logging(logging_config)
-
-# Then enable specific components we want to see
-configure_component_level("simulation.runner", logging.DEBUG)  # Show runner details
-# configure_component_level("service.pairing", logging.DEBUG)   # Uncomment for pairing details
-# configure_component_level("service.assignment", logging.DEBUG) # Uncomment for assignment details
 
 print("✓ Logging configured: Only simulation.runner messages will be shown")
 
