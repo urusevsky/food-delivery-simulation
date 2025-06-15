@@ -308,18 +308,17 @@ class SimulationRunner:
         self.env.run(until=duration)
         self.logger.info(f"Simulation completed at time {self.env.now:.2f}")
         
-        # Return raw data - that's it!
-        return {
-            'repositories': {
+        # Repos reference for analysis
+        repositories = {
                 'order': self.order_repository,
                 'driver': self.driver_repository,
                 'pair': self.pair_repository,
                 'delivery_unit': self.delivery_unit_repository,
-                'restaurant': self.restaurant_repository  # Reference for analysis
-            },
-            'simulation_time': self.env.now,
-            'replication_seed': getattr(self.operational_rng, 'replication_seed', None)
-        }
+                'restaurant': self.restaurant_repository  
+            }
+
+        # Return raw data - that's it!
+        return repositories
       
     def _generate_restaurants(self, count, area_size, rng):
         """Generate restaurant locations using structural RNG."""
