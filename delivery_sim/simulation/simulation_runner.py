@@ -204,7 +204,10 @@ class SimulationRunner:
         # 2. Create fresh operational RNG (different seed per replication)
         operational_base_seed = self.config.experiment_config.master_seed
         self.operational_rng = OperationalRNGManager(operational_base_seed, replication_number)
-        self.logger.debug(f"Using operational base seed: {operational_base_seed} for replication {replication_number}")
+        
+        # Log sample seeds to verify replication independence
+        sample_seeds = self.operational_rng.get_sample_stream_seeds()
+        self.logger.debug(f"Replication {replication_number} RNG streams: {sample_seeds}")
         
         # 3. Create fresh entity repositories
         self.order_repository = OrderRepository()
