@@ -1,11 +1,7 @@
-# %% [markdown]
-# # Food Delivery Simulation - Basic Runner for Priority Scoring System
-# Adapted to work with the latest model codebase using priority scoring system
-# Designed for VS Code Python Interactive Window
 
 # %% Import and Setup
 """
-Cell 1: Import necessary modules and set up logging
+Cell 1: Basic setup and imports only
 
 IMPORTANT: If you modify any files in delivery_sim/, you MUST restart and re-run 
 this cell to pick up the changes. Python caches imported modules and won't 
@@ -18,22 +14,41 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
+# Import necessary modules
 from delivery_sim.simulation.configuration import (
     StructuralConfig, OperationalConfig, ExperimentConfig, 
     LoggingConfig, ScoringConfig, SimulationConfig
 )
 from delivery_sim.simulation.simulation_runner import SimulationRunner
-
-# Configure logging for clean interactive output
+from delivery_sim.utils.logging_system import configure_logging, configure_component_level
 import logging
-logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
-print("All modules imported successfully!")
-print("Ready to configure and run simulation with priority scoring system")
+print("✓ Imports successful")
+
+# %% Logging Configuration  
+"""
+Cell 2: Configure logging for clean interactive output
+Suppress noisy components, show only what we care about
+"""
+# Base configuration: suppress everything by default
+logging_config = LoggingConfig(
+    console_level="ERROR",     # High threshold - suppresses most noise
+    file_level="DEBUG",        # Detailed file logs if needed
+    log_to_file=False          # Set True to create log files
+)
+
+configure_logging(logging_config)
+
+# Then enable specific components we want to see
+configure_component_level("simulation.runner", logging.DEBUG)  # Show runner details
+# configure_component_level("service.pairing", logging.DEBUG)   # Uncomment for pairing details
+# configure_component_level("service.assignment", logging.DEBUG) # Uncomment for assignment details
+
+print("✓ Logging configured: Only simulation.runner messages will be shown")
 
 # %% Infrastructure Configuration  
 """
-Cell 2: Define structural/geographical parameters
+Cell 3: Define structural/geographical parameters
 These represent the physical delivery environment
 """
 structural_config = StructuralConfig(
@@ -47,7 +62,7 @@ print(f"Average restaurant spacing: ~{(structural_config.delivery_area_size**2 /
 
 # %% Operational Parameters
 """
-Cell 3: Define business logic and operational rules
+Cell 4: Define business logic and operational rules
 Focus on arrival patterns, pairing rules, and driver service behavior
 Note: Assignment logic now uses priority scoring system instead of adjusted cost
 """
@@ -76,7 +91,7 @@ print(f"Operational config: {operational_config}")
 
 # %% Priority Scoring Configuration
 """
-Cell 4: Configure the priority scoring system
+Cell 5: Configure the priority scoring system
 This replaces the old adjusted cost framework with a principled multi-criteria approach
 """
 scoring_config = ScoringConfig(
@@ -99,7 +114,7 @@ print("Weights sum:", scoring_config.weight_distance + scoring_config.weight_thr
 
 # %% Experiment Configuration
 """
-Cell 5: Define experimental parameters
+Cell 6: Define experimental parameters
 Single replication for basic model verification
 """
 experiment_config = ExperimentConfig(
@@ -109,25 +124,6 @@ experiment_config = ExperimentConfig(
 )
 
 print(f"Experiment config: {experiment_config}")
-
-# %% Logging Configuration
-"""
-Cell 6: Configure logging for clear output
-Adjust logging levels to see more or less detail
-"""
-logging_config = LoggingConfig(
-    console_level="INFO",       # Console output level
-    file_level="DEBUG",         # File output level (if enabled)
-    log_to_file=False,         # Set True to create log files
-    component_levels={
-        "simulation.runner": "INFO",
-        "service.assignment": "INFO",
-        "service.pairing": "INFO",
-        "utils.priority_scoring": "DEBUG"  # More detail on scoring system
-    }
-)
-
-print(f"Logging config: Console level = {logging_config.console_level}")
 
 # %% Complete Configuration Assembly
 """
@@ -164,3 +160,5 @@ print("\n" + "="*60)
 print("SIMULATION COMPLETED")
 print("="*60)
 
+
+# %%
