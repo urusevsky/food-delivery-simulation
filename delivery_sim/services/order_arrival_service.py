@@ -14,7 +14,7 @@ class OrderArrivalService:
     def __init__(self, env, event_dispatcher, order_repository, restaurant_repository, config, id_generator, operational_rng_manager):
         """Initialize the order arrival service."""
         # Get a logger instance specific to this component
-        self.logger = get_logger("service.order_arrival")
+        self.logger = get_logger("services.order_arrival")
         
         # Store dependencies
         self.env = env

@@ -29,7 +29,7 @@ class DeliveryService:
             config: Configuration containing delivery parameters
         """
         # Get a logger instance specific to this component
-        self.logger = get_logger("service.delivery")
+        self.logger = get_logger("services.delivery")
         
         # Store dependencies
         self.env = env

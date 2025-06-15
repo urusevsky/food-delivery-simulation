@@ -18,7 +18,7 @@ class PairingService:
         Initialize the pairing service with its dependencies.
         """
         # Get a logger instance specific to this component
-        self.logger = get_logger("service.pairing")
+        self.logger = get_logger("services.pairing")
         
         # Store dependencies
         self.env = env

@@ -49,7 +49,7 @@ class AssignmentService:
             config: Configuration object containing assignment parameters
         """
         # Get a logger instance specific to this component
-        self.logger = get_logger("service.assignment")
+        self.logger = get_logger("services.assignment")
         
         # Store dependencies
         self.env = env

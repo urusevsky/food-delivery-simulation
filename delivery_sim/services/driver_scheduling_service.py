@@ -7,7 +7,7 @@ class DriverSchedulingService:
     def __init__(self, env, event_dispatcher, driver_repository):
         """Initialize the driver scheduling service with its dependencies."""
         # Get a logger instance specific to this component
-        self.logger = get_logger("service.driver_scheduling")
+        self.logger = get_logger("services.driver_scheduling")
         
         # Store dependencies
         self.env = env

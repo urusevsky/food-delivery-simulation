@@ -26,7 +26,7 @@ class DriverArrivalService:
             operational_rng_manager: Manager for random number streams
         """
         # Get a logger instance specific to this component
-        self.logger = get_logger("service.driver_arrival")
+        self.logger = get_logger("services.driver_arrival")
         
         # Store dependencies
         self.env = env
