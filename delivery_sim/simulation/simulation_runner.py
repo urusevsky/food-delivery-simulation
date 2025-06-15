@@ -296,62 +296,31 @@ class SimulationRunner:
         self.logger.info(f"Initialized {len(services)} services {pairing_status}")
     
     def _run_single_replication(self):
-        """Execute a single replication of the simulation."""
-
+        """
+        Execute single replication and return raw repository data.
+        
+        Simple and focused: just run simulation and return repositories.
+        No metrics calculation, no analysis, no logging summaries.
+        """
+        # Run simulation
         duration = self.config.experiment_config.simulation_duration
         self.logger.debug(f"Running simulation for {duration} minutes")
-        
         self.env.run(until=duration)
-
-        # Log completion
-        self.logger.info(f"Simulation completed after {self.env.now:.2f} minutes")
-
-        # Log summary statistics
-        self._log_simulation_summary()
+        self.logger.info(f"Simulation completed at time {self.env.now:.2f}")
         
-        # Collect results
-        return self._collect_replication_results()
-    
-    def _collect_replication_results(self):
-        """Collect results from the completed replication."""
-        # Implementation depends on what metrics you want to collect
-        # For now, return basic information
+        # Return raw data - that's it!
         return {
+            'repositories': {
+                'order': self.order_repository,
+                'driver': self.driver_repository,
+                'pair': self.pair_repository,
+                'delivery_unit': self.delivery_unit_repository,
+                'restaurant': self.restaurant_repository  # Reference for analysis
+            },
             'simulation_time': self.env.now,
-            'orders_created': len(self.order_repository.find_all()),
-            'drivers_created': len(self.driver_repository.find_all()),
-            'delivery_units_created': len(self.delivery_unit_repository.find_all()),
-            # Add more metrics as needed
+            'replication_seed': getattr(self.operational_rng, 'replication_seed', None)
         }
-    
-    def _log_simulation_summary(self):
-        """Log summary statistics of the simulation run."""
-        # Order statistics
-        orders = self.order_repository.find_all()
-        completed_orders = len([o for o in orders if hasattr(o, 'state') and o.state == 'delivered'])
-        total_orders = len(orders)
-        
-        # Driver statistics
-        drivers = self.driver_repository.find_all()
-        total_drivers = len(drivers)
-        
-        # Pair statistics if pairing enabled
-        if self.config.operational_config.pairing_enabled:
-            pairs = self.pair_repository.find_all()
-            completed_pairs = len([p for p in pairs if hasattr(p, 'state') and p.state == 'completed'])
-            total_pairs = len(pairs)
-            pair_ratio = len(pairs) / len(orders) if orders else 0
-            
-            self.logger.info(f"Simulation summary: "
-                          f"{completed_orders}/{total_orders} orders completed, "
-                          f"{completed_pairs}/{total_pairs} pairs completed, "
-                          f"pair ratio: {pair_ratio:.2f}, "
-                          f"total drivers: {total_drivers}")
-        else:
-            self.logger.info(f"Simulation summary: "
-                          f"{completed_orders}/{total_orders} orders completed, "
-                          f"total drivers: {total_drivers}")
-    
+      
     def _generate_restaurants(self, count, area_size, rng):
         """Generate restaurant locations using structural RNG."""
         restaurants = []
