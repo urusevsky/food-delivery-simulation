@@ -149,23 +149,36 @@ class PriorityScorer:
         return max(0.0, min(1.0, score))
     
     def _calculate_total_distance(self, driver, entity):
-        """Calculate total travel distance for this assignment."""
-        if entity.entity_type == EntityType.PAIR:
-            # Driver → Restaurant1 → Customer1 → Restaurant2 → Customer2
-            distance = (
-                calculate_distance(driver.location, entity.order1.restaurant.location) +
-                calculate_distance(entity.order1.restaurant.location, entity.order1.customer_location) +
-                calculate_distance(entity.order1.customer_location, entity.order2.restaurant.location) +
-                calculate_distance(entity.order2.restaurant.location, entity.order2.customer_location)
-            )
-        else:
-            # Driver → Restaurant → Customer
-            distance = (
-                calculate_distance(driver.location, entity.restaurant.location) +
-                calculate_distance(entity.restaurant.location, entity.customer_location)
-            )
+        """
+        Calculate total travel distance for this assignment.
         
-        return distance
+        For single orders: driver → restaurant → customer
+        For pairs: driver → first_location_in_optimal_sequence + pre_calculated_optimal_cost
+        
+        Args:
+            driver: Driver entity with location
+            entity: Order or Pair entity
+            
+        Returns:
+            float: Total travel distance in km
+        """
+        if entity.entity_type == EntityType.PAIR:
+            # Use pre-calculated optimal sequence and cost from pairing service
+            # Driver travels to first location in the optimal sequence, then follows the pre-optimized path
+            distance_to_first_location = calculate_distance(driver.location, entity.optimal_sequence[0])
+            total_distance = distance_to_first_location + entity.optimal_cost
+            
+            self.logger.debug(f"Pair {entity.pair_id}: driver_to_first={distance_to_first_location:.3f}km + optimal_cost={entity.optimal_cost:.3f}km = {total_distance:.3f}km")
+            return total_distance
+            
+        else:  # EntityType.ORDER
+            # Driver → Restaurant → Customer
+            driver_to_restaurant = calculate_distance(driver.location, entity.restaurant_location)
+            restaurant_to_customer = calculate_distance(entity.restaurant_location, entity.customer_location)
+            total_distance = driver_to_restaurant + restaurant_to_customer
+            
+            self.logger.debug(f"Order {entity.order_id}: driver_to_restaurant={driver_to_restaurant:.3f}km + restaurant_to_customer={restaurant_to_customer:.3f}km = {total_distance:.3f}km")
+            return total_distance
     
     def _get_order_count(self, entity):
         """Get number of orders in this entity."""
