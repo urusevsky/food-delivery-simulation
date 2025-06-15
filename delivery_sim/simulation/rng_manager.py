@@ -51,13 +51,19 @@ class OperationalRNGManager:
         # Uses large offsets to ensure mathematical independence
         base_offset = replication_number * 10000
         
+        # Store both streams and their seeds for transparency
+        self.stream_seeds = {
+            'order_arrivals': master_seed + base_offset + 1,
+            'driver_arrivals': master_seed + base_offset + 2,
+            'service_duration': master_seed + base_offset + 3,
+            'customer_locations': master_seed + base_offset + 4,
+            'driver_initial_locations': master_seed + base_offset + 5,
+            'restaurant_selection': master_seed + base_offset + 6
+        }
+        
         self.streams = {
-            'order_arrivals': np.random.RandomState(master_seed + base_offset + 1),
-            'driver_arrivals': np.random.RandomState(master_seed + base_offset + 2),
-            'service_duration': np.random.RandomState(master_seed + base_offset + 3),
-            'customer_locations': np.random.RandomState(master_seed + base_offset + 4),
-            'driver_initial_locations': np.random.RandomState(master_seed + base_offset + 5),
-            'restaurant_selection': np.random.RandomState(master_seed + base_offset + 6)
+            name: np.random.RandomState(seed) 
+            for name, seed in self.stream_seeds.items()
         }
     
     def get_stream(self, process_name):
@@ -78,6 +84,17 @@ class OperationalRNGManager:
             raise ValueError(f"Unknown process: {process_name}. Available: {available_streams}")
         
         return self.streams[process_name]
+    
+    def get_sample_stream_seeds(self):
+        """Return sample stream seeds to verify replication independence."""
+        return {
+            'order_arrivals': self.stream_seeds['order_arrivals'],
+            'driver_arrivals': self.stream_seeds['driver_arrivals']
+        }
+    
+    def get_all_stream_seeds(self):
+        """Return all stream seeds for debugging purposes."""
+        return self.stream_seeds.copy()
     
     def get_available_streams(self):
         """Get list of available stream names."""
