@@ -114,17 +114,17 @@ class SimulationRunner:
         """
         self.logger.debug("Initializing invariant components...")
         
-        # 1. Create structural components (restaurants, structural RNG)
+        # 1. Create consistent ID generators (MOVED TO FIRST!)
+        self._create_id_generators()
+        
+        # 2. Create structural components (restaurants, structural RNG)
         self._create_structural_components()
         
-        # 2. Analyze infrastructure (expensive Monte Carlo sampling - done once!)
+        # 3. Analyze infrastructure (expensive Monte Carlo sampling - done once!)
         self._analyze_infrastructure()
         
-        # 3. Create reusable priority scorer
+        # 4. Create reusable priority scorer
         self._create_priority_scorer()
-        
-        # 4. Create consistent ID generators
-        self._create_id_generators()
         
         self.logger.info(f"Invariant components initialized: {self.infrastructure_characteristics}")
     
