@@ -40,7 +40,7 @@ class TypicalDistanceCalculator:
         if not restaurants:
             raise ValueError("No restaurants found in repository for distance calculation")
         
-        logger = get_logger()
+        logger = get_logger("utils.infrastruture_analyzer")
         logger.debug(f"Calculating typical distance with {sample_size} samples")
         logger.debug(f"Area: {area_size}x{area_size}km, Restaurants: {len(restaurants)}")
         
@@ -92,7 +92,7 @@ def analyze_infrastructure(restaurant_repository, structural_config, structural_
             - restaurant_density: Restaurants per square km
             - average_restaurant_spacing: Rough spacing between restaurants
     """
-    logger = get_logger()
+    logger = get_logger("utils.infrastructure_analyzer")
     logger.info("Starting infrastructure analysis...")
     
     # Basic structural characteristics

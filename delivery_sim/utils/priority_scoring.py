@@ -38,7 +38,7 @@ class PriorityScorer:
         self.config = scoring_config
         self.typical_distance = typical_distance
         self.env = env
-        self.logger = get_logger()
+        self.logger = get_logger("utils.priority_scorer")
         
         self.logger.debug(f"PriorityScorer initialized with typical_distance={typical_distance:.3f}km")
     
