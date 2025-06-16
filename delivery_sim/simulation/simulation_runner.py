@@ -74,6 +74,7 @@ class SimulationRunner:
         configure_logging(config.logging_config)
         
         self.logger.info(f"Starting experiment with {config.experiment_config.num_replications} replications")
+        self.logger.debug(f"Full configuration:\n{config}")
         
         # ===== PHASE 1: INITIALIZE INVARIANT COMPONENTS =====
         self.logger.info("Phase 1: Initializing invariant components...")
