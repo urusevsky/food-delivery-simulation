@@ -126,7 +126,7 @@ class SimulationRunner:
         # 4. Create reusable priority scorer
         self._create_priority_scorer()
         
-        self.logger.info(f"Invariant components initialized: {self.infrastructure_characteristics}")
+        self.logger.info("Invariant components initialized successfully")
     
     def _create_structural_components(self):
         """Create structural components (restaurants, RNG)."""
@@ -204,7 +204,7 @@ class SimulationRunner:
         # 2. Create fresh operational RNG (different seed per replication)
         operational_base_seed = self.config.experiment_config.master_seed
         self.operational_rng = OperationalRNGManager(operational_base_seed, replication_number)
-        
+
         # Log sample seeds to verify replication independence
         sample_seeds = self.operational_rng.get_sample_stream_seeds()
         self.logger.debug(f"Replication {replication_number} RNG streams: {sample_seeds}")
