@@ -45,9 +45,7 @@ logging_config = LoggingConfig(
     }
 )
 
-configure_logging(logging_config)
-
-print("✓ Logging configured: Only simulation.runner messages will be shown")
+print("✓ Logging configuration defined - will be applied when simulation starts")
 
 # %% Infrastructure Configuration  
 """
@@ -122,7 +120,7 @@ Single replication for basic model verification
 """
 experiment_config = ExperimentConfig(
     simulation_duration=100,    # 100 minutes for quick testing - adjust as needed
-    num_replications=1,         # Single replication for basic testing
+    num_replications=2,         # Single replication for basic testing
     master_seed=42             # Consistent seed for reproducibility
 )
 
