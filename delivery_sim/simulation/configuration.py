@@ -14,9 +14,11 @@ class StructuralConfig:
         
     def __str__(self):
         """String representation for debugging and logging."""
-        return (f"StructuralConfig(area_size={self.delivery_area_size}km, "
-                f"restaurants={self.num_restaurants})")
-
+        return (f"StructuralConfig("
+                f"area_size={self.delivery_area_size}km, "
+                f"restaurants={self.num_restaurants}, "
+                f"driver_speed={self.driver_speed}km/min)")
+    
 class OperationalConfig:
     """Configuration for dynamic operational elements of the simulation."""
     
@@ -58,14 +60,18 @@ class OperationalConfig:
         # Assignment logic parameters
         self.immediate_assignment_threshold = immediate_assignment_threshold
         self.periodic_interval = periodic_interval
-    
+
     def __str__(self):
         """String representation for debugging and logging."""
         return (f"OperationalConfig("
                 f"order_interval={self.mean_order_inter_arrival_time}min, "
                 f"driver_interval={self.mean_driver_inter_arrival_time}min, "
                 f"pairing={'on' if self.pairing_enabled else 'off'}, "
-                f"threshold={self.immediate_assignment_threshold})")
+                f"restaurants_threshold={self.restaurants_proximity_threshold}km, "
+                f"customers_threshold={self.customers_proximity_threshold}km, "
+                f"assignment_threshold={self.immediate_assignment_threshold}, "
+                f"periodic_interval={self.periodic_interval}min, "
+                f"service_duration={self.mean_service_duration}±{self.service_duration_std_dev}min)")
 
 
 class ExperimentConfig:
@@ -73,6 +79,13 @@ class ExperimentConfig:
         self.simulation_duration = simulation_duration  # minutes
         self.num_replications = num_replications        # 1 for single replication
         self.master_seed = master_seed                  # base seed for all randomness
+
+    def __str__(self):
+        """String representation for debugging and logging."""
+        return (f"ExperimentConfig("
+                f"simulation_duration={self.simulation_duration}min, "
+                f"replications={self.num_replications}, "
+                f"master_seed={self.master_seed})")
     
 
 class LoggingConfig:
@@ -104,6 +117,24 @@ class LoggingConfig:
             for component, level in list(self.component_levels.items()):
                 if isinstance(level, str):
                     self.component_levels[component] = get_level_from_name(level)
+
+    def __str__(self):
+        """String representation for debugging and logging."""
+        # Convert numeric levels back to names for readability
+        def level_name(level):
+            level_map = {10: "DEBUG", 15: "SIMULATION", 20: "INFO", 
+                        30: "WARNING", 35: "VALIDATION", 40: "ERROR", 50: "CRITICAL"}
+            return level_map.get(level, str(level))
+        
+        component_str = ", ".join([f"{comp}:{level_name(level)}" 
+                                for comp, level in self.component_levels.items()]) if self.component_levels else "none"
+        
+        return (f"LoggingConfig("
+                f"console={level_name(self.console_level)}, "
+                f"file={level_name(self.file_level)}, "
+                f"to_file={self.log_to_file}, "
+                f"components=[{component_str}])")
+
 
 class ScoringConfig:
     """
@@ -150,7 +181,9 @@ class ScoringConfig:
         return (f"ScoringConfig("
                 f"weights=({self.weight_distance:.3f},{self.weight_throughput:.3f},{self.weight_fairness:.3f}), "
                 f"max_ratio={self.max_distance_ratio_multiplier}, "
-                f"max_wait={self.max_acceptable_wait}min)")
+                f"max_wait={self.max_acceptable_wait}min, "
+                f"max_orders={self.max_orders_per_trip}, "
+                f"typical_distance_samples={self.typical_distance_samples})")
 
 class FlatConfig:
     """
