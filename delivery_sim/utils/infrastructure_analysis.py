@@ -40,7 +40,7 @@ class TypicalDistanceCalculator:
         if not restaurants:
             raise ValueError("No restaurants found in repository for distance calculation")
         
-        logger = get_logger("utils.infrastruture_analyzer")
+        logger = get_logger("utils.infrastructure_analyzer")
         logger.debug(f"Calculating typical distance with {sample_size} samples")
         logger.debug(f"Area: {area_size}x{area_size}km, Restaurants: {len(restaurants)}")
         
