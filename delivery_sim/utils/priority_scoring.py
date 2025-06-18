@@ -53,8 +53,11 @@ class PriorityScorer:
         Returns:
             tuple: (priority_score_0_to_100, components_dictionary)
         """
+        # Calculate total distance once and cache it
+        total_distance = self._calculate_total_distance(driver, entity)
+        
         # Calculate individual component scores (all in [0,1] range)
-        distance_score = self._calculate_distance_score(driver, entity)
+        distance_score = self._calculate_distance_score(total_distance)
         throughput_score = self._calculate_throughput_score(entity)
         fairness_score = self._calculate_fairness_score(entity)
         
@@ -81,72 +84,90 @@ class PriorityScorer:
             "throughput_score": throughput_score,
             "fairness_score": fairness_score,
             "combined_score_0_1": combined_score,
-            "total_distance": self._calculate_total_distance(driver, entity),
+            "total_distance": total_distance,  # Use cached value
             "num_orders": self._get_order_count(entity),
             "wait_time_minutes": self._calculate_wait_time(entity)
         }
         
         return priority_score, components
-    
-    def _calculate_distance_score(self, driver, entity):
-        """
-        Calculate distance efficiency score (0-1, higher = better).
         
-        Uses two-step normalization for relational measures:
-        1. Contextualization: actual_distance / typical_distance  
-        2. Performance evaluation: good performance = low distance ratios
+    def _calculate_distance_score(self, total_distance):
         """
-        total_distance = self._calculate_total_distance(driver, entity)
+        Calculate distance efficiency score using two-step normalization.
+        
+        Distance is a relational measure that requires geographical contextualization.
+        The score represents how efficient this assignment is compared to typical
+        distances in this delivery area.
+        
+        Step 1: Contextualization - normalize by typical distance for this geography
+        Step 2: Performance assessment - apply universal acceptability standard
+        
+        Args:
+            total_distance (float): Pre-calculated total travel distance in km
+            
+        Returns:
+            float: Distance efficiency score in [0,1] range, where:
+                - 1.0 = perfect efficiency (zero distance)
+                - 0.5 = typical efficiency (1× typical distance) 
+                - 0.0 = unacceptable efficiency (≥2× typical distance)
+        """
+        # Step 1: Contextualization (acknowledge geographical reality)
         distance_ratio = total_distance / self.typical_distance
         
-        # Transform to score: ratio of 1.0 = score of 1.0 (perfect)
-        # Ratios above max_distance_ratio_multiplier = score of 0.0 (unacceptable)
-        max_ratio = self.config.max_distance_ratio_multiplier
+        # Step 2: Performance assessment (apply universal standard)
+        distance_score = max(0, 1 - distance_ratio / self.config.max_distance_ratio_multiplier)
         
-        if distance_ratio <= 1.0:
-            # Better than typical: score above baseline
-            score = 1.0
-        elif distance_ratio >= max_ratio:
-            # Unacceptably long: minimum score
-            score = 0.0
-        else:
-            # Linear interpolation between 1.0 and 0.0
-            score = 1.0 - (distance_ratio - 1.0) / (max_ratio - 1.0)
-        
-        return max(0.0, min(1.0, score))
-    
+        return distance_score
+
     def _calculate_throughput_score(self, entity):
         """
-        Calculate throughput optimization score (0-1, higher = better).
+        Calculate throughput optimization score based on order count.
         
-        Absolute measure - same meaning regardless of geography.
+        Throughput represents capacity utilization - how many orders can be
+        delivered in a single trip. This is an absolute measure with discrete
+        values since drivers can only handle 1 or 2 orders per trip.
+        
+        Args:
+            entity (Order or Pair): The delivery entity being evaluated
+            
+        Returns:
+            float: Throughput score in [0,1] range, where:
+                - 1.0 = maximum throughput (2 orders, full capacity)
+                - 0.5 = partial throughput (1 order, half capacity)
+                - Values are discrete, not continuous
         """
         num_orders = self._get_order_count(entity)
         max_orders = self.config.max_orders_per_trip
         
-        # Linear scaling: more orders = higher score
-        score = (num_orders - 1) / (max_orders - 1) if max_orders > 1 else 0.0
+        # Direct proportion: num_orders / max_orders_per_trip
+        throughput_score = num_orders / max_orders
         
-        return max(0.0, min(1.0, score))
-    
+        return throughput_score
+
     def _calculate_fairness_score(self, entity):
         """
-        Calculate fairness score (0-1, higher = better for shorter waits).
+        Calculate fairness score based on customer wait time urgency.
         
-        Absolute measure - same meaning regardless of geography.
+        Fairness represents how urgently this entity needs service based on
+        how long customers have been waiting. Longer waits indicate higher
+        priority for assignment to maintain customer satisfaction.
+        
+        Args:
+            entity (Order or Pair): The delivery entity being evaluated
+            
+        Returns:
+            float: Fairness urgency score in [0,1] range, where:
+                - 0.0 = just arrived, no urgency
+                - 0.5 = moderate urgency (15 min wait if max_wait=30 min)
+                - 1.0 = maximum urgency (≥30 min wait, critical priority)
         """
         wait_time = self._calculate_wait_time(entity)
         max_wait = self.config.max_acceptable_wait
         
-        # Transform to score: no wait = 1.0, max_wait = 0.0
-        if wait_time <= 0:
-            score = 1.0
-        elif wait_time >= max_wait:
-            score = 0.0
-        else:
-            score = 1.0 - (wait_time / max_wait)
+        # Direct normalization with ceiling: min(1.0, wait_time / max_acceptable_wait)
+        fairness_score = min(1.0, wait_time / max_wait)
         
-        return max(0.0, min(1.0, score))
+        return fairness_score
     
     def _calculate_total_distance(self, driver, entity):
         """
