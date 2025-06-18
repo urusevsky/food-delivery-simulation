@@ -154,7 +154,7 @@ def test_configure_logging_basic(reset_logger):
 
 @patch('sys.stdout', new_callable=io.StringIO)
 def test_log_message_appears_on_console(mock_stdout, reset_logger):
-    """Test that log messages appear on the console with the correct format."""
+    """Test that log messages appear on the console with logger name for component identification."""
     # ARRANGE - Configure for console logging only
     from delivery_sim.simulation.configuration import LoggingConfig
     config = LoggingConfig(
@@ -167,9 +167,20 @@ def test_log_message_appears_on_console(mock_stdout, reset_logger):
     # ACT - Log a message
     logger.info("Test console message")
     
-    # ASSERT
+    # ASSERT - Focus on essential elements rather than exact format
     output = mock_stdout.getvalue()
-    assert "INFO      : Test console message" in output, "Console should show correctly formatted message"
+    
+    # Essential elements that should be present
+    assert "INFO" in output, "Console should show log level"
+    assert "delivery_sim" in output, "Console should show logger name for component identification"
+    assert "Test console message" in output, "Console should show the actual message"
+    
+    # Verify it's a single line with newline
+    lines = output.strip().split('\n')
+    assert len(lines) == 1, "Should produce exactly one line of output"
+    
+    # The key improvement: logger name helps identify message source
+    assert "delivery_sim" in lines[0], "Logger name should help identify message source"
 
 # Test Group 6: File logging
 @pytest.fixture
@@ -308,6 +319,103 @@ def test_component_levels_from_config(reset_logger):
     
     assert pairing_logger.level == logging.DEBUG, "Pairing logger should have DEBUG level"
     assert assignment_logger.level == logging.WARNING, "Assignment logger should have WARNING level"
+
+def test_component_hierarchy_order_independence(reset_logger):
+    """Test that parent/child logger configuration order doesn't affect final levels."""
+    from delivery_sim.simulation.configuration import LoggingConfig
+    
+    # ARRANGE - Test configuration with child first, parent second
+    config_child_first = LoggingConfig(
+        console_level="DEBUG",
+        file_level="DEBUG", 
+        log_to_file=False,
+        component_levels={
+            "test.child": "DEBUG",        # Child first
+            "test": "ERROR",              # Parent second
+        }
+    )
+    
+    # ACT - Apply child-first configuration
+    configure_logging(config_child_first)
+    
+    # Get loggers after child-first configuration
+    child_logger_1 = get_logger("test.child")
+    parent_logger_1 = get_logger("test")
+    
+    # Store levels from child-first configuration
+    child_level_1 = child_logger_1.level
+    parent_level_1 = parent_logger_1.level
+    
+    # ARRANGE - Test configuration with parent first, child second  
+    config_parent_first = LoggingConfig(
+        console_level="DEBUG",
+        file_level="DEBUG",
+        log_to_file=False,
+        component_levels={
+            "test": "ERROR",              # Parent first
+            "test.child": "DEBUG",        # Child second
+        }
+    )
+    
+    # ACT - Apply parent-first configuration
+    configure_logging(config_parent_first)
+    
+    # Get loggers after parent-first configuration
+    child_logger_2 = get_logger("test.child")
+    parent_logger_2 = get_logger("test")
+    
+    # Store levels from parent-first configuration  
+    child_level_2 = child_logger_2.level
+    parent_level_2 = parent_logger_2.level
+    
+    # ASSERT - Both configurations should produce identical results
+    assert child_level_1 == logging.DEBUG, "Child logger should have DEBUG level (child-first config)"
+    assert parent_level_1 == logging.ERROR, "Parent logger should have ERROR level (child-first config)"
+    assert child_level_2 == logging.DEBUG, "Child logger should have DEBUG level (parent-first config)"  
+    assert parent_level_2 == logging.ERROR, "Parent logger should have ERROR level (parent-first config)"
+    
+    # The critical assertion: order should not matter
+    assert child_level_1 == child_level_2, "Child logger level should be identical regardless of configuration order"
+    assert parent_level_1 == parent_level_2, "Parent logger level should be identical regardless of configuration order"
+
+def test_component_hierarchy_child_overrides_parent(reset_logger):
+    """Test that explicit child logger levels override parent logger levels."""
+    from delivery_sim.simulation.configuration import LoggingConfig
+    
+    # ARRANGE - Configuration where parent and child have conflicting levels
+    config = LoggingConfig(
+        console_level="DEBUG",
+        file_level="DEBUG",
+        log_to_file=False,
+        component_levels={
+            "entities": "ERROR",                    # Parent: suppress everything
+            "entities.order": "DEBUG",              # Child: show debug messages  
+            "entities.driver": "WARNING",           # Another child: show warnings+
+            "services": "CRITICAL",                 # Another parent: almost nothing
+            "services.order_arrival": "INFO",       # Child: show info+
+        }
+    )
+    
+    # ACT
+    configure_logging(config)
+    
+    # Get all the loggers
+    entities_logger = get_logger("entities")
+    order_logger = get_logger("entities.order") 
+    driver_logger = get_logger("entities.driver")
+    services_logger = get_logger("services")
+    arrival_logger = get_logger("services.order_arrival")
+    
+    # ASSERT - Each logger should have its explicitly configured level
+    assert entities_logger.level == logging.ERROR, "entities logger should be ERROR"
+    assert order_logger.level == logging.DEBUG, "entities.order should override parent to DEBUG" 
+    assert driver_logger.level == logging.WARNING, "entities.driver should override parent to WARNING"
+    assert services_logger.level == logging.CRITICAL, "services logger should be CRITICAL"
+    assert arrival_logger.level == logging.INFO, "services.order_arrival should override parent to INFO"
+    
+    # ASSERT - Child levels should not be affected by their parents
+    assert order_logger.level != entities_logger.level, "Child should not inherit parent level when explicitly set"
+    assert arrival_logger.level != services_logger.level, "Child should not inherit parent level when explicitly set"
 
 # Test Group 8: Default configuration
 def test_configure_logging_without_config(reset_logger):
