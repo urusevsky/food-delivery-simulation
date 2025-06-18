@@ -115,16 +115,13 @@ class SimulationRunner:
         """
         self.logger.debug("Initializing invariant components...")
         
-        # 1. Create consistent ID generators (MOVED TO FIRST!)
-        self._create_id_generators()
-        
-        # 2. Create structural components (restaurants, structural RNG)
+        # 1. Create structural components (restaurants, structural RNG)
         self._create_structural_components()
         
-        # 3. Analyze infrastructure (expensive Monte Carlo sampling - done once!)
+        # 2. Analyze infrastructure (expensive Monte Carlo sampling - done once!)
         self._analyze_infrastructure()
         
-        # 4. Create reusable priority scorer
+        # 3. Create reusable priority scorer
         self._create_priority_scorer()
         
         self.logger.info("Invariant components initialized successfully")
@@ -181,13 +178,13 @@ class SimulationRunner:
             self.logger.debug("No scoring configuration provided - priority scorer disabled")
 
     def _create_id_generators(self):
-        """Create consistent ID generators."""
+        """Create ID generators for entities that reset per replication."""
         self.logger.debug("Creating ID generators...")
         
         self.id_generators = {
             'order': PrefixedIdGenerator('O', 1),      # Generates: O1, O2, O3, ...
             'driver': PrefixedIdGenerator('D', 1),     # Generates: D1, D2, D3, ...
-            'restaurant': PrefixedIdGenerator('R', 1)  # Generates: R1, R2, R3, ...
+            # Restaurant IDs are handled separately in structural components
         }
     
     def _initialize_variant_components(self, replication_number):
@@ -198,11 +195,14 @@ class SimulationRunner:
         """
         self.logger.debug(f"Initializing variant components for replication {replication_number}...")
         
-        # 1. Create fresh simulation environment
+        # 1. Create fresh ID generators for this replication
+        self._create_id_generators()
+        
+        # 2. Create fresh simulation environment
         self.env = simpy.Environment()
         self.event_dispatcher = EventDispatcher()
         
-        # 2. Create fresh operational RNG (different seed per replication)
+        # 3. Create fresh operational RNG (different seed per replication)
         operational_base_seed = self.config.experiment_config.master_seed
         self.operational_rng = OperationalRNGManager(operational_base_seed, replication_number)
 
@@ -210,13 +210,13 @@ class SimulationRunner:
         sample_seeds = self.operational_rng.get_sample_stream_seeds()
         self.logger.debug(f"Replication {replication_number} RNG streams: {sample_seeds}")
         
-        # 3. Create fresh entity repositories
+        # 4. Create fresh entity repositories
         self.order_repository = OrderRepository()
         self.driver_repository = DriverRepository()
         self.pair_repository = PairRepository()
         self.delivery_unit_repository = DeliveryUnitRepository()
         
-        # 4. Create priority scorer for this replication
+        # 5. Create priority scorer for this replication
         self.priority_scorer = create_priority_scorer(
                 infrastructure_characteristics=self.infrastructure_characteristics,
                 scoring_config=self.config.scoring_config,
@@ -224,7 +224,7 @@ class SimulationRunner:
             )
         self.logger.debug(f"Priority scorer created for replication {replication_number}")
         
-        # 5. Create services (connect invariant logic to variant environment)
+        # 6. Create services (connect invariant logic to variant environment)
         self._create_services()
         
         self.logger.debug(f"Variant components initialized for replication {replication_number}")
@@ -329,8 +329,8 @@ class SimulationRunner:
         restaurants = []
         for i in range(count):
             location = rng.uniform(0, area_size, size=2).tolist()
-            # Use invariant ID generator for consistent naming
-            restaurant_id = self.id_generators['restaurant'].next() if hasattr(self, 'id_generators') else f"R{i+1}"
+            # Use simple indexing for restaurant IDs (infrastructure should be consistent)
+            restaurant_id = f"R{i+1}"
             restaurant = Restaurant(restaurant_id=restaurant_id, location=location)
             restaurants.append(restaurant)
         return restaurants
