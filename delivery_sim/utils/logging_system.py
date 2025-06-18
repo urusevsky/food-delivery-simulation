@@ -63,7 +63,7 @@ def configure_logging(config=None):
     
     # Create formatters
     console_formatter = logging.Formatter(
-        '%(levelname)-10s: %(message)s'
+        '%(levelname)-10s | %(name)-25s | %(message)s'
     )
     
     file_formatter = logging.Formatter(
