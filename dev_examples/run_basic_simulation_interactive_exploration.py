@@ -30,18 +30,13 @@ print("✓ Imports successful")
 Cell 2: Configure logging for clean interactive output
 Suppress noisy components, show only what we care about
 """
-# Base configuration: handler must accept DEBUG level to show component messages
+
 logging_config = LoggingConfig(
-    console_level="DEBUG",     # Handler accepts DEBUG messages
-    file_level="DEBUG",        # Detailed file logs if needed
-    log_to_file=False,         # Set True to create log files
+    console_level="DEBUG",  
+    file_level="DEBUG",
+    log_to_file=False,
     component_levels={
-        # Set most components to ERROR (suppressed)
-        "services": "ERROR",
-        "entities": "ERROR", 
-        "utils": "ERROR",
-        # Enable only simulation.runner
-        "simulation.runner": "DEBUG"
+
     }
 )
 
@@ -119,8 +114,8 @@ Cell 6: Define experimental parameters
 Single replication for basic model verification
 """
 experiment_config = ExperimentConfig(
-    simulation_duration=100,    # 100 minutes for quick testing - adjust as needed
-    num_replications=2,         # Single replication for basic testing
+    simulation_duration=30,    # __ minutes for quick testing - adjust as needed
+    num_replications=2,         # __ replication for basic testing
     master_seed=42             # Consistent seed for reproducibility
 )
 
