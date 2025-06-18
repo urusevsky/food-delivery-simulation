@@ -326,11 +326,17 @@ class SimulationRunner:
       
     def _generate_restaurants(self, count, area_size, rng):
         """Generate restaurant locations using structural RNG."""
+        from delivery_sim.utils.location_utils import format_location
+        
         restaurants = []
         for i in range(count):
             location = rng.uniform(0, area_size, size=2).tolist()
-            # Use simple indexing for restaurant IDs (infrastructure should be consistent)
             restaurant_id = f"R{i+1}"
             restaurant = Restaurant(restaurant_id=restaurant_id, location=location)
             restaurants.append(restaurant)
+            
+            # Log restaurant creation
+            self.logger.debug(f"Created restaurant {restaurant_id} at {format_location(location)}")
+        
+        self.logger.info(f"Generated {count} restaurants in {area_size}x{area_size}km area")
         return restaurants

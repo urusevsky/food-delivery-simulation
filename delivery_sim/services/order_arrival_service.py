@@ -1,6 +1,7 @@
 from delivery_sim.entities.order import Order
 from delivery_sim.events.order_events import OrderCreatedEvent
 from delivery_sim.utils.logging_system import get_logger
+from delivery_sim.utils.location_utils import format_location
 
 class OrderArrivalService:
     """
@@ -51,7 +52,8 @@ class OrderArrivalService:
             customer_location = self._generate_customer_location()
             
             self.logger.debug(f"[t={self.env.now:.2f}] Generated attributes for order {order_id}: "
-                             f"restaurant at {restaurant_location}, customer at {customer_location}")
+                            f"restaurant at {format_location(restaurant_location)}, customer at {format_location(customer_location)}")
+
             
             # Create new order
             new_order = Order(
@@ -65,7 +67,7 @@ class OrderArrivalService:
             self.order_repository.add(new_order)
             
             # Log order creation
-            self.logger.info(f"[t={self.env.now:.2f}] Created order {order_id} from restaurant at {restaurant_location} to customer at {customer_location}")
+            self.logger.info(f"[t={self.env.now:.2f}] Created order {order_id} from restaurant at {format_location(restaurant_location)} to customer at {format_location(customer_location)}")
             
             # Dispatch order created event
             self.logger.simulation_event(f"[t={self.env.now:.2f}] Dispatching OrderCreatedEvent for order {order_id}")
@@ -89,7 +91,7 @@ class OrderArrivalService:
         # Randomly select one
         selected_restaurant = self.restaurant_selection_stream.choice(restaurants)
         
-        self.logger.debug(f"[t={self.env.now:.2f}] Selected restaurant {selected_restaurant.restaurant_id} at {selected_restaurant.location}")
+        self.logger.debug(f"[t={self.env.now:.2f}] Selected restaurant {selected_restaurant.restaurant_id} at {format_location(selected_restaurant.location)}")
         return selected_restaurant.location
 
     def _generate_customer_location(self):

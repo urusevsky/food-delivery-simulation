@@ -1,6 +1,7 @@
 from delivery_sim.entities.driver import Driver
 from delivery_sim.events.driver_events import DriverLoggedInEvent
 from delivery_sim.utils.logging_system import get_logger
+from delivery_sim.utils.location_utils import format_location
 import numpy as np
 from scipy.stats import lognorm
 
@@ -62,8 +63,8 @@ class DriverArrivalService:
             service_duration = self._generate_service_duration()
             
             self.logger.debug(f"[t={self.env.now:.2f}] Generated attributes for driver {driver_id}: "
-                            f"location={initial_location}, service_duration={service_duration:.2f}")
-            
+                            f"location={format_location(initial_location)}, service_duration={service_duration:.2f}")
+
             # Create new driver
             new_driver = Driver(
                 driver_id=driver_id,
@@ -76,7 +77,7 @@ class DriverArrivalService:
             self.driver_repository.add(new_driver)
             
             # Log driver creation
-            self.logger.info(f"[t={self.env.now:.2f}] Created driver {driver_id} at location {initial_location} with service duration {service_duration:.2f} minutes")
+            self.logger.info(f"[t={self.env.now:.2f}] Created driver {driver_id} at location {format_location(initial_location)} with service duration {service_duration:.2f} minutes")
             
             # Dispatch driver logged in event
             self.logger.simulation_event(f"[t={self.env.now:.2f}] Dispatching DriverLoggedInEvent for driver {driver_id}")
