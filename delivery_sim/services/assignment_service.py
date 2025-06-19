@@ -318,8 +318,8 @@ class AssignmentService:
             self.logger.info(f"[t={self.env.now:.2f}] Periodic optimization skipped: insufficient entities or drivers")
             return
         
-        # Generate score matrix for optimization
-        score_matrix = self._generate_score_matrix(waiting_entities, available_drivers)
+        # Generate score matrix and cache components for optimization
+        score_matrix, score_components_cache = self._generate_score_matrix(waiting_entities, available_drivers)
         
         # Apply Hungarian algorithm (maximize scores)
         row_indices, col_indices = linear_sum_assignment(score_matrix, maximize=True)
@@ -327,14 +327,14 @@ class AssignmentService:
         # Log the optimization results
         self.logger.info(f"[t={self.env.now:.2f}] Periodic optimization completed: {len(row_indices)} assignments identified")
         
-        # Execute the optimal assignments
+        # Execute the optimal assignments using cached components
         assignments_created = 0
         for row, col in zip(row_indices, col_indices):
             entity = waiting_entities[row]
             driver = available_drivers[col]
             
-            # Calculate full score information for record keeping
-            priority_score, score_components = self.priority_scorer.calculate_priority_score(driver, entity)
+            # Retrieve cached score components (no need to recalculate!)
+            score_components = score_components_cache[(row, col)]
             
             # Create the assignment (detailed logging happens inside this method)
             delivery_unit = self._create_assignment(driver, entity, "periodic", score_components)
@@ -352,24 +352,30 @@ class AssignmentService:
             available_drivers: List of available drivers
             
         Returns:
-            numpy.ndarray: 2D matrix of priority scores
+            tuple: (score_matrix, score_components_cache)
+                - score_matrix: numpy.ndarray of priority scores
+                - score_components_cache: dict mapping (row, col) to score components
         """
         score_matrix = []
+        score_components_cache = {}
         
-        for entity in waiting_entities:
+        for i, entity in enumerate(waiting_entities):
             row = []
             entity_type = entity.entity_type
             entity_id = entity.order_id if entity_type == EntityType.ORDER else entity.pair_id
             
-            for driver in available_drivers:
-                priority_score, _ = self.priority_scorer.calculate_priority_score(driver, entity)
+            for j, driver in enumerate(available_drivers):
+                priority_score, components = self.priority_scorer.calculate_priority_score(driver, entity)
                 row.append(priority_score)
+                
+                # Cache components using matrix indices
+                score_components_cache[(i, j)] = components
                 
                 self.logger.debug(f"[t={self.env.now:.2f}] Score matrix entry: {entity_type} {entity_id} to driver {driver.driver_id} = {priority_score:.2f}")
             
             score_matrix.append(row)
         
-        return np.array(score_matrix)
+        return np.array(score_matrix), score_components_cache
     
     def _find_best_match(self, fixed_entity, candidates):
         """
