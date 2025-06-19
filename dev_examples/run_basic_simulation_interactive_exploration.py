@@ -36,7 +36,16 @@ logging_config = LoggingConfig(
     file_level="DEBUG",
     log_to_file=False,
     component_levels={
-
+        # Step 1: Broad suppression (sets the default)
+        "services": "ERROR",
+        "entities": "ERROR", 
+        "repositories": "ERROR",
+        "utils": "ERROR",
+        
+        # Step 2: Surgical enablement (overrides the default)
+        "utils.priority_scorer": "DEBUG",
+        "services.assignment": "INFO",
+        "simulation.runner": "INFO"
     }
 )
 
