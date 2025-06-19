@@ -202,13 +202,13 @@ class AssignmentService:
         entity_type = delivery_entity.entity_type
         entity_id = delivery_entity.order_id if entity_type == EntityType.ORDER else delivery_entity.pair_id
         
-        self.logger.debug(f"[t={self.env.now:.2f}] Attempting immediate assignment for {entity_type} {entity_id}")
+        self.logger.info(f"[t={self.env.now:.2f}] Attempting immediate assignment for {entity_type} {entity_id}")
         
         # Business logic: Check for available drivers
         available_drivers = self.driver_repository.find_available_drivers()
         if not available_drivers:
             # Business outcome: No drivers available to make assignment
-            self.logger.debug(f"[t={self.env.now:.2f}] No available drivers for {entity_type} {entity_id}, assignment deferred")
+            self.logger.info(f"[t={self.env.now:.2f}] No available drivers for {entity_type} {entity_id}, assignment deferred")
             return False
         
         self.logger.debug(f"[t={self.env.now:.2f}] Found {len(available_drivers)} available drivers for {entity_type} {entity_id}")
@@ -245,7 +245,7 @@ class AssignmentService:
         Returns:
             bool: True if assignment succeeded, False otherwise
         """
-        self.logger.debug(f"[t={self.env.now:.2f}] Attempting immediate assignment for driver {driver.driver_id}")
+        self.logger.info(f"[t={self.env.now:.2f}] Attempting immediate assignment for driver {driver.driver_id}")
         
         # Business logic: Collect all available delivery entities
         waiting_entities = []
@@ -254,7 +254,7 @@ class AssignmentService:
         
         if not waiting_entities:
             # Business outcome: No entities available for assignment
-            self.logger.debug(f"[t={self.env.now:.2f}] No waiting entities for driver {driver.driver_id}")
+            self.logger.info(f"[t={self.env.now:.2f}] No waiting entities for driver {driver.driver_id}")
             return False
         
         self.logger.debug(f"[t={self.env.now:.2f}] Found {len(waiting_entities)} waiting entities for driver {driver.driver_id}")
@@ -301,7 +301,7 @@ class AssignmentService:
         This method collects all waiting entities and available drivers,
         then uses optimization to find the globally optimal assignments.
         """
-        self.logger.debug(f"[t={self.env.now:.2f}] Starting periodic assignment optimization")
+        self.logger.info(f"[t={self.env.now:.2f}] Starting periodic assignment optimization")
         
         # Collect entities waiting for assignment
         waiting_entities = []
@@ -311,11 +311,11 @@ class AssignmentService:
         # Collect available drivers
         available_drivers = self.driver_repository.find_available_drivers()
         
-        self.logger.debug(f"[t={self.env.now:.2f}] Periodic optimization: {len(waiting_entities)} entities, {len(available_drivers)} drivers")
+        self.logger.info(f"[t={self.env.now:.2f}] Periodic optimization: {len(waiting_entities)} entities, {len(available_drivers)} drivers")
         
         # Check if optimization is needed
         if not waiting_entities or not available_drivers:
-            self.logger.debug(f"[t={self.env.now:.2f}] Periodic optimization skipped: insufficient entities or drivers")
+            self.logger.info(f"[t={self.env.now:.2f}] Periodic optimization skipped: insufficient entities or drivers")
             return
         
         # Generate score matrix for optimization
