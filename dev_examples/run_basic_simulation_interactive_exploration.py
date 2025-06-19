@@ -88,7 +88,7 @@ operational_config = OperationalConfig(
     max_service_duration=240,       # maximum 4 hours
     
     # Assignment strategy parameters (priority scoring system)
-    immediate_assignment_threshold=75.0,    # Priority score threshold - try 70, 75, 80
+    immediate_assignment_threshold=50.0,    # Priority score threshold 
     periodic_interval=3.0                   # 3 minutes between global optimizations - try 2.0, 3.0, 5.0
 )
 
