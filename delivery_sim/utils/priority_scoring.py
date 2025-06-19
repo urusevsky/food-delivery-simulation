@@ -72,7 +72,7 @@ class PriorityScorer:
         priority_score = combined_score * 100
         
         # Log detailed calculation
-        self.logger.debug(
+        self.logger.info(
             f"[t={self.env.now:.2f}] Priority score calculation: "
             f"distance={distance_score:.3f}, throughput={throughput_score:.3f}, "
             f"fairness={fairness_score:.3f}, combined={priority_score:.2f}"
