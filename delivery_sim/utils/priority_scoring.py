@@ -71,9 +71,13 @@ class PriorityScorer:
         # Scale to 0-100 range for interpretability
         priority_score = combined_score * 100
         
-        # Log detailed calculation
+        # Determine entity type and ID for logging
+        entity_type = entity.entity_type
+        entity_id = entity.order_id if entity_type == EntityType.ORDER else entity.pair_id
+        
+        # Log detailed calculation with entity information
         self.logger.info(
-            f"[t={self.env.now:.2f}] Priority score calculation: "
+            f"[t={self.env.now:.2f}] Priority score calculation for {entity_type} {entity_id}: "
             f"distance={distance_score:.3f}, throughput={throughput_score:.3f}, "
             f"fairness={fairness_score:.3f}, combined={priority_score:.2f}"
         )
