@@ -122,7 +122,7 @@ class LoggingConfig:
         """String representation for debugging and logging."""
         # Convert numeric levels back to names for readability
         def level_name(level):
-            level_map = {10: "DEBUG", 15: "SIMULATION", 20: "INFO", 
+            level_map = {10: "DEBUG", 20: "INFO", 25: "SIMULATION",
                         30: "WARNING", 35: "VALIDATION", 40: "ERROR", 50: "CRITICAL"}
             return level_map.get(level, str(level))
         

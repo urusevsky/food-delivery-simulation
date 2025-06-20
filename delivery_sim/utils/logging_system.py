@@ -5,7 +5,7 @@ from datetime import datetime
 
 # Define custom log levels for simulation specific needs
 # Standard levels are: DEBUG=10, INFO=20, WARNING=30, ERROR=40, CRITICAL=50
-SIMULATION_EVENT = 15  # Between DEBUG and INFO
+SIMULATION_EVENT = 25  # Between DEBUG and INFO
 VALIDATION = 35        # Between WARNING and ERROR
 
 # Register our custom levels with the logging module
