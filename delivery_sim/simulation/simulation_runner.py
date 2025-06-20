@@ -278,6 +278,7 @@ class SimulationRunner:
                 order_repository=self.order_repository,
                 pair_repository=self.pair_repository,
                 delivery_unit_repository=self.delivery_unit_repository,
+                restaurant_repository=self.restaurant_repository,  # Add this line
                 config=self.config.flat_config
             )
         }
