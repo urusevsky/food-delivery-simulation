@@ -253,7 +253,13 @@ class SimulationRunner:
                 id_generator=self.id_generators['driver'],  # Reuse invariant ID generator!
                 operational_rng_manager=self.operational_rng
             ),
-            
+
+            'driver_scheduling': DriverSchedulingService(
+                env=self.env,
+                event_dispatcher=self.event_dispatcher,
+                driver_repository=self.driver_repository
+            ),
+
             'assignment': AssignmentService(
                 env=self.env,
                 event_dispatcher=self.event_dispatcher,
@@ -273,12 +279,6 @@ class SimulationRunner:
                 pair_repository=self.pair_repository,
                 delivery_unit_repository=self.delivery_unit_repository,
                 config=self.config.flat_config
-            ),
-            
-            'driver_scheduling': DriverSchedulingService(
-                env=self.env,
-                event_dispatcher=self.event_dispatcher,
-                driver_repository=self.driver_repository
             )
         }
         
