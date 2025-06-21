@@ -98,6 +98,9 @@ class DriverSchedulingService:
         else:
             # Driver is eligible for assignment - notify assignment service
             self.logger.info(f"[t={self.env.now:.2f}] Driver {driver.driver_id} available for new assignments")
+            
+            # Add the missing simulation_event log
+            self.logger.simulation_event(f"[t={self.env.now:.2f}] Dispatching DriverAvailableForAssignmentEvent for driver {driver.driver_id}")
             self.event_dispatcher.dispatch(DriverAvailableForAssignmentEvent(
                 timestamp=current_time,
                 driver_id=driver.driver_id
@@ -127,6 +130,8 @@ class DriverSchedulingService:
         self.logger.info(f"[t={self.env.now:.2f}] Logging out driver {driver.driver_id} ({logout_reason})")
         driver.transition_to(DriverState.OFFLINE, self.event_dispatcher, self.env)
         
+        # Add the missing simulation_event log
+        self.logger.simulation_event(f"[t={self.env.now:.2f}] Dispatching DriverLoggedOutEvent for driver {driver.driver_id}")
         self.event_dispatcher.dispatch(DriverLoggedOutEvent(
             timestamp=timestamp,
             driver_id=driver.driver_id,
