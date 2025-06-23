@@ -6,17 +6,16 @@ This module provides functions to calculate timing metrics for individual orders
 based on their lifecycle events in the food delivery simulation.
 
 Key metrics:
-- Order waiting time: Time from arrival until assignment
+- Order assignment time: Time from arrival until assignment
 - Order travel time: Time from assignment until delivery (pure logistics)
 - Order fulfillment time: Total time from arrival until delivery
 """
 
-def calculate_order_waiting_time(order):
+def calculate_order_assignment_time(order):
     """
     Calculate time from order arrival to driver assignment.
     
-    This represents the customer's waiting experience before their order
-    enters the delivery pipeline.
+    This represents how long it took for an order to get assigned.
     
     Args:
         order: Order entity with arrival_time and assignment_time attributes
@@ -31,10 +30,9 @@ def calculate_order_waiting_time(order):
 
 def calculate_order_travel_time(order):
     """
-    Calculate time from driver assignment to delivery completion.
+    Calculate time from order assignment to delivery completion.
     
-    This represents pure logistics time: driver travel to restaurant
-    plus driver travel to customer (assuming instant pickup/handoff).
+    This represents pure logistics time from order assignment to order completion.
     
     Args:
         order: Order entity with assignment_time and delivery_time attributes
