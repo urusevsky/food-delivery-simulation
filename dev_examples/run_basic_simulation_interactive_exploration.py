@@ -43,9 +43,18 @@ logging_config = LoggingConfig(
         "utils": "ERROR",
         
         # Step 2: Surgical enablement (overrides the default)
-        "utils.priority_scorer": "DEBUG",
-        "services.assignment": "INFO",
-        "simulation.runner": "INFO"
+        "simulation.runner": "INFO",
+        "entities.order": "SIMULATION",
+        "entities.pair": "SIMULATION",
+        "entities.driver": "SIMULATION",
+        "entities.delivery_unit": "SIMULATION",
+        "services.order_arrival": "SIMULATION",
+        #"services.driver_arrival": "SIMULATION",
+        "services.pairing": "SIMULATION",
+        "services.assignment": "SIMULATION",
+        "services.delivery": "SIMULATION",
+        #"services.driver_scheduling": "INFO"
+
     }
 )
 
@@ -102,7 +111,7 @@ This replaces the old adjusted cost framework with a principled multi-criteria a
 scoring_config = ScoringConfig(
     # Business policy parameters (universal standards)
     max_distance_ratio_multiplier=2.0,     # Beyond 2x typical distance is unacceptable
-    max_acceptable_wait=20,               # 20 minutes maximum wait time
+    max_acceptable_delay=20,               # 20 minutes maximum wait time
     max_orders_per_trip=2,                  # Maximum orders per delivery trip
     
     # Strategic weights (business preferences) - must sum to 1.0
@@ -124,7 +133,7 @@ Single replication for basic model verification
 """
 experiment_config = ExperimentConfig(
     simulation_duration=30,    # __ minutes for quick testing - adjust as needed
-    num_replications=2,         # __ replication for basic testing
+    num_replications=1,         # __ replication for basic testing
     master_seed=42             # Consistent seed for reproducibility
 )
 

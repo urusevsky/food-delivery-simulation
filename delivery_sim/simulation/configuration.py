@@ -147,7 +147,7 @@ class ScoringConfig:
     def __init__(self, 
                  # Business policy parameters (constant across configurations)
                  max_distance_ratio_multiplier=2.0,
-                 max_acceptable_wait=30.0,
+                 max_acceptable_delay=30.0,
                  max_orders_per_trip=2,
                  
                  # Strategic weights (business preferences)
@@ -165,7 +165,7 @@ class ScoringConfig:
         
         # Business policy parameters
         self.max_distance_ratio_multiplier = max_distance_ratio_multiplier
-        self.max_acceptable_wait = max_acceptable_wait
+        self.max_acceptable_delay = max_acceptable_delay
         self.max_orders_per_trip = max_orders_per_trip
         
         # Strategic weights
@@ -181,7 +181,7 @@ class ScoringConfig:
         return (f"ScoringConfig("
                 f"weights=({self.weight_distance:.3f},{self.weight_throughput:.3f},{self.weight_fairness:.3f}), "
                 f"max_ratio={self.max_distance_ratio_multiplier}, "
-                f"max_wait={self.max_acceptable_wait}min, "
+                f"max_wait={self.max_acceptable_delay}min, "
                 f"max_orders={self.max_orders_per_trip}, "
                 f"typical_distance_samples={self.typical_distance_samples})")
 

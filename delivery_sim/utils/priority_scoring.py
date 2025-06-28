@@ -166,7 +166,7 @@ class PriorityScorer:
                 - 1.0 = maximum urgency (≥max_acceptable delay, critical assignment priority)
         """
         assignment_delay = self._calculate_assignment_delay(entity)
-        max_acceptable_delay = self.config.max_acceptable_wait
+        max_acceptable_delay = self.config.max_acceptable_delay
         
         # Direct normalization with ceiling: min(1.0, assignment_delay / max_acceptable_delay)
         fairness_score = min(1.0, assignment_delay / max_acceptable_delay)

@@ -31,7 +31,7 @@ class TestPriorityScorer:
         """Create a mock scoring configuration."""
         config = Mock()
         config.max_distance_ratio_multiplier = 2.0  # Distances >2x typical = score 0
-        config.max_acceptable_wait = 30.0  # 30 min = maximum urgency  
+        config.max_acceptable_delay = 30.0  # 30 min = maximum urgency  
         config.max_orders_per_trip = 2  # System constraint
         config.weight_distance = 1/3
         config.weight_throughput = 1/3  
