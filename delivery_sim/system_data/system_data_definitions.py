@@ -35,8 +35,7 @@ class SystemDataDefinitions:
             'waiting_pairs_count': self.count_waiting_pairs(),
             'total_waiting_entities': self.count_total_waiting_entities(),
             'available_drivers_count': self.count_available_drivers(),
-            'delivering_drivers_count': self.count_delivering_drivers(),
-            'system_load_ratio': self.calculate_system_load_ratio()
+            'delivering_drivers_count': self.count_delivering_drivers()
         }
     
     # Individual metric calculation methods
@@ -60,23 +59,3 @@ class SystemDataDefinitions:
         """Count drivers currently performing deliveries."""
         return len(self.repositories['driver'].find_by_state(DriverState.DELIVERING))
     
-    def calculate_system_load_ratio(self):
-        """
-        Calculate system load as ratio of waiting entities to available drivers.
-        
-        Returns:
-            float: Load ratio where:
-                - 0.0 = no waiting entities
-                - 1.0 = equal waiting entities and available drivers
-                - >1.0 = more entities waiting than drivers available  
-                - inf = entities waiting but no available drivers
-        """
-        waiting = self.count_total_waiting_entities()
-        available = self.count_available_drivers()
-        
-        if available > 0:
-            return waiting / available
-        elif waiting > 0:
-            return float('inf')
-        else:
-            return 0.0
