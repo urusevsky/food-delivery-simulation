@@ -88,9 +88,9 @@ class PriorityScorer:
             "throughput_score": throughput_score,
             "fairness_score": fairness_score,
             "combined_score_0_1": combined_score,
-            "total_distance": total_distance,  # Use cached value
+            "total_distance": total_distance,
             "num_orders": self._get_order_count(entity),
-            "wait_time_minutes": self._calculate_wait_time(entity)
+            "assignment_delay_minutes": self._calculate_assignment_delay(entity)  # Updated key name
         }
         
         return priority_score, components
@@ -150,26 +150,26 @@ class PriorityScorer:
 
     def _calculate_fairness_score(self, entity):
         """
-        Calculate fairness score based on customer wait time urgency.
+        Calculate fairness score based on assignment urgency.
         
-        Fairness represents how urgently this entity needs service based on
-        how long customers have been waiting. Longer waits indicate higher
-        priority for assignment to maintain customer satisfaction.
+        Fairness represents how urgently this entity needs assignment based on
+        how long it has been waiting for driver assignment. Longer assignment
+        delays indicate higher priority to maintain fairness in assignment opportunities.
         
         Args:
             entity (Order or Pair): The delivery entity being evaluated
             
         Returns:
             float: Fairness urgency score in [0,1] range, where:
-                - 0.0 = just arrived, no urgency
-                - 0.5 = moderate urgency (15 min wait if max_wait=30 min)
-                - 1.0 = maximum urgency (≥30 min wait, critical priority)
+                - 0.0 = just arrived, no assignment urgency
+                - 0.5 = moderate urgency (e.g., 15 min delay if max_acceptable=30 min)
+                - 1.0 = maximum urgency (≥max_acceptable delay, critical assignment priority)
         """
-        wait_time = self._calculate_wait_time(entity)
-        max_wait = self.config.max_acceptable_wait
+        assignment_delay = self._calculate_assignment_delay(entity)
+        max_acceptable_delay = self.config.max_acceptable_wait
         
-        # Direct normalization with ceiling: min(1.0, wait_time / max_acceptable_wait)
-        fairness_score = min(1.0, wait_time / max_wait)
+        # Direct normalization with ceiling: min(1.0, assignment_delay / max_acceptable_delay)
+        fairness_score = min(1.0, assignment_delay / max_acceptable_delay)
         
         return fairness_score
     
@@ -209,16 +209,31 @@ class PriorityScorer:
         """Get number of orders in this entity."""
         return 2 if entity.entity_type == EntityType.PAIR else 1
     
-    def _calculate_wait_time(self, entity):
-        """Calculate wait time in minutes for this entity."""
-        if entity.entity_type == EntityType.PAIR:
-            # Use earliest arrival time for pairs
-            arrival_time = min(entity.order1.arrival_time, entity.order2.arrival_time)
-        else:
-            arrival_time = entity.arrival_time
+    def _calculate_assignment_delay(self, entity):
+        """
+        Calculate assignment delay from the customer fairness perspective.
         
-        wait_time_minutes = self.env.now - arrival_time
-        return wait_time_minutes
+        For single orders: Time from order arrival until current assignment consideration.
+        For pairs: Time from the EARLIEST order arrival (worst-case customer experience)
+                until current assignment consideration, regardless of when the pair was formed.
+        
+        This ensures fairness prioritization reflects the longest-waiting customer's experience,
+        not just when the delivery entity became available for assignment.
+        
+        Args:
+            entity (Order or Pair): The delivery entity being evaluated
+            
+        Returns:
+            float: Assignment delay in minutes from customer perspective
+        """
+        if entity.entity_type == EntityType.PAIR:
+            # Use earliest arrival time for pairs (when first order arrived)
+            earliest_arrival = min(entity.order1.arrival_time, entity.order2.arrival_time)
+        else:
+            earliest_arrival = entity.arrival_time
+        
+        assignment_delay_minutes = self.env.now - earliest_arrival
+        return assignment_delay_minutes
 
 
 def create_priority_scorer(infrastructure_characteristics, scoring_config, env):
