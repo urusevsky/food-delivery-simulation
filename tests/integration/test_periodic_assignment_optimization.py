@@ -93,7 +93,7 @@ class TestPeriodicAssignmentOptimization:
             "combined_score_0_1": 0.80,
             "total_distance": 7.0,
             "num_orders": 1,
-            "wait_time_minutes": 4.0
+            "assignment_delay_minutes": 4.0
         })
         return scorer
     
@@ -111,19 +111,19 @@ class TestPeriodicAssignmentOptimization:
             scores = [
                 (85.0, {
                     'distance_score': 0.85, 'throughput_score': 0.0, 'fairness_score': 0.9,
-                    'combined_score_0_1': 0.85, 'total_distance': 5.0, 'num_orders': 1, 'wait_time_minutes': 2.0
+                    'combined_score_0_1': 0.85, 'total_distance': 5.0, 'num_orders': 1, 'assignment_delay_minutes': 2.0
                 }),
                 (75.0, {
                     'distance_score': 0.75, 'throughput_score': 0.0, 'fairness_score': 0.8,
-                    'combined_score_0_1': 0.75, 'total_distance': 8.0, 'num_orders': 1, 'wait_time_minutes': 5.0
+                    'combined_score_0_1': 0.75, 'total_distance': 8.0, 'num_orders': 1, 'assignment_delay_minutes': 5.0
                 }),
                 (90.0, {
                     'distance_score': 0.90, 'throughput_score': 0.5, 'fairness_score': 0.95,
-                    'combined_score_0_1': 0.90, 'total_distance': 4.0, 'num_orders': 2, 'wait_time_minutes': 1.0
+                    'combined_score_0_1': 0.90, 'total_distance': 4.0, 'num_orders': 2, 'assignment_delay_minutes': 1.0
                 }),
                 (70.0, {
                     'distance_score': 0.70, 'throughput_score': 0.0, 'fairness_score': 0.75,
-                    'combined_score_0_1': 0.70, 'total_distance': 10.0, 'num_orders': 1, 'wait_time_minutes': 8.0
+                    'combined_score_0_1': 0.70, 'total_distance': 10.0, 'num_orders': 1, 'assignment_delay_minutes': 8.0
                 })
             ]
             return scores[(call_count - 1) % len(scores)]
@@ -364,7 +364,7 @@ class TestPeriodicAssignmentOptimization:
             "combined_score_0_1": 0.85,
             "total_distance": 5.0,
             "num_orders": 1,
-            "wait_time_minutes": 3.0
+            "assignment_delay_minutes": 3.0
         }
         mock_priority_scorer.calculate_priority_score.return_value = (immediate_score, immediate_components)
         

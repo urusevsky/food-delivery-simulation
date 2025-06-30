@@ -288,7 +288,7 @@ class TestPriorityScorer:
         assert components["combined_score_0_1"] == pytest.approx(0.5)
         assert components["total_distance"] == pytest.approx(5.0)
         assert components["num_orders"] == 1
-        assert components["wait_time_minutes"] == pytest.approx(15.0)
+        assert components["assignment_delay_minutes"] == pytest.approx(15.0)
 
     @patch('delivery_sim.utils.priority_scoring.calculate_distance')
     def test_calculate_priority_score_integration_pair(self, mock_calculate_distance, priority_scorer, sample_driver, sample_pair, test_env):

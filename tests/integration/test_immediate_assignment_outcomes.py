@@ -98,7 +98,7 @@ class TestImmediateAssignmentOutcomes:
             "combined_score_0_1": 0.80,
             "total_distance": 6.5,
             "num_orders": 1,
-            "wait_time_minutes": 5.0
+            "assignment_delay_minutes": 5.0
         })
         return scorer
     
@@ -189,7 +189,7 @@ class TestImmediateAssignmentOutcomes:
             "combined_score_0_1": 0.70,
             "total_distance": 12.0,
             "num_orders": 1,
-            "wait_time_minutes": 8.0
+            "assignment_delay_minutes": 8.0
         })
         
         # Create the assignment service
@@ -272,7 +272,7 @@ class TestImmediateAssignmentOutcomes:
             "combined_score_0_1": 0.85,
             "total_distance": 5.0,
             "num_orders": 1,
-            "wait_time_minutes": 3.0
+            "assignment_delay_minutes": 3.0
         }
         mock_priority_scorer.calculate_priority_score.return_value = (high_score, score_components)
         
@@ -383,7 +383,7 @@ class TestImmediateAssignmentOutcomes:
                 "combined_score_0_1": 0.785,
                 "total_distance": 6.2,
                 "num_orders": 1,
-                "wait_time_minutes": 2.0
+                "assignment_delay_minutes": 2.0
             })
             score_calculations.append({
                 'driver_id': driver.driver_id,
@@ -444,7 +444,7 @@ class TestImmediateAssignmentOutcomes:
         assert 0.0 <= components['combined_score_0_1'] <= 1.0, "Combined score should be in [0,1] range"
         assert components['total_distance'] > 0, "Total distance should be positive"
         assert components['num_orders'] == 1, "Should be 1 order for single order"
-        assert components['wait_time_minutes'] >= 0, "Wait time should be non-negative"
+        assert components['assignment_delay_minutes'] >= 0, "Wait time should be non-negative"
         
         # Verify assignment succeeded (score 78.5 >= threshold 75.0)
         assert result is True, "Assignment should succeed with this score"

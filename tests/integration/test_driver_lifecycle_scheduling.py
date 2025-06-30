@@ -73,7 +73,7 @@ class TestDriverLifecycleScheduling:
             "combined_score_0_1": 0.70,
             "total_distance": 8.5,
             "num_orders": 1,
-            "wait_time_minutes": 6.0
+            "assignment_delay_minutes": 6.0
         })
         return scorer
     
@@ -346,7 +346,7 @@ class TestDriverLifecycleScheduling:
             "combined_score_0_1": 0.85,
             "total_distance": 5.0,
             "num_orders": 1,
-            "wait_time_minutes": 2.0
+            "assignment_delay_minutes": 2.0
         })
         
         # Create assignment service

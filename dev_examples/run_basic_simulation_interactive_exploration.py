@@ -44,15 +44,15 @@ logging_config = LoggingConfig(
         
         # Step 2: Surgical enablement (overrides the default)
         "simulation.runner": "INFO",
-        "entities.order": "SIMULATION",
-        "entities.pair": "SIMULATION",
-        "entities.driver": "SIMULATION",
-        "entities.delivery_unit": "SIMULATION",
-        "services.order_arrival": "SIMULATION",
+        #"entities.order": "SIMULATION",
+        #"entities.pair": "SIMULATION",
+        #"entities.driver": "SIMULATION",
+        #"entities.delivery_unit": "SIMULATION",
+        #"services.order_arrival": "SIMULATION",
         #"services.driver_arrival": "SIMULATION",
-        "services.pairing": "SIMULATION",
-        "services.assignment": "SIMULATION",
-        "services.delivery": "SIMULATION",
+        #"services.pairing": "SIMULATION",
+        #"services.assignment": "SIMULATION",
+        #"services.delivery": "SIMULATION",
         #"services.driver_scheduling": "INFO"
 
     }
@@ -86,7 +86,7 @@ operational_config = OperationalConfig(
     mean_driver_inter_arrival_time=3.0,   # 3 minutes between drivers - try 2.0, 3.0, 5.0
     
     # Pairing strategy - experiment with pairing effectiveness
-    pairing_enabled=True,
+    pairing_enabled=False,
     restaurants_proximity_threshold=2.0,   # 2km for restaurant clustering - try 1.0, 2.0, 4.0
     customers_proximity_threshold=2.5,     # 2.5km for customer clustering - try 1.5, 2.5, 4.0
     
@@ -97,7 +97,7 @@ operational_config = OperationalConfig(
     max_service_duration=240,       # maximum 4 hours
     
     # Assignment strategy parameters (priority scoring system)
-    immediate_assignment_threshold=50.0,    # Priority score threshold 
+    immediate_assignment_threshold=100,    # Priority score threshold 
     periodic_interval=3.0                   # 3 minutes between global optimizations - try 2.0, 3.0, 5.0
 )
 
@@ -132,7 +132,7 @@ Cell 6: Define experimental parameters
 Single replication for basic model verification
 """
 experiment_config = ExperimentConfig(
-    simulation_duration=30,    # __ minutes for quick testing - adjust as needed
+    simulation_duration=100,    # __ minutes for quick testing - adjust as needed
     num_replications=1,         # __ replication for basic testing
     master_seed=42             # Consistent seed for reproducibility
 )
@@ -174,5 +174,110 @@ print("\n" + "="*60)
 print("SIMULATION COMPLETED")
 print("="*60)
 
+# %% Metrics Analysis Pipeline
+"""
+Cell 9: Analyze simulation results using the new metrics pipeline
+This demonstrates the complete pipeline from raw data to analyzable results
+"""
+print("\n" + "="*60)
+print("METRICS ANALYSIS PIPELINE")
+print("="*60)
+
+# Import metrics modules
+from delivery_sim.simulation.data_preparation import filter_entities_for_analysis, get_analysis_time_window
+from delivery_sim.metrics.entity.base.order_metrics import calculate_order_assignment_time
+from delivery_sim.metrics.entity.base.delivery_unit_metrics import calculate_delivery_unit_total_distance
+from delivery_sim.metrics.entity.aggregate.entity_aggregates import calculate_summary_statistics
+from delivery_sim.metrics.system.entity_derived_metrics import calculate_all_entity_derived_system_metrics
+
+# Step 1: Extract raw repositories from simulation results
+print("Step 1: Extracting raw data...")
+repositories = results['replication_results'][0]  # First (and only) replication
+print(f"  Raw entities - Orders: {len(repositories['order'].find_all())}, "
+      f"Delivery Units: {len(repositories['delivery_unit'].find_all())}, "
+      f"Drivers: {len(repositories['driver'].find_all())}")
+
+# Step 2: Data preparation - apply warmup filtering
+print("\nStep 2: Applying warmup filtering...")
+warmup_period = 30  # 30 minutes warmup for testing - adjust as needed
+simulation_duration = experiment_config.simulation_duration
+
+# Get analysis time window
+analysis_start, analysis_end = get_analysis_time_window(simulation_duration, warmup_period)
+analysis_duration = analysis_end - analysis_start
+
+print(f"  Warmup period: {warmup_period} minutes")
+print(f"  Analysis window: {analysis_start} to {analysis_end} ({analysis_duration} minutes)")
+
+# Filter entities for analysis
+filtered_entities = filter_entities_for_analysis(repositories, warmup_period)
+print(f"  Filtered entities - Orders: {len(filtered_entities['order'])}, "
+      f"Delivery Units: {len(filtered_entities['delivery_unit'])}")
+
+# Step 3: Calculate individual entity metrics
+print("\nStep 3: Calculating individual entity metrics...")
+
+# Order assignment times
+assignment_times = [
+    calculate_order_assignment_time(order) 
+    for order in filtered_entities['order']
+]
+valid_assignment_times = [t for t in assignment_times if t is not None]
+print(f"  Order assignment times calculated: {len(valid_assignment_times)} valid values")
+
+# Delivery unit distances  
+delivery_distances = [
+    calculate_delivery_unit_total_distance(unit)
+    for unit in filtered_entities['delivery_unit']
+]
+valid_distances = [d for d in delivery_distances if d is not None]
+print(f"  Delivery distances calculated: {len(valid_distances)} valid values")
+
+# Step 4: Aggregate individual metrics into summary statistics
+print("\nStep 4: Aggregating entity metrics...")
+
+assignment_summary = calculate_summary_statistics(assignment_times)
+distance_summary = calculate_summary_statistics(delivery_distances)
+
+print(f"  Order assignment time summary: {assignment_summary['count']} orders")
+if assignment_summary['mean']:
+    print(f"    Mean: {assignment_summary['mean']:.2f} min, Std: {assignment_summary['std']:.2f} min")
+    print(f"    Range: {assignment_summary['min']:.2f} - {assignment_summary['max']:.2f} min")
+    print(f"    95th percentile: {assignment_summary['p95']:.2f} min")
+
+print(f"  Delivery distance summary: {distance_summary['count']} deliveries")
+if distance_summary['mean']:
+    print(f"    Mean: {distance_summary['mean']:.2f} km, Std: {distance_summary['std']:.2f} km")
+    print(f"    Range: {distance_summary['min']:.2f} - {distance_summary['max']:.2f} km")
+    print(f"    95th percentile: {distance_summary['p95']:.2f} km")
+
+# Step 5: Calculate system metrics
+print("\nStep 5: Calculating system metrics...")
+
+system_metrics = calculate_all_entity_derived_system_metrics(filtered_entities)
+throughput = system_metrics['system_throughput']
+
+print(f"  System throughput: {throughput} orders delivered during analysis period")
+print(f"  Throughput rate: {throughput/analysis_duration:.2f} orders per minute")
+
+# Step 6: Summary of results
+print("\n" + "="*60)
+print("METRICS SUMMARY")
+print("="*60)
+
+print("Individual Entity Performance:")
+if assignment_summary['mean']:
+    print(f"  • Average order assignment time: {assignment_summary['mean']:.2f} ± {assignment_summary['std']:.2f} minutes")
+if distance_summary['mean']:
+    print(f"  • Average delivery distance: {distance_summary['mean']:.2f} ± {distance_summary['std']:.2f} km")
+
+print(f"\nSystem Performance:")
+print(f"  • Total orders delivered: {throughput} orders")
+print(f"  • System throughput: {throughput/analysis_duration:.2f} orders/minute")
+
+print(f"\nData Quality:")
+print(f"  • Analysis period: {analysis_duration} minutes ({analysis_duration/simulation_duration*100:.1f}% of simulation)")
+print(f"  • Valid order metrics: {assignment_summary['count']}")
+print(f"  • Valid delivery metrics: {distance_summary['count']}")
 
 # %%

@@ -104,7 +104,7 @@ class TestImmediateAssignmentTriggers:
             'combined_score_0_1': 0.80,
             'total_distance': 8.5,
             'num_orders': 1,
-            'wait_time_minutes': 5.0
+            'assignment_delay_minutes': 5.0
         })
         return mock_scorer
     

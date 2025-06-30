@@ -454,7 +454,7 @@ class AssignmentService:
             "priority_score_0_100": score_components["combined_score_0_1"] * 100,
             "total_distance": score_components["total_distance"],
             "num_orders": score_components["num_orders"],
-            "wait_time_minutes": score_components["wait_time_minutes"]
+            "assignment_delay_minutes": score_components["assignment_delay_minutes"]
         }
         
         # Add to repository

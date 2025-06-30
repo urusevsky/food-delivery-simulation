@@ -48,7 +48,7 @@ def test_delivery_unit_creation_with_single_order():
     assert all(key in delivery_unit.assignment_scores for key in [
         "distance_score", "throughput_score", "fairness_score", 
         "combined_score_0_1", "priority_score_0_100", "total_distance",
-        "num_orders", "wait_time_minutes"
+        "num_orders", "assignment_delay_minutes"
     ])
     assert all(value is None for value in delivery_unit.assignment_scores.values())
 
@@ -188,7 +188,7 @@ def test_assignment_score_recording():
         "priority_score_0_100": 55.0,  # Final priority score
         "total_distance": 8.5,         # Actual distance in km
         "num_orders": 1,               # Number of orders
-        "wait_time_minutes": 3.0       # Wait time
+        "assignment_delay_minutes": 3.0       # Wait time
     }
     
     # ASSERT - Verify scores are recorded correctly
@@ -199,7 +199,7 @@ def test_assignment_score_recording():
     assert delivery_unit.assignment_scores["priority_score_0_100"] == 55.0
     assert delivery_unit.assignment_scores["total_distance"] == 8.5
     assert delivery_unit.assignment_scores["num_orders"] == 1
-    assert delivery_unit.assignment_scores["wait_time_minutes"] == 3.0
+    assert delivery_unit.assignment_scores["assignment_delay_minutes"] == 3.0
 
 # Test Group 6: Testing assignment path recording
 def test_assignment_path_recording():

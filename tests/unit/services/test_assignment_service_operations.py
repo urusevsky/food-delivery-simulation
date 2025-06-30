@@ -62,7 +62,7 @@ class TestAssignmentServiceOperations:
             "combined_score_0_1": 0.75,
             "total_distance": 8.5,
             "num_orders": 1,
-            "wait_time_minutes": 5.0
+            "assignment_delay_minutes": 5.0
         })
         return scorer
 
@@ -348,7 +348,7 @@ class TestAssignmentServiceOperations:
             "combined_score_0_1": 0.825,
             "total_distance": 7.5,
             "num_orders": 1,
-            "wait_time_minutes": 3.0
+            "assignment_delay_minutes": 3.0
         }
         
         service.priority_scorer.calculate_priority_score.return_value = (expected_score, expected_components)

@@ -54,7 +54,7 @@ class DeliveryUnit:
             "priority_score_0_100": None,  # Final score (0-100)
             "total_distance": None,        # Actual distance in km
             "num_orders": None,            # Number of orders in this delivery
-            "wait_time_minutes": None      # Wait time for this assignment
+            "assignment_delay_minutes": None      # Wait time for this assignment
         }
         
         # Log creation
