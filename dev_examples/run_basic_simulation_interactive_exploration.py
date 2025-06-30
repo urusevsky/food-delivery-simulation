@@ -82,7 +82,7 @@ Note: Assignment logic now uses priority scoring system instead of adjusted cost
 """
 operational_config = OperationalConfig(
     # Arrival patterns - experiment with different system loads
-    mean_order_inter_arrival_time=2.0,    # 2 minutes between orders - try 1.0, 2.0, 4.0 
+    mean_order_inter_arrival_time=0.3,    # 2 minutes between orders - try 1.0, 2.0, 4.0 
     mean_driver_inter_arrival_time=3.0,   # 3 minutes between drivers - try 2.0, 3.0, 5.0
     
     # Pairing strategy - experiment with pairing effectiveness
@@ -199,7 +199,7 @@ print(f"  Raw entities - Orders: {len(repositories['order'].find_all())}, "
 
 # Step 2: Data preparation - apply warmup filtering
 print("\nStep 2: Applying warmup filtering...")
-warmup_period = 30  # 30 minutes warmup for testing - adjust as needed
+warmup_period = 30 # 30 minutes warmup for testing - adjust as needed
 simulation_duration = experiment_config.simulation_duration
 
 # Get analysis time window
@@ -254,10 +254,15 @@ if distance_summary['mean']:
 # Step 5: Calculate system metrics
 print("\nStep 5: Calculating system metrics...")
 
-system_metrics = calculate_all_entity_derived_system_metrics(filtered_entities)
+system_metrics = calculate_all_entity_derived_system_metrics(repositories, filtered_entities, warmup_period)
 throughput = system_metrics['system_throughput']
+completion_rate = system_metrics['system_completion_rate']
+total_arrived = system_metrics['total_orders_arrived']
+total_delivered = system_metrics['total_orders_delivered']
 
 print(f"  System throughput: {throughput} orders delivered during analysis period")
+print(f"  Orders arrived: {total_arrived}, Orders delivered: {total_delivered}")
+print(f"  Completion rate: {completion_rate:.1%}")
 print(f"  Throughput rate: {throughput/analysis_duration:.2f} orders per minute")
 
 # Step 6: Summary of results
@@ -273,11 +278,11 @@ if distance_summary['mean']:
 
 print(f"\nSystem Performance:")
 print(f"  • Total orders delivered: {throughput} orders")
+print(f"  • System completion rate: {completion_rate:.1%} ({total_delivered}/{total_arrived})")
 print(f"  • System throughput: {throughput/analysis_duration:.2f} orders/minute")
 
 print(f"\nData Quality:")
 print(f"  • Analysis period: {analysis_duration} minutes ({analysis_duration/simulation_duration*100:.1f}% of simulation)")
 print(f"  • Valid order metrics: {assignment_summary['count']}")
 print(f"  • Valid delivery metrics: {distance_summary['count']}")
-
 # %%
