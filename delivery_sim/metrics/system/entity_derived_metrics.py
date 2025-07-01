@@ -49,7 +49,7 @@ def calculate_system_completion_rate(repositories, filtered_entities, warmup_per
     Returns:
         dict: Contains total_arrived, total_delivered, and completion_rate
     """
-    from delivery_sim.simulation.data_preparation import count_orders_arrived_during_analysis
+    from delivery_sim.analysis_pipeline.data_preparation import count_orders_arrived_during_analysis
     
     # Total orders that arrived during analysis period (regardless of completion)
     total_arrived = count_orders_arrived_during_analysis(repositories['order'], warmup_period)
