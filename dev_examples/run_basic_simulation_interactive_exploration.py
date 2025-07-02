@@ -82,7 +82,7 @@ Note: Assignment logic now uses priority scoring system instead of adjusted cost
 """
 operational_config = OperationalConfig(
     # Arrival patterns - experiment with different system loads
-    mean_order_inter_arrival_time=0.3,    # 2 minutes between orders - try 1.0, 2.0, 4.0 
+    mean_order_inter_arrival_time=2.0,    # 2 minutes between orders - try 1.0, 2.0, 4.0 
     mean_driver_inter_arrival_time=3.0,   # 3 minutes between drivers - try 2.0, 3.0, 5.0
     
     # Pairing strategy - experiment with pairing effectiveness
@@ -133,7 +133,7 @@ Single replication for basic model verification
 """
 experiment_config = ExperimentConfig(
     simulation_duration=100,    # __ minutes for quick testing - adjust as needed
-    num_replications=1,         # __ replication for basic testing
+    num_replications=3,         # __ replication for basic testing
     master_seed=42             # Consistent seed for reproducibility
 )
 
@@ -179,110 +179,28 @@ print("="*60)
 Cell 9: Analyze simulation results using the new metrics pipeline
 This demonstrates the complete pipeline from raw data to analyzable results
 """
+# NEW: Use the analysis pipeline
+from delivery_sim.analysis_pipeline.pipeline_coordinator import analyze_single_configuration, quick_summary
+
 print("\n" + "="*60)
-print("METRICS ANALYSIS PIPELINE")
+print("NEW ANALYSIS PIPELINE TEST")
 print("="*60)
 
-# Import metrics modules
-from delivery_sim.simulation.data_preparation import filter_entities_for_analysis, get_analysis_time_window
-from delivery_sim.metrics.entity.base.order_metrics import calculate_order_assignment_time
-from delivery_sim.metrics.entity.base.delivery_unit_metrics import calculate_delivery_unit_total_distance
-from delivery_sim.metrics.entity.aggregate.entity_aggregates import calculate_summary_statistics
-from delivery_sim.metrics.system.entity_derived_metrics import calculate_all_entity_derived_system_metrics
+# Run the complete pipeline
+warmup_period = 30  # Same as your current analysis
+experiment_summary = analyze_single_configuration(results, warmup_period)
 
-# Step 1: Extract raw repositories from simulation results
-print("Step 1: Extracting raw data...")
-repositories = results['replication_results'][0]  # First (and only) replication
-print(f"  Raw entities - Orders: {len(repositories['order'].find_all())}, "
-      f"Delivery Units: {len(repositories['delivery_unit'].find_all())}, "
-      f"Drivers: {len(repositories['driver'].find_all())}")
+# Get quick summary for key metrics
+quick_results = quick_summary(experiment_summary, 
+                            metrics_of_interest=['system_completion_rate', 'assignment_time', 'total_distance'])
 
-# Step 2: Data preparation - apply warmup filtering
-print("\nStep 2: Applying warmup filtering...")
-warmup_period = 30 # 30 minutes warmup for testing - adjust as needed
-simulation_duration = experiment_config.simulation_duration
+print("\nQuick Results:")
+for metric_name, data in quick_results.items():
+    print(f"  {metric_name}: {data['formatted']}")
 
-# Get analysis time window
-analysis_start, analysis_end = get_analysis_time_window(simulation_duration, warmup_period)
-analysis_duration = analysis_end - analysis_start
-
-print(f"  Warmup period: {warmup_period} minutes")
-print(f"  Analysis window: {analysis_start} to {analysis_end} ({analysis_duration} minutes)")
-
-# Filter entities for analysis
-filtered_entities = filter_entities_for_analysis(repositories, warmup_period)
-print(f"  Filtered entities - Orders: {len(filtered_entities['order'])}, "
-      f"Delivery Units: {len(filtered_entities['delivery_unit'])}")
-
-# Step 3: Calculate individual entity metrics
-print("\nStep 3: Calculating individual entity metrics...")
-
-# Order assignment times
-assignment_times = [
-    calculate_order_assignment_time(order) 
-    for order in filtered_entities['order']
-]
-valid_assignment_times = [t for t in assignment_times if t is not None]
-print(f"  Order assignment times calculated: {len(valid_assignment_times)} valid values")
-
-# Delivery unit distances  
-delivery_distances = [
-    calculate_delivery_unit_total_distance(unit)
-    for unit in filtered_entities['delivery_unit']
-]
-valid_distances = [d for d in delivery_distances if d is not None]
-print(f"  Delivery distances calculated: {len(valid_distances)} valid values")
-
-# Step 4: Aggregate individual metrics into summary statistics
-print("\nStep 4: Aggregating entity metrics...")
-
-assignment_summary = calculate_summary_statistics(assignment_times)
-distance_summary = calculate_summary_statistics(delivery_distances)
-
-print(f"  Order assignment time summary: {assignment_summary['count']} orders")
-if assignment_summary['mean']:
-    print(f"    Mean: {assignment_summary['mean']:.2f} min, Std: {assignment_summary['std']:.2f} min")
-    print(f"    Range: {assignment_summary['min']:.2f} - {assignment_summary['max']:.2f} min")
-    print(f"    95th percentile: {assignment_summary['p95']:.2f} min")
-
-print(f"  Delivery distance summary: {distance_summary['count']} deliveries")
-if distance_summary['mean']:
-    print(f"    Mean: {distance_summary['mean']:.2f} km, Std: {distance_summary['std']:.2f} km")
-    print(f"    Range: {distance_summary['min']:.2f} - {distance_summary['max']:.2f} km")
-    print(f"    95th percentile: {distance_summary['p95']:.2f} km")
-
-# Step 5: Calculate system metrics
-print("\nStep 5: Calculating system metrics...")
-
-system_metrics = calculate_all_entity_derived_system_metrics(repositories, filtered_entities, warmup_period)
-throughput = system_metrics['system_throughput']
-completion_rate = system_metrics['system_completion_rate']
-total_arrived = system_metrics['total_orders_arrived']
-total_delivered = system_metrics['total_orders_delivered']
-
-print(f"  System throughput: {throughput} orders delivered during analysis period")
-print(f"  Orders arrived: {total_arrived}, Orders delivered: {total_delivered}")
-print(f"  Completion rate: {completion_rate:.1%}")
-print(f"  Throughput rate: {throughput/analysis_duration:.2f} orders per minute")
-
-# Step 6: Summary of results
-print("\n" + "="*60)
-print("METRICS SUMMARY")
-print("="*60)
-
-print("Individual Entity Performance:")
-if assignment_summary['mean']:
-    print(f"  • Average order assignment time: {assignment_summary['mean']:.2f} ± {assignment_summary['std']:.2f} minutes")
-if distance_summary['mean']:
-    print(f"  • Average delivery distance: {distance_summary['mean']:.2f} ± {distance_summary['std']:.2f} km")
-
-print(f"\nSystem Performance:")
-print(f"  • Total orders delivered: {throughput} orders")
-print(f"  • System completion rate: {completion_rate:.1%} ({total_delivered}/{total_arrived})")
-print(f"  • System throughput: {throughput/analysis_duration:.2f} orders/minute")
-
-print(f"\nData Quality:")
-print(f"  • Analysis period: {analysis_duration} minutes ({analysis_duration/simulation_duration*100:.1f}% of simulation)")
-print(f"  • Valid order metrics: {assignment_summary['count']}")
-print(f"  • Valid delivery metrics: {distance_summary['count']}")
+print(f"\nFull Results Available:")
+print(f"  Entity metrics: {list(experiment_summary['entity_metrics'].keys())}")
+print(f"  System metrics: {list(experiment_summary['system_metrics'].keys())}")
+print(f"  Replications: {experiment_summary['num_replications']}")
+print(f"  Confidence level: {experiment_summary['confidence_level']*100}%")
 # %%
