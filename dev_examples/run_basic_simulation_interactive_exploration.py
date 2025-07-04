@@ -132,7 +132,7 @@ Cell 6: Define experimental parameters
 Single replication for basic model verification
 """
 experiment_config = ExperimentConfig(
-    simulation_duration=100,    # __ minutes for quick testing - adjust as needed
+    simulation_duration=300,    # __ minutes for quick testing - adjust as needed
     num_replications=3,         # __ replication for basic testing
     master_seed=42             # Consistent seed for reproducibility
 )
@@ -190,7 +190,8 @@ print("WARMUP ANALYSIS - WELCH'S METHOD VISUALIZATION")
 print("="*50)
 
 # Import warmup analysis tools
-from delivery_sim.warmup_analysis import WelchAnalyzer, WarmupVisualization
+from delivery_sim.warmup_analysis.welch_analyzer import WelchAnalyzer
+from delivery_sim.warmup_analysis.visualization import WarmupVisualization
 import matplotlib.pyplot as plt
 
 # Step 1: Extract system snapshots from simulation results
