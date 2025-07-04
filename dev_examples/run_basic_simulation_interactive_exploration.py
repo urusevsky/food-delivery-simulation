@@ -82,7 +82,7 @@ Note: Assignment logic now uses priority scoring system instead of adjusted cost
 """
 operational_config = OperationalConfig(
     # Arrival patterns - experiment with different system loads
-    mean_order_inter_arrival_time=1.0,    # 2 minutes between orders - try 1.0, 2.0, 4.0 
+    mean_order_inter_arrival_time=1.0,    # _ minutes between orders - try 1.0, 2.0, 4.0 
     mean_driver_inter_arrival_time=3.0,   # 3 minutes between drivers - try 2.0, 3.0, 5.0
     
     # Pairing strategy - experiment with pairing effectiveness
@@ -255,19 +255,24 @@ print("VISUAL INSPECTION GUIDANCE")
 print("="*50)
 
 print("🔍 How to read the Welch plots:")
-print("  • BLUE line = Cross-replication averages (raw Ȳ.j)")
-print("  • RED line = Cumulative average (smoothed)")
-print("  • Focus on the RED line for convergence assessment")
+print("  • BLUE line = Cross-replication averages (primary indicator)")
+print("  • RED line = Cumulative average (conservative reference)")
+print("  • Human pattern recognition works well with blue line directly")
 print()
 print("📊 Look for convergence indicators:")
-print("  • RED line stops trending and becomes relatively flat")
-print("  • Oscillations in RED line become small and stable")
-print("  • System appears to reach operational steady state")
+print("  • Blue line reaches stable oscillation around consistent level")
+print("  • System transitions from trending to operational behavior")
+print("  • Variability becomes consistent rather than decreasing")
 print()
 print("⏰ Choose warmup period:")
-print("  • Select a time BEFORE the RED line stabilizes")
-print("  • Be conservative - choose earlier rather than later")
-print("  • Consider steepest changes as still part of warmup")
+print("  • Identify where BLUE line reaches stable pattern")
+print("  • Choose warmup period AT OR AFTER this stabilization point")
+print("  • Conservative: If stabilization at 100, consider warmup = 120-150")
+print("  • RED line provides conservative validation (naturally delayed)")
+print()
+print("💡 Pattern recognition tip:")
+print("  • Blue line alone often provides sufficient visual clarity")
+print("  • Smoothing helps but isn't required for good assessment")
 
 # Display final values and simulation context
 print(f"\n📈 Final stabilized values:")
