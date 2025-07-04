@@ -7,6 +7,8 @@ class SystemDataDefinitions:
     
     This class encapsulates all the business logic for measuring
     system state, separate from when/how often to measure.
+    
+    Enhanced with warmup detection metrics.
     """
     
     def __init__(self, repositories):
@@ -27,18 +29,25 @@ class SystemDataDefinitions:
             timestamp: Current simulation time
             
         Returns:
-            dict: Complete snapshot with all system metrics
+            dict: Complete snapshot with all system metrics including warmup detection metrics
         """
         return {
             'timestamp': timestamp,
+            
+            # Existing metrics for system performance analysis
             'active_orders_count': self.count_active_orders(),
             'waiting_pairs_count': self.count_waiting_pairs(),
             'total_waiting_entities': self.count_total_waiting_entities(),
             'available_drivers_count': self.count_available_drivers(),
-            'delivering_drivers_count': self.count_delivering_drivers()
+            'delivering_drivers_count': self.count_delivering_drivers(),
+            
+            # NEW: Warmup detection metrics
+            'active_drivers': self.count_active_drivers(),
+            'active_delivery_entities': self.count_active_delivery_entities()
         }
     
-    # Individual metric calculation methods
+    # ===== Existing System Performance Metrics =====
+    
     def count_active_orders(self):
         """Count orders waiting for assignment (not yet assigned to drivers)."""
         return len(self.repositories['order'].find_by_state(OrderState.CREATED))
@@ -59,3 +68,45 @@ class SystemDataDefinitions:
         """Count drivers currently performing deliveries."""
         return len(self.repositories['driver'].find_by_state(DriverState.DELIVERING))
     
+    # ===== NEW: Warmup Detection Metrics =====
+    
+    def count_active_drivers(self):
+        """
+        Count all drivers who are actively participating in the system.
+        
+        This includes both available and delivering drivers, but excludes
+        drivers who have logged out. This metric is key for warmup detection
+        as it shows the system's progression from zero drivers to stable
+        driver population levels.
+        
+        Returns:
+            int: Number of active drivers (AVAILABLE + DELIVERING)
+        """
+        all_drivers = self.repositories['driver'].find_all()
+        active_drivers = [driver for driver in all_drivers 
+                         if driver.state != DriverState.OFFLINE]
+        return len(active_drivers)
+    
+    def count_active_delivery_entities(self):
+        """
+        Count all delivery entities that exist in the system but are unassigned.
+        
+        This includes:
+        - Orders in CREATED state (waiting for pairing or assignment)
+        - Pairs in CREATED state (waiting for assignment)
+        
+        This metric is crucial for warmup detection as it reflects the
+        supply-demand balance. In steady state, this should stabilize
+        around some level. If it grows indefinitely, the system may be
+        in failure mode (demand >> supply).
+        
+        Note: "delivery_entities" refers to assignable units (orders/pairs),
+        not to "delivery_units" which are assignment contracts.
+        
+        Returns:
+            int: Number of unassigned delivery entities
+        """
+        unassigned_orders = len(self.repositories['order'].find_by_state(OrderState.CREATED))
+        unassigned_pairs = len(self.repositories['pair'].find_by_state(PairState.CREATED))
+        
+        return unassigned_orders + unassigned_pairs
