@@ -25,6 +25,9 @@ from delivery_sim.utils.id_generator import PrefixedIdGenerator
 from delivery_sim.utils.logging_system import get_logger, configure_logging
 from delivery_sim.utils.infrastructure_analysis import analyze_infrastructure
 from delivery_sim.utils.priority_scoring import create_priority_scorer
+from delivery_sim.system_data.system_data_definitions import SystemDataDefinitions
+from delivery_sim.system_data.system_data_collector import SystemDataCollector
+from delivery_sim.system_data.system_snapshot_repository import SystemSnapshotRepository
 
 class SimulationRunner:
     """
@@ -57,6 +60,11 @@ class SimulationRunner:
         self.delivery_unit_repository = None
         self.operational_rng = None
         self.services = None
+
+        # NEW: System data collection components (variant per replication)
+        self.system_data_definitions = None
+        self.system_data_collector = None
+        self.system_snapshot_repository = None
     
     def run_experiment(self, config):
         """
@@ -98,7 +106,7 @@ class SimulationRunner:
         
         # ===== PHASE 3: RETURN RESULTS =====
         experiment_result = {
-            'replication_results': replication_results,
+            'replication_results': replication_results,  # Now includes system_snapshots
             'infrastructure_characteristics': self.infrastructure_characteristics,
             'config_summary': str(config),
             'num_replications': len(replication_results)
@@ -226,6 +234,9 @@ class SimulationRunner:
         
         # 6. Create services (connect invariant logic to variant environment)
         self._create_services()
+
+        # NEW: Initialize system data collection infrastructure
+        self._initialize_system_data_collection()
         
         self.logger.debug(f"Variant components initialized for replication {replication_number}")
     
@@ -299,31 +310,70 @@ class SimulationRunner:
         # Log services created
         pairing_status = "with pairing" if self.config.operational_config.pairing_enabled else "without pairing"
         self.logger.info(f"Initialized {len(services)} services {pairing_status}")
-    
+
+    def _initialize_system_data_collection(self):
+        """
+        Initialize system data collection for warmup analysis.
+        
+        Creates the infrastructure needed to collect time series data
+        during simulation for post-processing warmup detection.
+        """
+        self.logger.debug("Initializing system data collection infrastructure...")
+        
+        # Create repository for storing snapshots
+        self.system_snapshot_repository = SystemSnapshotRepository()
+        
+        # Create definitions for calculating system metrics
+        repositories_dict = {
+            'order': self.order_repository,
+            'driver': self.driver_repository,
+            'pair': self.pair_repository,
+            'delivery_unit': self.delivery_unit_repository
+        }
+        self.system_data_definitions = SystemDataDefinitions(repositories_dict)
+        
+        # Create collector that will run during simulation
+        collection_interval = 0.5  # Collect every 0.5 simulation minutes for warmup analysis
+        self.system_data_collector = SystemDataCollector(
+            env=self.env,
+            system_data_definitions=self.system_data_definitions,
+            snapshot_repository=self.system_snapshot_repository,
+            collection_interval=collection_interval
+        )
+        
+        self.logger.debug(f"System data collection initialized with interval {collection_interval} minutes")
+
     def _run_single_replication(self):
         """
-        Execute single replication and return raw repository data.
+        Execute single replication and return raw repository data AND system snapshots.
         
-        Simple and focused: just run simulation and return repositories.
-        No metrics calculation, no analysis, no logging summaries.
+        Enhanced to include system data collection results for warmup analysis.
         """
-        # Run simulation
+        # Run simulation (system data collector runs automatically as SimPy process)
         duration = self.config.experiment_config.simulation_duration
         self.logger.debug(f"Running simulation for {duration} minutes")
         self.env.run(until=duration)
         self.logger.info(f"Simulation completed at time {self.env.now:.2f}")
         
-        # Repos reference for analysis
+        # Collect repositories (existing functionality)
         repositories = {
-                'order': self.order_repository,
-                'driver': self.driver_repository,
-                'pair': self.pair_repository,
-                'delivery_unit': self.delivery_unit_repository,
-                'restaurant': self.restaurant_repository  
-            }
+            'order': self.order_repository,
+            'driver': self.driver_repository,
+            'pair': self.pair_repository,
+            'delivery_unit': self.delivery_unit_repository,
+            'restaurant': self.restaurant_repository  
+        }
 
-        # Return raw data - that's it!
-        return repositories
+        # NEW: Collect system snapshots for warmup analysis
+        system_snapshots = self.system_snapshot_repository.get_all_snapshots()
+        
+        self.logger.debug(f"Collected {len(system_snapshots)} system snapshots for warmup analysis")
+        
+        # Return enhanced results structure
+        return {
+            'repositories': repositories,
+            'system_snapshots': system_snapshots  # NEW: Include time series data
+        }
       
     def _generate_restaurants(self, count, area_size, rng):
         """Generate restaurant locations using structural RNG."""
