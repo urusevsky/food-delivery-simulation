@@ -82,7 +82,7 @@ Note: Assignment logic now uses priority scoring system instead of adjusted cost
 """
 operational_config = OperationalConfig(
     # Arrival patterns - experiment with different system loads
-    mean_order_inter_arrival_time=2.0,    # 2 minutes between orders - try 1.0, 2.0, 4.0 
+    mean_order_inter_arrival_time=1.0,    # 2 minutes between orders - try 1.0, 2.0, 4.0 
     mean_driver_inter_arrival_time=3.0,   # 3 minutes between drivers - try 2.0, 3.0, 5.0
     
     # Pairing strategy - experiment with pairing effectiveness
@@ -174,33 +174,225 @@ print("\n" + "="*60)
 print("SIMULATION COMPLETED")
 print("="*60)
 
-# %% Metrics Analysis Pipeline
+# %% Warmup Analysis Visualization
 """
-Cell 9: Analyze simulation results using the new metrics pipeline
+Cell 9: Warmup Analysis Visualization
+Create Welch plots for visual warmup period determination.
+
+This cell applies Welch's method and creates visualization plots.
+Use these plots to visually assess convergence patterns.
+
+Next step: Run Cell 10 to set warmup_period based on visual inspection.
+"""
+
+print("\n" + "="*50)
+print("WARMUP ANALYSIS - WELCH'S METHOD VISUALIZATION")
+print("="*50)
+
+# Import warmup analysis tools
+from delivery_sim.warmup_analysis import WelchAnalyzer, WarmupVisualization
+import matplotlib.pyplot as plt
+
+# Step 1: Extract system snapshots from simulation results
+print("Step 1: Extracting system snapshots...")
+
+replication_snapshots = []
+for i, replication_result in enumerate(results['replication_results']):
+    snapshots = replication_result['system_snapshots']
+    if snapshots:
+        replication_snapshots.append(snapshots)
+        print(f"  Replication {i+1}: {len(snapshots)} snapshots")
+
+print(f"✓ Extracted data from {len(replication_snapshots)} replications")
+
+# Check if we have sufficient data
+if len(replication_snapshots) < 3:
+    print("⚠️  WARNING: Welch analysis works best with ≥3 replications")
+    print("   Consider increasing num_replications for more reliable results")
+
+# Step 2: Apply Welch's method
+print("\nStep 2: Applying Welch's method...")
+
+analyzer = WelchAnalyzer()
+warmup_metrics = ['active_drivers', 'active_delivery_entities']
+
+welch_results = analyzer.analyze_warmup_convergence(
+    multi_replication_snapshots=replication_snapshots,
+    metrics=warmup_metrics,
+    collection_interval=0.5  # Should match SystemDataCollector setting
+)
+
+print("✓ Cross-replication averaging and cumulative smoothing completed")
+
+# Step 3: Create Welch plots for visual inspection
+print("\nStep 3: Creating Welch plots for visual inspection...")
+
+viz = WarmupVisualization(figsize=(12, 6))
+
+# Create plots for each metric
+for metric_name in warmup_metrics:
+    if metric_name in welch_results:
+        fig = viz.create_welch_plot(
+            welch_results=welch_results,
+            metric_name=metric_name,
+            title=f'Warmup Detection: {metric_name.replace("_", " ").title()}'
+        )
+        plt.show()
+
+# Create combined view
+if len(welch_results) > 1:
+    print("\nCombined view of all metrics:")
+    fig = viz.create_multi_metric_plot(
+        welch_results=welch_results,
+        title="Warmup Analysis - Both Metrics"
+    )
+    plt.show()
+
+# Step 4: Provide visual inspection guidance
+print("\n" + "="*50)
+print("VISUAL INSPECTION GUIDANCE")
+print("="*50)
+
+print("🔍 How to read the Welch plots:")
+print("  • BLUE line = Cross-replication averages (raw Ȳ.j)")
+print("  • RED line = Cumulative average (smoothed)")
+print("  • Focus on the RED line for convergence assessment")
+print()
+print("📊 Look for convergence indicators:")
+print("  • RED line stops trending and becomes relatively flat")
+print("  • Oscillations in RED line become small and stable")
+print("  • System appears to reach operational steady state")
+print()
+print("⏰ Choose warmup period:")
+print("  • Select a time BEFORE the RED line stabilizes")
+print("  • Be conservative - choose earlier rather than later")
+print("  • Consider steepest changes as still part of warmup")
+
+# Display final values and simulation context
+print(f"\n📈 Final stabilized values:")
+for metric_name, data in welch_results.items():
+    if data['cumulative_average']:
+        final_value = data['cumulative_average'][-1]
+        print(f"  • {metric_name.replace('_', ' ').title()}: {final_value:.1f}")
+
+print(f"\n📋 Simulation context:")
+print(f"  • Total duration: {experiment_config.simulation_duration} minutes")
+print(f"  • Order arrival: every {operational_config.mean_order_inter_arrival_time} minutes")
+print(f"  • Driver arrival: every {operational_config.mean_driver_inter_arrival_time} minutes")
+print(f"  • System load ratio: {operational_config.mean_driver_inter_arrival_time / operational_config.mean_order_inter_arrival_time:.2f}")
+
+print("\n" + "="*50)
+print("PLOTS READY FOR VISUAL INSPECTION")
+print("="*50)
+print("➡️  Next: Run Cell 10 to set warmup_period based on your visual analysis")
+
+# %% Warmup Period Determination
+"""
+Cell 10: Warmup Period Determination
+Set the warmup period based on visual inspection of Welch plots from Cell 9.
+
+Instructions:
+1. Look at the Welch plots from the previous cell
+2. Identify where the RED lines (cumulative averages) stabilize
+3. Choose a conservative warmup period BEFORE stabilization
+4. Update the warmup_period value below
+"""
+
+print("\n" + "="*50)
+print("WARMUP PERIOD DETERMINATION")
+print("="*50)
+
+# ======================================================================
+# SET YOUR WARMUP PERIOD HERE BASED ON VISUAL INSPECTION
+# ======================================================================
+
+# Update this value based on your visual analysis of the Welch plots above
+warmup_period = 30  # TODO: Replace with your visually determined value
+
+# ======================================================================
+
+print(f"📌 Warmup period set to: {warmup_period} minutes")
+
+# Validation and analysis window assessment
+analysis_window = experiment_config.simulation_duration - warmup_period
+warmup_ratio = warmup_period / experiment_config.simulation_duration
+
+print(f"\n📊 Warmup assessment:")
+print(f"  • Simulation duration: {experiment_config.simulation_duration} minutes")
+print(f"  • Warmup period: {warmup_period} minutes ({warmup_ratio*100:.1f}% of total)")
+print(f"  • Analysis window: {analysis_window} minutes ({(1-warmup_ratio)*100:.1f}% of total)")
+
+# Validation checks
+print(f"\n✅ Validation checks:")
+
+if warmup_ratio > 0.5:
+    print(f"⚠️  WARNING: Warmup period is {warmup_ratio*100:.1f}% of simulation duration (> 50%)")
+    print("   Consider extending simulation_duration or reducing warmup_period")
+    print("   Analysis window may be too small for reliable results")
+elif warmup_ratio > 0.3:
+    print(f"⚠️  CAUTION: Warmup period is {warmup_ratio*100:.1f}% of simulation duration (> 30%)")
+    print("   Analysis window is somewhat limited but acceptable")
+else:
+    print(f"✓ Good ratio: Warmup period is {warmup_ratio*100:.1f}% of simulation duration")
+
+if analysis_window < 30:
+    print(f"⚠️  WARNING: Analysis window ({analysis_window} min) may be too short")
+    print("   Consider extending simulation_duration for more robust results")
+else:
+    print(f"✓ Analysis window ({analysis_window} min) should provide adequate data")
+
+# Guidance for next steps
+print(f"\n🎯 Recommendation:")
+if warmup_ratio <= 0.3 and analysis_window >= 30:
+    print("✓ Warmup period appears appropriate for analysis")
+    print("✓ Proceed to Cell 11 for post-simulation performance analysis")
+else:
+    print("⚠️  Consider adjusting warmup_period or simulation_duration")
+    print("   You can re-run this cell with different warmup_period values")
+
+print("\n" + "="*50)
+print("WARMUP PERIOD DETERMINATION COMPLETE")
+print("="*50)
+print(f"Selected warmup_period: {warmup_period} minutes")
+print("➡️  Next: Run Cell 11 for performance analysis using this warmup period")
+
+# %% Metrics Analysis Pipeline: Post-Simulation Analysis - Using Determined Warmup Period
+"""
+Cell 11: Analyze simulation results using the new metrics pipeline
 This demonstrates the complete pipeline from raw data to analyzable results
+
+This cell uses the warmup_period set in Cell 10 based on visual inspection
+of Welch plots, ensuring analysis is based on steady-state data only.
 """
 # NEW: Use the analysis pipeline
 from delivery_sim.analysis_pipeline.pipeline_coordinator import analyze_single_configuration, quick_summary
 
 print("\n" + "="*60)
-print("NEW ANALYSIS PIPELINE TEST")
+print("POST-SIMULATION ANALYSIS WITH DETERMINED WARMUP PERIOD")
 print("="*60)
 
-# Run the complete pipeline
-warmup_period = 30  # Same as your current analysis
+print(f"Using warmup_period = {warmup_period} minutes (determined through Welch analysis)")
+
+# Run the complete analysis pipeline with the visually determined warmup period
 experiment_summary = analyze_single_configuration(results, warmup_period)
 
 # Get quick summary for key metrics
 quick_results = quick_summary(experiment_summary, 
                             metrics_of_interest=['system_completion_rate', 'assignment_time', 'total_distance'])
 
-print("\nQuick Results:")
+print("\nQuick Results with Determined Warmup Period:")
 for metric_name, data in quick_results.items():
     print(f"  {metric_name}: {data['formatted']}")
 
-print(f"\nFull Results Available:")
+print(f"\nAnalysis Details:")
 print(f"  Entity metrics: {list(experiment_summary['entity_metrics'].keys())}")
 print(f"  System metrics: {list(experiment_summary['system_metrics'].keys())}")
 print(f"  Replications: {experiment_summary['num_replications']}")
 print(f"  Confidence level: {experiment_summary['confidence_level']*100}%")
+print(f"  Warmup period: {experiment_summary['warmup_period']} minutes")
+print(f"  Analysis window: {experiment_config.simulation_duration - warmup_period} minutes")
+
+print("\n" + "="*60)
+print("ANALYSIS COMPLETE - RESULTS BASED ON STEADY-STATE DATA")
+print("="*60)
 # %%
