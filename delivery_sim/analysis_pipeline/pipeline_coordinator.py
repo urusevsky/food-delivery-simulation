@@ -60,8 +60,11 @@ class ExperimentAnalysisPipeline:
         entity_summaries = []
         system_summaries = []
         
-        for i, repositories in enumerate(replication_results):
+        for i, replication_result in enumerate(replication_results):
             self.logger.debug(f"Processing replication {i+1}/{num_replications}")
+
+            # FIXED: Extract repositories from enhanced structure
+            repositories = replication_result['repositories']
             
             # Step 1: Data preparation (filtering)
             filtered_entities = filter_entities_for_analysis(repositories, self.warmup_period)
