@@ -41,6 +41,7 @@ logging_config = LoggingConfig(
         "entities": "ERROR", 
         "repositories": "ERROR",
         "utils": "ERROR",
+        "system_data": "ERROR",
         
         # Step 2: Surgical enablement (overrides the default)
         "simulation.runner": "INFO",
@@ -82,13 +83,13 @@ Note: Assignment logic now uses priority scoring system instead of adjusted cost
 """
 operational_config = OperationalConfig(
     # Arrival patterns - experiment with different system loads
-    mean_order_inter_arrival_time=1.0,    # _ minutes between orders - try 1.0, 2.0, 4.0 
+    mean_order_inter_arrival_time=0.5,    # _ minutes between orders - try 1.0, 2.0, 4.0 
     mean_driver_inter_arrival_time=3.0,   # 3 minutes between drivers - try 2.0, 3.0, 5.0
     
     # Pairing strategy - experiment with pairing effectiveness
     pairing_enabled=False,
-    restaurants_proximity_threshold=2.0,   # 2km for restaurant clustering - try 1.0, 2.0, 4.0
-    customers_proximity_threshold=2.5,     # 2.5km for customer clustering - try 1.5, 2.5, 4.0
+    restaurants_proximity_threshold=4.0,   # 2km for restaurant clustering - try 1.0, 2.0, 4.0
+    customers_proximity_threshold=4.0,     # 2.5km for customer clustering - try 1.5, 2.5, 4.0
     
     # Driver service patterns
     mean_service_duration=120,      # 2 hours average service time
@@ -132,7 +133,7 @@ Cell 6: Define experimental parameters
 Single replication for basic model verification
 """
 experiment_config = ExperimentConfig(
-    simulation_duration=300,    # __ minutes for quick testing - adjust as needed
+    simulation_duration=1000,    # __ minutes for quick testing - adjust as needed
     num_replications=3,         # __ replication for basic testing
     master_seed=42             # Consistent seed for reproducibility
 )
@@ -313,7 +314,7 @@ print("="*50)
 # ======================================================================
 
 # Update this value based on your visual analysis of the Welch plots above
-warmup_period = 30  # TODO: Replace with your visually determined value
+warmup_period = 100  # TODO: Replace with your visually determined value
 
 # ======================================================================
 
