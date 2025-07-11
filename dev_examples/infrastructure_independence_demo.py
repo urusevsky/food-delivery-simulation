@@ -38,8 +38,16 @@ Cell 2: Configure logging for clean interactive output
 logging_config = LoggingConfig(
     console_level="INFO",
     component_levels={
+        # Step 1: Broad suppression (sets the default)
+        "services": "ERROR",
+        "entities": "ERROR", 
+        "repositories": "ERROR",
+        "utils": "ERROR",
+        "system_data": "ERROR",
+        
+        # Step 2: Surgical enablement (overrides the default)
+        "simulation.runner": "INFO",
         "infrastructure": "INFO",  # Show infrastructure activities
-        "entities": "ERROR"        # Suppress entity details
     }
 )
 configure_logging(logging_config)
