@@ -227,8 +227,8 @@ Cell 6: Define experiment parameters
 print("\nStep 5: ExperimentConfig")
 
 experiment_config = ExperimentConfig(
-    simulation_duration=200,
-    num_replications=5,
+    simulation_duration=1000,
+    num_replications=3,
     master_seed=42
 )
 
@@ -251,306 +251,246 @@ print(f"\n✅ Study completed!")
 print(f"  • Design points executed: {len(study_results)}")
 print(f"  • Results available for warmup analysis")
 
-# %% Step 7: Extract System Snapshots for Warmup Analysis
+# %% Step 8: Simplified Warmup Analysis - Time Series Extraction
 """
-Cell 8: Extract system_snapshots from study_results for warmup analysis
+Cell 8: Extract cross-replication averaged time series from all design points
+
+This cell applies the new simplified warmup analysis approach:
+- Focus on cross-replication averaging (the core insight)
+- No complex cumulative smoothing
+- Prepare data for visual inspection
 """
-print("\nStep 7: Extract System Snapshots for Warmup Analysis")
+print("\nStep 8: Simplified Warmup Analysis - Time Series Extraction")
+print("=" * 60)
 
-# Extract system snapshots for each design point
-design_point_snapshots = {}
-
-for design_name, design_result in study_results.items():
-    replication_results = design_result['replication_results']
-    
-    # Extract snapshots from each replication
-    design_snapshots = []
-    for replication in replication_results:
-        snapshots = replication['system_snapshots']
-        if snapshots:
-            design_snapshots.append(snapshots)
-    
-    design_point_snapshots[design_name] = design_snapshots
-    print(f"  • {design_name}: {len(design_snapshots)} replications, {sum(len(rep) for rep in design_snapshots)} total snapshots")
-
-print(f"\n✓ Extracted system snapshots for {len(design_point_snapshots)} design points")
-
-# %% Step 8: Apply Welch's Method to Each Design Point
-"""
-Cell 9: Apply Welch's method to each design point for warmup detection
-"""
-print("\nStep 8: Apply Welch's Method to Each Design Point")
-
-from delivery_sim.warmup_analysis.welch_analyzer import WelchAnalyzer
-from delivery_sim.warmup_analysis.visualization import WarmupVisualization
+# Import the new simplified warmup analysis modules
+from delivery_sim.warmup_analysis.time_series_preprocessing import extract_time_series_for_inspection
+from delivery_sim.warmup_analysis.visualization import TimeSeriesVisualization
 import matplotlib.pyplot as plt
 
-# Initialize Welch analyzer
-analyzer = WelchAnalyzer()
+print("✓ New simplified warmup analysis modules imported")
 
-# Warmup detection metrics
-warmup_metrics = ['active_drivers', 'active_delivery_entities']
+# Extract time series data from all design points
+print(f"\n📊 Extracting time series data from {len(study_results)} design points...")
 
-# Analyze each design point separately
-design_point_welch_results = {}
+all_time_series_data = {}
 
-for design_name, snapshots in design_point_snapshots.items():
-    if not snapshots or not snapshots[0]:  # Skip if no data
-        print(f"⚠️ No snapshot data for {design_name}")
+for design_name, design_results in study_results.items():
+    print(f"  Processing {design_name}...")
+    
+    # Extract system snapshots from this design point's replications
+    replication_snapshots = []
+    for replication_result in design_results['replication_results']:
+        snapshots = replication_result['system_snapshots']
+        if snapshots:
+            replication_snapshots.append(snapshots)
+    
+    if len(replication_snapshots) < 2:
+        print(f"    ⚠️  Warning: Only {len(replication_snapshots)} replications for {design_name}")
         continue
     
-    print(f"\n--- Analyzing {design_name} ---")
-    
-    # Apply Welch's method to this design point
-    welch_results = analyzer.analyze_warmup_convergence(
-        multi_replication_snapshots=snapshots,
-        metrics=warmup_metrics,
+    # Extract cross-replication averages (the core operation!)
+    time_series_data = extract_time_series_for_inspection(
+        multi_replication_snapshots=replication_snapshots,
+        metrics=['active_drivers', 'active_delivery_entities'],
         collection_interval=0.5  # Should match SystemDataCollector setting
     )
     
-    design_point_welch_results[design_name] = welch_results
+    all_time_series_data[design_name] = time_series_data
+    print(f"    ✓ Extracted data for {len(time_series_data)} metrics, {len(replication_snapshots)} replications")
+
+print(f"\n✅ Time series extraction complete!")
+print(f"  • Design points processed: {len(all_time_series_data)}")
+print(f"  • Metrics per design point: {len(list(all_time_series_data.values())[0]) if all_time_series_data else 0}")
+print(f"  • Ready for visual inspection")
+
+# %% Step 9: Visual Inspection - Combined Plots for All Design Points  
+"""
+Cell 9: Create combined time series plots for visual warmup inspection
+
+Shows cross-replication averaged time series for each design point.
+Focus on visual pattern recognition to identify warmup periods.
+"""
+print("\nStep 9: Visual Inspection - Combined Plots for All Design Points")
+print("=" * 60)
+
+# Create visualization instance
+viz = TimeSeriesVisualization(figsize=(14, 8))
+
+print(f"🔍 Creating combined inspection plots for visual warmup determination...")
+print(f"  • Total plots to display: {len(all_time_series_data)}")
+print(f"  • Metrics per plot: active_drivers, active_delivery_entities")
+
+# Create combined plot for each design point
+plot_count = 0
+for design_name, time_series_data in all_time_series_data.items():
+    plot_count += 1
     
-    # Show final values for this design point
-    for metric_name, data in welch_results.items():
-        if data['cumulative_average']:
-            final_value = data['cumulative_average'][-1]
-            print(f"  • {metric_name}: final stabilized value = {final_value:.1f}")
-
-print(f"\n✓ Welch analysis completed for {len(design_point_welch_results)} design points")
-
-# %% Step 9: Create Warmup Visualization Plots
-"""
-Cell 10: Create Welch plots for visual inspection of each design point
-"""
-print("\nStep 9: Create Warmup Visualization Plots")
-
-# Initialize visualization
-viz = WarmupVisualization(figsize=(12, 6))
-
-# Create plots for each design point
-for design_name, welch_results in design_point_welch_results.items():
-    print(f"\nCreating Welch plots for {design_name}...")
+    print(f"\n--- Plot {plot_count}/{len(all_time_series_data)}: {design_name} ---")
     
-    # Create individual plots for each metric
-    for metric_name in warmup_metrics:
-        if metric_name in welch_results:
-            fig = viz.create_welch_plot(
-                welch_results=welch_results,
-                metric_name=metric_name,
-                title=f'Warmup Analysis: {design_name} - {metric_name.replace("_", " ").title()}'
-            )
-            plt.show()
+    # Get basic info about this design point
+    first_metric_data = list(time_series_data.values())[0]
+    total_duration = max(first_metric_data['time_points'])
+    replication_count = first_metric_data['replication_count']
     
-    # Create combined view for this design point
-    if len(welch_results) > 1:
-        print(f"Combined view for {design_name}:")
-        fig = viz.create_multi_metric_plot(
-            welch_results=welch_results,
-            title=f"Warmup Analysis: {design_name} - Both Metrics"
-        )
-        plt.show()
-
-print(f"\n✓ Visualization plots created for all design points")
-
-# %% Step 10: Determine Universal Warmup Period
-"""
-Cell 11: Analyze convergence patterns and determine uniform warmup period
-"""
-print("\nStep 10: Determine Universal Warmup Period")
-
-print(f"🔍 Visual Inspection Guidance:")
-print(f"  • Look at the BLUE lines (cross-replication averages) in the plots above")
-print(f"  • Identify where each design point reaches stable oscillation")
-print(f"  • Note any differences in convergence time between design points")
-print(f"  • High-load conditions may need longer warmup than low-load conditions")
-
-# Analyze convergence characteristics across design points
-print(f"\n📊 Convergence Analysis by Design Point:")
-
-convergence_summary = {}
-for design_name, welch_results in design_point_welch_results.items():
-    summary = {}
+    print(f"  • Duration: {total_duration:.1f} minutes")
+    print(f"  • Replications: {replication_count}")
     
-    for metric_name, data in welch_results.items():
-        if data['cumulative_average']:
-            # Simple heuristic: look at final 25% of simulation to see stability
-            final_quarter_start = int(len(data['cumulative_average']) * 0.75)
-            final_quarter = data['cumulative_average'][final_quarter_start:]
-            
-            if final_quarter:
-                final_mean = sum(final_quarter) / len(final_quarter)
-                final_std = (sum((x - final_mean)**2 for x in final_quarter) / len(final_quarter))**0.5
-                coefficient_of_variation = final_std / final_mean if final_mean > 0 else 0
-                
-                summary[metric_name] = {
-                    'final_value': data['cumulative_average'][-1],
-                    'final_quarter_cv': coefficient_of_variation,
-                    'total_time_points': len(data['time_points'])
-                }
+    # Create combined plot for this design point
+    fig = viz.create_combined_inspection_plot(
+        time_series_data, 
+        title=f'Warmup Inspection: {design_name.replace("_", " ").title()}'
+    )
     
-    convergence_summary[design_name] = summary
+    # Show the plot
+    plt.show()
     
-    # Extract load ratio for analysis
-    dp = design_points[design_name]
-    load_ratio = dp.operational_config.mean_driver_inter_arrival_time / dp.operational_config.mean_order_inter_arrival_time
-    
-    print(f"  • {design_name} (load_ratio={load_ratio:.1f}):")
-    for metric_name, metric_data in summary.items():
-        cv = metric_data['final_quarter_cv']
-        final_val = metric_data['final_value']
-        print(f"    - {metric_name}: final_value={final_val:.1f}, stability_cv={cv:.3f}")
+    print(f"  ✓ Plot displayed for visual inspection")
 
-# %% Step 11: Warmup Period Decision Framework
+print(f"\n🎯 All {plot_count} plots displayed for visual inspection!")
+
+# %% Step 10: Visual Inspection Guidance and Warmup Determination
 """
-Cell 12: Framework for deciding uniform warmup period
+Cell 10: Guidance for visual inspection and warmup period determination
+
+Provides systematic guidance for determining uniform warmup period across
+all design points based on visual inspection of the plots above.
 """
-print("\nStep 11: Warmup Period Decision Framework")
+print("\nStep 10: Visual Inspection Guidance and Warmup Determination")
+print("=" * 60)
 
-print(f"🎯 Decision Framework for Uniform Warmup Period:")
-decision_framework = [
-    "1. Visual Inspection: Look at Welch plots to identify convergence points",
-    "2. Conservative Approach: Choose warmup period that works for ALL design points",
-    "3. Load Factor Consideration: High-load configs may need longer warmup",
-    "4. Analysis Window: Ensure (duration - warmup) provides sufficient data",
-    "5. Iteration: Adjust simulation_duration if analysis window too small"
-]
+print("🔍 VISUAL INSPECTION METHODOLOGY")
+print("-" * 40)
 
-for step in decision_framework:
-    print(f"  {step}")
+print("\n📋 Step-by-step visual inspection process:")
+print("  1. Look at each of the 9 plots displayed above")
+print("  2. For each plot, identify the transition point where:")
+print("     • Lines stop trending/changing (transient phase)")
+print("     • Lines start stable oscillation around consistent levels (steady-state)")
+print("  3. Note the time point where this transition occurs for each design point")
+print("  4. Choose the LATEST transition time across all design points")
+print("  5. Add a conservative safety margin (e.g., +20-30 minutes)")
 
-# Provide convergence time estimates based on simulation context
-simulation_duration = experiment_config.simulation_duration
-print(f"\n📋 Simulation Context:")
-print(f"  • Simulation duration: {simulation_duration} minutes")
-print(f"  • Collection interval: 0.5 minutes")
-print(f"  • Total time points per replication: ~{int(simulation_duration / 0.5)}")
+print("\n🎯 PATTERN RECOGNITION GUIDE:")
+print("  • Early Phase (Transient): Lines trending upward as system 'warms up'")
+print("  • Transition Point: Where trending behavior stops")
+print("  • Steady Phase: Lines oscillating around stable levels")
+print("  • Conservative Choice: Use transition point + safety margin")
 
-# Rough guidelines based on supply-demand study characteristics
-print(f"\n💡 Supply-Demand Study Considerations:")
-considerations = [
-    "Low-load conditions (high load_ratio): May converge quickly",
-    "High-load conditions (low load_ratio): May need longer warmup", 
-    "Driver arrival patterns: Consider mean_service_duration (100 min)",
-    "System saturation: Watch for diverging vs converging patterns"
-]
+print("\n⚖️ UNIFORM WARMUP REQUIREMENT:")
+print("  • Same warmup period MUST be used for ALL design points")
+print("  • Based on the slowest-converging design point")
+print("  • Better to be conservative than risk initialization bias")
 
-for consideration in considerations:
-    print(f"  • {consideration}")
+# Show simulation context for reference
+print(f"\n📊 Simulation Context for Reference:")
+print(f"  • Total simulation duration: {experiment_config.simulation_duration} minutes")
+print(f"  • Number of design points: {len(all_time_series_data)}")
+print(f"  • Replications per design point: {experiment_config.num_replications}")
 
-print(f"\n🎯 Suggested Next Steps:")
-next_steps = [
-    "1. Examine plots above to visually identify convergence points",
-    "2. Choose conservative warmup period (e.g., 50-80 minutes)", 
-    "3. Validate analysis window: (200 - warmup) should be ≥ 100 minutes",
-    "4. If analysis window too small, increase simulation_duration and re-run",
-    "5. Apply chosen warmup period to post-simulation analysis"
-]
+# Provide warmup ratio guidance
+print(f"\n📏 Warmup Period Guidelines:")
+print(f"  • Total duration: {experiment_config.simulation_duration} minutes")
+print(f"  • Recommended warmup ratio: ≤30% of total duration")
+print(f"  • Maximum acceptable warmup: {experiment_config.simulation_duration * 0.3:.0f} minutes (30%)")
+print(f"  • Analysis window should be ≥70% of total duration")
 
-for step in next_steps:
-    print(f"  {step}")
+print(f"\n💡 Next Steps:")
+print(f"  1. Examine all {len(all_time_series_data)} plots above")
+print(f"  2. Identify transition points visually")
+print(f"  3. Choose conservative uniform warmup period")
+print(f"  4. Proceed to Cell 11 for warmup validation")
 
-# %% Step 12: Warmup Period Selection
+# Prepare variables for next cell
+print(f"\n🔧 Preparation for Next Cell:")
+print(f"  • Variable 'all_time_series_data' contains extracted data")
+print(f"  • Variable 'experiment_config' contains simulation parameters")
+print(f"  • Ready for warmup period validation in next cell")
+
+# %% Step 11: Warmup Period Validation
 """
-Cell 13: Select and validate uniform warmup period
+Cell 11: Validate your visually determined warmup period
+
+Set your warmup period based on visual inspection and validate it across all design points.
 """
-print("\nStep 12: Warmup Period Selection")
+print("\nStep 11: Warmup Period Validation")
+print("=" * 60)
 
 # ======================================================================
-# MANUAL WARMUP PERIOD SELECTION
+# SET YOUR WARMUP PERIOD HERE BASED ON VISUAL INSPECTION
 # ======================================================================
-# Based on visual inspection of the Welch plots above, choose your warmup period:
+print("📌 WARMUP PERIOD DETERMINATION:")
+print("Based on visual inspection of the plots above, set your warmup period:")
 
-# TODO: Update this value based on your visual analysis of the plots
-uniform_warmup_period = 80  # minutes - ADJUST BASED ON VISUAL INSPECTION
+# TODO: Update this value based on your visual inspection of the plots
+proposed_warmup_period = 80  # Replace with your visually determined value
 
+print(f"  • Proposed warmup period: {proposed_warmup_period} minutes")
 # ======================================================================
 
-print(f"📌 Selected uniform warmup period: {uniform_warmup_period} minutes")
+print(f"\n🔍 Validating warmup period across all design points...")
 
-# Validate the selection
-analysis_window = simulation_duration - uniform_warmup_period
-warmup_ratio = uniform_warmup_period / simulation_duration
+# Validation summary
+validation_results = []
 
-print(f"\n📊 Warmup Period Validation:")
-print(f"  • Simulation duration: {simulation_duration} minutes")
-print(f"  • Warmup period: {uniform_warmup_period} minutes ({warmup_ratio*100:.1f}% of total)")
-print(f"  • Analysis window: {analysis_window} minutes ({(1-warmup_ratio)*100:.1f}% of total)")
+for design_name, time_series_data in all_time_series_data.items():
+    # Get time series info
+    first_metric = list(time_series_data.keys())[0]
+    max_time = max(time_series_data[first_metric]['time_points'])
+    
+    # Calculate analysis window
+    analysis_window = max_time - proposed_warmup_period
+    warmup_ratio = proposed_warmup_period / max_time
+    
+    # Store validation info
+    validation_info = {
+        'design_name': design_name,
+        'total_duration': max_time,
+        'warmup_period': proposed_warmup_period,
+        'analysis_window': analysis_window,
+        'warmup_ratio': warmup_ratio
+    }
+    validation_results.append(validation_info)
+    
+    print(f"\n  📊 {design_name}:")
+    print(f"    • Total duration: {max_time:.1f} minutes")
+    print(f"    • Warmup period: {proposed_warmup_period:.1f} minutes ({warmup_ratio*100:.1f}%)")
+    print(f"    • Analysis window: {analysis_window:.1f} minutes ({(1-warmup_ratio)*100:.1f}%)")
+    
+    # Validation checks
+    if warmup_ratio > 0.5:
+        print(f"    ⚠️  WARNING: Warmup is {warmup_ratio*100:.1f}% of total (>50%)")
+    elif warmup_ratio > 0.3:
+        print(f"    ⚠️  CAUTION: Warmup is {warmup_ratio*100:.1f}% of total (>30%)")
+    else:
+        print(f"    ✅ Good ratio: {warmup_ratio*100:.1f}% warmup")
+    
+    if analysis_window < 30:
+        print(f"    ⚠️  WARNING: Analysis window ({analysis_window:.1f} min) may be too short")
+    else:
+        print(f"    ✅ Analysis window ({analysis_window:.1f} min) adequate")
 
-# Validation checks
-print(f"\n✅ Validation Checks:")
+# Overall validation summary
+all_ratios = [v['warmup_ratio'] for v in validation_results]
+all_windows = [v['analysis_window'] for v in validation_results]
 
-if warmup_ratio > 0.5:
-    print(f"⚠️  WARNING: Warmup period is {warmup_ratio*100:.1f}% of simulation duration (> 50%)")
-    print(f"   Consider extending simulation_duration or reducing warmup_period")
-elif warmup_ratio > 0.4:
-    print(f"⚠️  CAUTION: Warmup period is {warmup_ratio*100:.1f}% of simulation duration (> 40%)")
-    print(f"   Analysis window is somewhat limited but may be acceptable")
+print(f"\n📋 OVERALL VALIDATION SUMMARY:")
+print(f"  • Warmup ratios: {min(all_ratios)*100:.1f}% - {max(all_ratios)*100:.1f}%")
+print(f"  • Analysis windows: {min(all_windows):.1f} - {max(all_windows):.1f} minutes")
+
+# Final recommendation
+if max(all_ratios) <= 0.3 and min(all_windows) >= 30:
+    print(f"  ✅ RECOMMENDED: Warmup period appears appropriate for all design points")
 else:
-    print(f"✓ Good ratio: Warmup period is {warmup_ratio*100:.1f}% of simulation duration")
+    print(f"  ⚠️  CONSIDER ADJUSTMENT: Review warmup period based on validation results")
 
-if analysis_window < 50:
-    print(f"⚠️  WARNING: Analysis window ({analysis_window} min) may be too short")
-    print(f"   Consider extending simulation_duration for more robust results")
-elif analysis_window < 100:
-    print(f"⚠️  CAUTION: Analysis window ({analysis_window} min) is somewhat limited")
-else:
-    print(f"✓ Analysis window ({analysis_window} min) should provide adequate data")
+print(f"\n🎯 UNIFORM WARMUP PERIOD DETERMINED:")
+print(f"  • Selected warmup period: {proposed_warmup_period} minutes")
+print(f"  • Applies to ALL {len(all_time_series_data)} design points")
+print(f"  • Ready for post-simulation analysis in next workflow phase")
 
-print(f"\n🎯 Warmup Period Decision:")
-if warmup_ratio <= 0.4 and analysis_window >= 50:
-    print(f"✅ Warmup period appears appropriate for comparative analysis")
-    print(f"✅ Ready to proceed with post-simulation analysis")
-    print(f"✅ All design points will use uniform warmup period: {uniform_warmup_period} minutes")
-else:
-    print(f"⚠️  Consider adjusting parameters:")
-    if warmup_ratio > 0.4:
-        print(f"   • Reduce warmup_period if plots show earlier convergence")
-    if analysis_window < 50:
-        print(f"   • Increase simulation_duration to: {uniform_warmup_period + 100} minutes")
-    print(f"   • Re-run experimental study if adjustments needed")
+print(f"\n➡️  Next: Use this warmup period for performance analysis across design points")
 
-# %% Step 13: Ready for Post-Simulation Analysis
-"""
-Cell 14: Prepare for post-simulation analysis with determined warmup period
-"""
-print("\nStep 13: Ready for Post-Simulation Analysis")
-
-print(f"🎉 Warmup Analysis Complete!")
-print(f"  • Uniform warmup period determined: {uniform_warmup_period} minutes")
-print(f"  • Applied to all {len(design_points)} design points")
-print(f"  • Analysis window: {analysis_window} minutes per design point")
-
-print(f"\n📋 Summary for Thesis Documentation:")
-thesis_summary = [
-    f"Experimental design: {len(design_points)} supply-demand conditions",
-    f"Replications per condition: {experiment_config.num_replications}",
-    f"Total replications: {len(design_points) * experiment_config.num_replications}",
-    f"Warmup method: Welch's visual inspection method",
-    f"Uniform warmup period: {uniform_warmup_period} minutes",
-    f"Analysis window: {analysis_window} minutes",
-    f"Infrastructure reuse: ✓ (same across all conditions)"
-]
-
-for item in thesis_summary:
-    print(f"  • {item}")
-
-print(f"\n🚀 Next Research Workflow Steps:")
-next_research_steps = [
-    "Apply uniform warmup period to filter simulation data",
-    "Calculate performance metrics for each design point", 
-    "Perform statistical analysis and comparison",
-    "Generate thesis-quality results and visualizations",
-    "Draw conclusions about supply-demand effects"
-]
-
-for i, step in enumerate(next_research_steps, 1):
-    print(f"  {i}. {step}")
-
-print(f"\n✨ Research Milestone Achieved:")
-print(f"✓ Clean experimental architecture implemented")
-print(f"✓ Supply-demand study executed successfully") 
-print(f"✓ Warmup analysis completed with visual validation")
-print(f"✓ Uniform warmup period determined for fair comparison")
-print(f"✓ Ready for post-simulation analysis and thesis writing")
-
-print("\n🎯 Experimental workflow complete - ready for analysis! 🎉")
+# Store for next workflow phase
+uniform_warmup_period = proposed_warmup_period
+print(f"\n✓ Variable 'uniform_warmup_period' = {uniform_warmup_period} minutes stored for next phase")
