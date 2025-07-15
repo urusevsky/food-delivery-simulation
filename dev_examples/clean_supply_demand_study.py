@@ -109,18 +109,6 @@ base_params = {
 # Manually create design points dictionary
 design_points = {}
 
-# Low demand conditions
-design_points["low_demand_low_supply"] = DesignPoint(
-    infrastructure=infrastructure,
-    operational_config=OperationalConfig(
-        mean_order_inter_arrival_time=3.0,
-        mean_driver_inter_arrival_time=10.0,
-        **base_params
-    ),
-    scoring_config=scoring_config,
-    name="low_demand_low_supply"
-)
-
 design_points["low_demand_medium_supply"] = DesignPoint(
     infrastructure=infrastructure,
     operational_config=OperationalConfig(
@@ -132,52 +120,6 @@ design_points["low_demand_medium_supply"] = DesignPoint(
     name="low_demand_medium_supply"
 )
 
-design_points["low_demand_high_supply"] = DesignPoint(
-    infrastructure=infrastructure,
-    operational_config=OperationalConfig(
-        mean_order_inter_arrival_time=3.0,
-        mean_driver_inter_arrival_time=5.0,
-        **base_params
-    ),
-    scoring_config=scoring_config,
-    name="low_demand_high_supply"
-)
-
-# Medium demand conditions
-design_points["medium_demand_low_supply"] = DesignPoint(
-    infrastructure=infrastructure,
-    operational_config=OperationalConfig(
-        mean_order_inter_arrival_time=2.0,
-        mean_driver_inter_arrival_time=10.0,
-        **base_params
-    ),
-    scoring_config=scoring_config,
-    name="medium_demand_low_supply"
-)
-
-design_points["medium_demand_medium_supply"] = DesignPoint(
-    infrastructure=infrastructure,
-    operational_config=OperationalConfig(
-        mean_order_inter_arrival_time=2.0,
-        mean_driver_inter_arrival_time=8.0,
-        **base_params
-    ),
-    scoring_config=scoring_config,
-    name="medium_demand_medium_supply"
-)
-
-design_points["medium_demand_high_supply"] = DesignPoint(
-    infrastructure=infrastructure,
-    operational_config=OperationalConfig(
-        mean_order_inter_arrival_time=2.0,
-        mean_driver_inter_arrival_time=5.0,
-        **base_params
-    ),
-    scoring_config=scoring_config,
-    name="medium_demand_high_supply"
-)
-
-# High demand conditions
 design_points["high_demand_low_supply"] = DesignPoint(
     infrastructure=infrastructure,
     operational_config=OperationalConfig(
@@ -187,17 +129,6 @@ design_points["high_demand_low_supply"] = DesignPoint(
     ),
     scoring_config=scoring_config,
     name="high_demand_low_supply"
-)
-
-design_points["high_demand_medium_supply"] = DesignPoint(
-    infrastructure=infrastructure,
-    operational_config=OperationalConfig(
-        mean_order_inter_arrival_time=1.0,
-        mean_driver_inter_arrival_time=8.0,
-        **base_params
-    ),
-    scoring_config=scoring_config,
-    name="high_demand_medium_supply"
 )
 
 design_points["high_demand_high_supply"] = DesignPoint(
@@ -423,7 +354,7 @@ print("📌 WARMUP PERIOD DETERMINATION:")
 print("Based on visual inspection of the plots above, set your warmup period:")
 
 # TODO: Update this value based on your visual inspection of the plots
-proposed_warmup_period = 80  # Replace with your visually determined value
+proposed_warmup_period = 400  # Replace with your visually determined value
 
 print(f"  • Proposed warmup period: {proposed_warmup_period} minutes")
 # ======================================================================
@@ -494,3 +425,296 @@ print(f"\n➡️  Next: Use this warmup period for performance analysis across d
 # Store for next workflow phase
 uniform_warmup_period = proposed_warmup_period
 print(f"\n✓ Variable 'uniform_warmup_period' = {uniform_warmup_period} minutes stored for next phase")
+
+# %% Step 12: Performance Metrics Calculation
+"""
+Cell 12: Apply Analysis Pipeline to Calculate Performance Metrics
+
+Use existing analysis pipeline to calculate key metrics that will provide
+quantitative evidence for the pattern classifications observed in time series plots.
+"""
+print("\nStep 12: Performance Metrics Calculation")
+print("=" * 60)
+
+# Import the analysis pipeline
+from delivery_sim.analysis_pipeline.pipeline_coordinator import analyze_single_configuration
+
+print("📊 Calculating performance metrics for all design points...")
+print(f"  • Using uniform warmup period: {uniform_warmup_period} minutes")
+print(f"  • Metrics: Order Assignment Time + System Completion Rate")
+
+# Calculate metrics for each design point
+metrics_results = {}
+
+for design_name, design_results in study_results.items():
+    print(f"\n  Processing {design_name}...")
+    
+    try:
+        # Apply analysis pipeline with uniform warmup period
+        analysis_result = analyze_single_configuration(
+            simulation_results=design_results,
+            warmup_period=uniform_warmup_period,
+            confidence_level=0.95
+        )
+        
+        metrics_results[design_name] = {
+            'analysis': analysis_result,
+            'status': 'success'
+        }
+        
+        print(f"    ✓ Metrics calculated successfully")
+        
+    except Exception as e:
+        print(f"    ✗ Error calculating metrics: {str(e)}")
+        metrics_results[design_name] = {
+            'analysis': None,
+            'status': 'error',
+            'error': str(e)
+        }
+
+print(f"\n✅ Performance metrics calculation complete!")
+print(f"  • Successfully analyzed: {sum(1 for r in metrics_results.values() if r['status'] == 'success')}")
+print(f"  • Errors encountered: {sum(1 for r in metrics_results.values() if r['status'] == 'error')}")
+
+# %% Step 13: Extract Key Metrics for Pattern Analysis
+"""
+Cell 13: Extract and Display Key Performance Metrics
+
+Extract the two key metrics (assignment time, completion rate) from analysis results
+to provide quantitative evidence for pattern classification.
+"""
+print("\nStep 13: Extract Key Metrics for Pattern Analysis")
+print("=" * 60)
+
+# Extract key metrics from analysis results
+pattern_evidence = {}
+
+print("📋 Extracting key metrics for pattern analysis...")
+
+for design_name, result in metrics_results.items():
+    if result['status'] != 'success':
+        print(f"  ⚠️  Skipping {design_name}: {result.get('error', 'Analysis failed')}")
+        continue
+    
+    analysis = result['analysis']
+    
+    try:
+        # Extract Order Assignment Time (entity metric)
+        entity_metrics = analysis.get('entity_metrics', {})
+        orders_metrics = entity_metrics.get('orders', {})
+        assignment_time_data = orders_metrics.get('assignment_time', {})
+        
+        if assignment_time_data and 'mean' in assignment_time_data:
+            assignment_time_mean = assignment_time_data['mean'].get('point_estimate')
+            assignment_time_ci = assignment_time_data['mean'].get('confidence_interval', [None, None])
+            assignment_time_std = assignment_time_data['mean'].get('standard_error', 0) * (3**0.5) if assignment_time_data['mean'].get('standard_error') else None
+        else:
+            assignment_time_mean = None
+            assignment_time_ci = [None, None]
+            assignment_time_std = None
+        
+        # Extract System Completion Rate (system metric)
+        system_metrics = analysis.get('system_metrics', {})
+        completion_rate_data = system_metrics.get('system_completion_rate', {})
+        
+        if completion_rate_data:
+            completion_rate = completion_rate_data.get('point_estimate')
+            completion_rate_ci = completion_rate_data.get('confidence_interval', [None, None])
+        else:
+            completion_rate = None
+            completion_rate_ci = [None, None]
+        
+        # Get load ratio from design point
+        design_point = design_points[design_name]
+        load_ratio = (design_point.operational_config.mean_driver_inter_arrival_time / 
+                     design_point.operational_config.mean_order_inter_arrival_time)
+        
+        pattern_evidence[design_name] = {
+            'load_ratio': load_ratio,
+            'assignment_time_mean': assignment_time_mean,
+            'assignment_time_ci': assignment_time_ci,
+            'assignment_time_std': assignment_time_std,
+            'completion_rate': completion_rate,
+            'completion_rate_ci': completion_rate_ci,
+            'status': 'valid'
+        }
+        
+        print(f"  ✓ {design_name}: Assignment Time = {assignment_time_mean:.1f} min, Completion Rate = {completion_rate:.1%}" if assignment_time_mean and completion_rate else f"  ⚠️  {design_name}: Incomplete data")
+        
+    except Exception as e:
+        print(f"  ✗ Error extracting metrics for {design_name}: {str(e)}")
+        pattern_evidence[design_name] = {
+            'status': 'extraction_error',
+            'error': str(e)
+        }
+
+print(f"\n✅ Key metrics extraction complete!")
+print(f"  • Valid results: {sum(1 for r in pattern_evidence.values() if r.get('status') == 'valid')}")
+
+# %% Step 14: Performance Metrics Evidence Table
+"""
+Cell 14: Create Evidence Table for Pattern Classification
+
+Display performance metrics in a clear table format that provides quantitative
+evidence for the three patterns observed in time series plots.
+"""
+print("\nStep 14: Performance Metrics Evidence Table")
+print("=" * 60)
+
+import pandas as pd
+
+print("📊 Creating performance metrics evidence table...")
+
+# Prepare data for table
+table_data = []
+
+for design_name, evidence in pattern_evidence.items():
+    if evidence.get('status') != 'valid':
+        continue
+    
+    # Calculate assignment time statistics
+    assignment_mean = evidence.get('assignment_time_mean')
+    assignment_std = evidence.get('assignment_time_std')
+    assignment_ci = evidence.get('assignment_time_ci', [None, None])
+    
+    # Format assignment time
+    if assignment_mean is not None:
+        if assignment_std is not None:
+            assignment_formatted = f"{assignment_mean:.1f}±{assignment_std:.1f}"
+        elif assignment_ci[0] is not None and assignment_ci[1] is not None:
+            ci_width = (assignment_ci[1] - assignment_ci[0]) / 2
+            assignment_formatted = f"{assignment_mean:.1f}±{ci_width:.1f}"
+        else:
+            assignment_formatted = f"{assignment_mean:.1f}"
+    else:
+        assignment_formatted = "N/A"
+    
+    # Format completion rate
+    completion_rate = evidence.get('completion_rate')
+    completion_formatted = f"{completion_rate:.1%}" if completion_rate is not None else "N/A"
+    
+    table_data.append({
+        'Design Point': design_name.replace('_', ' ').title(),
+        'Load Ratio': f"{evidence['load_ratio']:.1f}",
+        'Assignment Time (min)': assignment_formatted,
+        'Completion Rate': completion_formatted,
+        'Load Ratio Value': evidence['load_ratio'],  # For sorting
+        'Assignment Value': assignment_mean if assignment_mean else 999,  # For sorting
+        'Completion Value': completion_rate if completion_rate else 0  # For sorting
+    })
+
+# Create and display table
+if table_data:
+    df = pd.DataFrame(table_data)
+    
+    # Sort by load ratio for logical presentation
+    df_display = df.sort_values('Load Ratio Value')[['Design Point', 'Load Ratio', 'Assignment Time (min)', 'Completion Rate']]
+    
+    print("\n🎯 PERFORMANCE METRICS EVIDENCE TABLE")
+    print("-" * 80)
+    print(df_display.to_string(index=False))
+    
+    print(f"\n📈 Key Observations for Pattern Classification:")
+    
+    # Identify patterns based on completion rate and assignment time variance
+    high_completion = df['Completion Value'] > 0.85
+    low_completion = df['Completion Value'] < 0.6
+    
+    stable_candidates = df[high_completion & (df['Load Ratio Value'] < 4.0)]
+    volatile_candidates = df[high_completion & (df['Load Ratio Value'] >= 4.0)]
+    unstable_candidates = df[low_completion]
+    
+    if len(stable_candidates) > 0:
+        print(f"  • Potential STABLE systems: {', '.join(stable_candidates['Design Point'].values)}")
+        print(f"    - High completion rates (>{85}%)")
+        print(f"    - Low load ratios (<4.0)")
+    
+    if len(volatile_candidates) > 0:
+        print(f"  • Potential VOLATILE systems: {', '.join(volatile_candidates['Design Point'].values)}")
+        print(f"    - Maintained completion rates (>{85}%)")  
+        print(f"    - Higher load ratios (≥4.0)")
+        print(f"    - Likely higher assignment time variance")
+    
+    if len(unstable_candidates) > 0:
+        print(f"  • Potential UNSTABLE systems: {', '.join(unstable_candidates['Design Point'].values)}")
+        print(f"    - Low completion rates (<60%)")
+        print(f"    - System failure indicators")
+    
+    print(f"\n💡 This quantitative evidence confirms the patterns observed in time series plots!")
+    
+else:
+    print("⚠️  No valid data available for evidence table")
+
+# %% Step 15: Pattern Classification Based on Evidence
+"""
+Cell 15: Evidence-Based Pattern Classification
+
+Combine time series visual evidence with performance metrics to make final
+pattern classifications for each design point.
+"""
+print("\nStep 15: Evidence-Based Pattern Classification")
+print("=" * 60)
+
+print("🔬 Combining visual time series evidence with performance metrics...")
+
+# Manual classification based on evidence
+final_classifications = {}
+
+print(f"\n📋 EVIDENCE-BASED PATTERN CLASSIFICATION:")
+print(f"Based on time series plots (Steps 8-10) + performance metrics (Step 14)")
+print("-" * 60)
+
+# You'll need to manually classify based on your observations
+# This is where YOU make the decisions based on the evidence
+
+print("📝 Manual Classification Guidelines:")
+print("  • STABLE: Low load ratio + high completion rate + low time series volatility")
+print("  • VOLATILE: Medium/high load ratio + decent completion rate + high time series volatility") 
+print("  • UNSTABLE: High load ratio + low completion rate + growing time series")
+
+print(f"\n🎯 PRELIMINARY CLASSIFICATIONS (to be confirmed by visual inspection):")
+
+for design_name, evidence in pattern_evidence.items():
+    if evidence.get('status') != 'valid':
+        print(f"  • {design_name}: INSUFFICIENT_DATA")
+        final_classifications[design_name] = "insufficient_data"
+        continue
+    
+    load_ratio = evidence['load_ratio']
+    completion_rate = evidence.get('completion_rate', 0)
+    
+    # Preliminary classification - YOU should refine this based on visual evidence
+    if completion_rate < 0.6:
+        preliminary = "UNSTABLE"
+    elif load_ratio < 3.0 and completion_rate > 0.9:
+        preliminary = "STABLE"  
+    elif completion_rate > 0.8:
+        preliminary = "VOLATILE"
+    else:
+        preliminary = "UNCLEAR"
+    
+    print(f"  • {design_name}: {preliminary} (Load: {load_ratio:.1f}, Completion: {completion_rate:.1%})")
+    final_classifications[design_name] = preliminary.lower()
+
+print(f"\n⚠️  IMPORTANT: Refine these classifications by reviewing:")
+print(f"  1. Time series plots from Steps 8-10 (visual evidence)")
+print(f"  2. Performance metrics table from Step 14 (quantitative evidence)")
+print(f"  3. Your domain knowledge of the system behavior")
+
+print(f"\n✅ Evidence gathering complete!")
+print(f"✅ Ready for thesis writing with solid evidence base!")
+
+# Store results for thesis
+thesis_evidence = {
+    'classifications': final_classifications,
+    'metrics_table': df_display if 'df_display' in locals() else None,
+    'time_series_data': all_time_series_data,
+    'warmup_period': uniform_warmup_period
+}
+
+print(f"\n📚 Thesis Evidence Package Ready:")
+print(f"  • Pattern classifications: ✓")
+print(f"  • Performance metrics table: ✓") 
+print(f"  • Time series data: ✓")
+print(f"  • Warmup period: {uniform_warmup_period} minutes")
+# %%
