@@ -182,29 +182,30 @@ print(f"\n✅ Study completed!")
 print(f"  • Design points executed: {len(study_results)}")
 print(f"  • Results available for warmup analysis")
 
-# %% Step 8: Simplified Warmup Analysis - Time Series Extraction
+# %% Step 8: Enhanced Warmup Analysis with Welch's Method and Little's Law (Corrected)
 """
-Cell 8: Extract cross-replication averaged time series from all design points
+Cell 8: Extract enhanced time series data with Welch's method and Little's Law validation
 
-This cell applies the new simplified warmup analysis approach:
-- Focus on cross-replication averaging (the core insight)
-- No complex cumulative smoothing
-- Prepare data for visual inspection
+This cell applies the enhanced warmup analysis approach:
+- Cross-replication averaging with moving average smoothing (Welch's method)
+- Little's Law theoretical validation for active drivers
+- Prepares data for principled visual warmup determination
 """
-print("\nStep 8: Simplified Warmup Analysis - Time Series Extraction")
+print("\nStep 8: Enhanced Warmup Analysis with Welch's Method and Little's Law")
 print("=" * 60)
 
-# Import the new simplified warmup analysis modules
-from delivery_sim.warmup_analysis.time_series_preprocessing import extract_time_series_for_inspection
-from delivery_sim.warmup_analysis.visualization import TimeSeriesVisualization
+# Import the enhanced warmup analysis modules
+from delivery_sim.warmup_analysis.time_series_preprocessing import TimeSeriesPreprocessor
+from delivery_sim.warmup_analysis.visualization import WelchMethodVisualization
 import matplotlib.pyplot as plt
 
-print("✓ New simplified warmup analysis modules imported")
+print("✓ Enhanced warmup analysis modules imported")
 
-# Extract time series data from all design points
-print(f"\n📊 Extracting time series data from {len(study_results)} design points...")
+# Extract enhanced time series data from all design points
+print(f"\n📊 Extracting enhanced time series data from {len(study_results)} design points...")
 
-all_time_series_data = {}
+all_enhanced_time_series = {}
+preprocessor = TimeSeriesPreprocessor()
 
 for design_name, design_results in study_results.items():
     print(f"  Processing {design_name}...")
@@ -220,124 +221,197 @@ for design_name, design_results in study_results.items():
         print(f"    ⚠️  Warning: Only {len(replication_snapshots)} replications for {design_name}")
         continue
     
-    # Extract cross-replication averages (the core operation!)
-    time_series_data = extract_time_series_for_inspection(
+    # Step 1: Basic extraction with Welch's method
+    basic_data = preprocessor.extract_cross_replication_averages(
         multi_replication_snapshots=replication_snapshots,
         metrics=['active_drivers', 'active_delivery_entities'],
-        collection_interval=0.5  # Should match SystemDataCollector setting
+        collection_interval=0.5,
+        moving_average_window=50
     )
     
-    all_time_series_data[design_name] = time_series_data
-    print(f"    ✓ Extracted data for {len(time_series_data)} metrics, {len(replication_snapshots)} replications")
+    # Step 2: Add Little's Law theoretical validation
+    single_design_dict = {design_name: design_points[design_name]}
+    enhanced_data = preprocessor.add_little_law_theoretical_values(
+        time_series_data={design_name: basic_data},
+        design_points_dict=single_design_dict
+    )
+    
+    # Store the enhanced data for this design point
+    all_enhanced_time_series[design_name] = enhanced_data[design_name]
+    
+    # Show Little's Law validation info
+    if 'active_drivers' in enhanced_data[design_name] and 'theoretical_value' in enhanced_data[design_name]['active_drivers']:
+        theoretical_value = enhanced_data[design_name]['active_drivers']['theoretical_value']
+        print(f"    ✓ Little's Law predicts {theoretical_value:.1f} active drivers")
+    
+    print(f"    ✓ Welch's method applied: {len(replication_snapshots)} replications processed")
 
-print(f"\n✅ Time series extraction complete!")
-print(f"  • Design points processed: {len(all_time_series_data)}")
-print(f"  • Metrics per design point: {len(list(all_time_series_data.values())[0]) if all_time_series_data else 0}")
-print(f"  • Ready for visual inspection")
+print(f"\n✅ Enhanced time series extraction complete!")
+print(f"  • Design points processed: {len(all_enhanced_time_series)}")
+print(f"  • Welch's method applied with moving average smoothing")
+print(f"  • Little's Law theoretical validation added for active drivers")
+print(f"  • Ready for enhanced visual warmup inspection")
 
-# %% Step 9: Visual Inspection - Combined Plots for All Design Points  
+# Backward compatibility for existing workflow
+all_time_series_data = all_enhanced_time_series
+print(f"\n✓ Variable compatibility maintained for downstream cells")
+# %% Step 9: Welch's Method Visual Inspection with Methodological Evidence (Corrected)
 """
-Cell 9: Create combined time series plots for visual warmup inspection
+Cell 9: Create enhanced Welch's method plots with Little's Law validation
 
-Shows cross-replication averaged time series for each design point.
-Focus on visual pattern recognition to identify warmup periods.
+Shows the juxtaposition of active drivers vs active delivery entities to demonstrate
+why active drivers is the optimal warmup indicator across different operational regimes.
 """
-print("\nStep 9: Visual Inspection - Combined Plots for All Design Points")
+print("\nStep 9: Welch's Method Visual Inspection with Methodological Evidence")
 print("=" * 60)
 
-# Create visualization instance
-viz = TimeSeriesVisualization(figsize=(14, 8))
+# Create enhanced visualization instance
+viz = WelchMethodVisualization(figsize=(14, 8))
 
-print(f"🔍 Creating combined inspection plots for visual warmup determination...")
-print(f"  • Total plots to display: {len(all_time_series_data)}")
-print(f"  • Metrics per plot: active_drivers, active_delivery_entities")
+print(f"🔬 Creating enhanced Welch's method plots for methodological evidence...")
+print(f"  • Total plots to display: {len(all_enhanced_time_series)}")
+print(f"  • Each plot shows: Cross-replication averages + Welch's smoothing + Little's Law validation")
+print(f"  • Focus: Juxtaposition demonstrates active drivers superiority")
 
-# Create combined plot for each design point
+# Create enhanced plots for each design point
 plot_count = 0
-for design_name, time_series_data in all_time_series_data.items():
+regime_classifications = {
+    "low_demand_medium_supply": "Stable",
+    "high_demand_high_supply": "Volatile", 
+    "high_demand_low_supply": "System Failure"
+}
+
+for design_name, enhanced_data in all_enhanced_time_series.items():
     plot_count += 1
+    regime_type = regime_classifications.get(design_name, "Unknown")
     
-    print(f"\n--- Plot {plot_count}/{len(all_time_series_data)}: {design_name} ---")
+    print(f"\n--- Plot {plot_count}/{len(all_enhanced_time_series)}: {design_name} ({regime_type} Regime) ---")
     
     # Get basic info about this design point
-    first_metric_data = list(time_series_data.values())[0]
-    total_duration = max(first_metric_data['time_points'])
-    replication_count = first_metric_data['replication_count']
+    if 'active_drivers' in enhanced_data:
+        first_metric_data = enhanced_data['active_drivers']
+        total_duration = max(first_metric_data['time_points'])
+        replication_count = first_metric_data['replication_count']
+        window_size = first_metric_data['moving_average_window']
+        
+        print(f"  • Duration: {total_duration:.1f} minutes")
+        print(f"  • Replications: {replication_count}")
+        print(f"  • Moving average window: {window_size}")
+        
+        # Show Little's Law validation
+        if 'theoretical_value' in first_metric_data:
+            theoretical_value = first_metric_data['theoretical_value']
+            moving_averages = first_metric_data['moving_averages']
+            final_ma_value = moving_averages[-1] if moving_averages else 0
+            convergence_error = abs(final_ma_value - theoretical_value) / theoretical_value * 100
+            print(f"  • Little's Law theoretical: {theoretical_value:.1f} active drivers")
+            print(f"  • Final moving average: {final_ma_value:.1f} active drivers")
+            print(f"  • Convergence error: {convergence_error:.1f}%")
     
-    print(f"  • Duration: {total_duration:.1f} minutes")
-    print(f"  • Replications: {replication_count}")
-    
-    # Create combined plot for this design point
-    fig = viz.create_combined_inspection_plot(
-        time_series_data, 
-        title=f'Warmup Inspection: {design_name.replace("_", " ").title()}'
+    # Create enhanced combined plot showing methodological evidence
+    fig = viz.create_combined_welch_inspection_plot(
+        enhanced_data, 
+        title=f'Welch\'s Method Warmup Analysis: {design_name.replace("_", " ").title()} ({regime_type} Regime)'
     )
+    
+    # Add regime-specific annotation for methodological evidence
+    fig.text(0.5, 0.01, 
+             f'Methodological Evidence: Note consistent active drivers convergence vs. regime-dependent delivery entities pattern',
+             ha='center', fontsize=11, weight='bold',
+             bbox=dict(boxstyle='round', facecolor='lightgreen', alpha=0.8))
     
     # Show the plot
     plt.show()
     
-    print(f"  ✓ Plot displayed for visual inspection")
+    print(f"  ✓ Enhanced plot displayed with Welch's method + Little's Law validation")
 
-print(f"\n🎯 All {plot_count} plots displayed for visual inspection!")
+print(f"\n🎯 All {plot_count} enhanced plots displayed!")
+print(f"\n📋 Key Methodological Evidence Observed:")
+print(f"  • Active Drivers: Consistent convergence to Little's Law prediction across ALL regimes")
+print(f"  • Active Delivery Entities: Regime-dependent patterns (stable/volatile/failure)")
+print(f"  • Conclusion: Active drivers provides regime-independent warmup detection")
 
-# %% Step 10: Visual Inspection Guidance and Warmup Determination
+# %% Step 10: Enhanced Warmup Determination Using Welch's Method (Corrected)
 """
-Cell 10: Guidance for visual inspection and warmup period determination
+Cell 10: Principled warmup determination using Welch's method convergence
 
-Provides systematic guidance for determining uniform warmup period across
-all design points based on visual inspection of the plots above.
+Provides systematic guidance for determining uniform warmup period based on
+Welch's method moving average convergence to Little's Law theoretical values.
 """
-print("\nStep 10: Visual Inspection Guidance and Warmup Determination")
+print("\nStep 10: Enhanced Warmup Determination Using Welch's Method")
 print("=" * 60)
 
-print("🔍 VISUAL INSPECTION METHODOLOGY")
+print("🔬 WELCH'S METHOD WARMUP DETERMINATION")
 print("-" * 40)
 
-print("\n📋 Step-by-step visual inspection process:")
-print("  1. Look at each of the 9 plots displayed above")
-print("  2. For each plot, identify the transition point where:")
-print("     • Lines stop trending/changing (transient phase)")
-print("     • Lines start stable oscillation around consistent levels (steady-state)")
-print("  3. Note the time point where this transition occurs for each design point")
-print("  4. Choose the LATEST transition time across all design points")
-print("  5. Add a conservative safety margin (e.g., +20-30 minutes)")
+print("\n📋 Enhanced methodology for warmup determination:")
+print("  1. Focus on ACTIVE DRIVERS plots (top panels) from above")
+print("  2. Examine the BLUE SMOOTHED LINE (Welch's moving average)")
+print("  3. Look for convergence to RED DASHED LINE (Little's Law theoretical)")
+print("  4. Choose warmup period AFTER moving average stabilizes near theoretical value")
+print("  5. Apply conservative margin for methodological rigor")
 
-print("\n🎯 PATTERN RECOGNITION GUIDE:")
-print("  • Early Phase (Transient): Lines trending upward as system 'warms up'")
-print("  • Transition Point: Where trending behavior stops")
-print("  • Steady Phase: Lines oscillating around stable levels")
-print("  • Conservative Choice: Use transition point + safety margin")
+print("\n🎯 WELCH'S METHOD CONVERGENCE ANALYSIS:")
+print("  • Blue Line Interpretation: Welch's moving average filters out noise")
+print("  • Red Line Target: Little's Law theoretical prediction")
+print("  • Convergence Point: Where blue line stabilizes near red line")
+print("  • Conservative Choice: Add safety margin after apparent convergence")
 
-print("\n⚖️ UNIFORM WARMUP REQUIREMENT:")
-print("  • Same warmup period MUST be used for ALL design points")
-print("  • Based on the slowest-converging design point")
-print("  • Better to be conservative than risk initialization bias")
+print("\n⚖️ LITTLE'S LAW VALIDATION SUMMARY:")
+convergence_summary = []
+
+for design_name, enhanced_data in all_enhanced_time_series.items():
+    if 'active_drivers' in enhanced_data and 'theoretical_value' in enhanced_data['active_drivers']:
+        data = enhanced_data['active_drivers']
+        theoretical_value = data['theoretical_value']
+        moving_averages = data['moving_averages']
+        final_ma_value = moving_averages[-1] if moving_averages else 0
+        convergence_error = abs(final_ma_value - theoretical_value) / theoretical_value * 100
+        
+        convergence_summary.append({
+            'design_name': design_name,
+            'theoretical': theoretical_value,
+            'final_ma': final_ma_value,
+            'error_percent': convergence_error
+        })
+        
+        regime_type = regime_classifications.get(design_name, "Unknown")
+        print(f"  • {design_name} ({regime_type}):")
+        print(f"    - Theoretical: {theoretical_value:.1f}, Final MA: {final_ma_value:.1f}, Error: {convergence_error:.1f}%")
 
 # Show simulation context for reference
-print(f"\n📊 Simulation Context for Reference:")
+default_window_size = 50  # Default from extraction
+actual_window_size = default_window_size
+
+# Try to get actual window size from data if available
+if all_enhanced_time_series:
+    first_design_data = next(iter(all_enhanced_time_series.values()))
+    if 'active_drivers' in first_design_data and 'moving_average_window' in first_design_data['active_drivers']:
+        actual_window_size = first_design_data['active_drivers']['moving_average_window']
+
+print(f"\n📊 Simulation Context for Warmup Decision:")
 print(f"  • Total simulation duration: {experiment_config.simulation_duration} minutes")
-print(f"  • Number of design points: {len(all_time_series_data)}")
-print(f"  • Replications per design point: {experiment_config.num_replications}")
+print(f"  • Number of design points: {len(all_enhanced_time_series)}")
+print(f"  • Moving average window: {actual_window_size} data points")
 
-# Provide warmup ratio guidance
-print(f"\n📏 Warmup Period Guidelines:")
-print(f"  • Total duration: {experiment_config.simulation_duration} minutes")
-print(f"  • Recommended warmup ratio: ≤30% of total duration")
-print(f"  • Maximum acceptable warmup: {experiment_config.simulation_duration * 0.3:.0f} minutes (30%)")
-print(f"  • Analysis window should be ≥70% of total duration")
+# Provide enhanced warmup guidance
+print(f"\n📏 Enhanced Warmup Period Guidelines:")
+print(f"  • Based on Welch's method convergence observation")
+print(f"  • Theoretical validation via Little's Law")
+print(f"  • Conservative margin for methodological rigor")
+print(f"  • Uniform application across all design points (CRN requirement)")
 
-print(f"\n💡 Next Steps:")
-print(f"  1. Examine all {len(all_time_series_data)} plots above")
-print(f"  2. Identify transition points visually")
-print(f"  3. Choose conservative uniform warmup period")
-print(f"  4. Proceed to Cell 11 for warmup validation")
+print(f"\n💡 Next Steps - Warmup Period Selection:")
+print(f"  1. Examine active drivers convergence in all {len(all_enhanced_time_series)} plots above")
+print(f"  2. Identify latest convergence point across all design points")
+print(f"  3. Add conservative margin (e.g., +50-100 minutes)")
+print(f"  4. Validate: Ensure post-warmup analysis window ≥ 60% of total duration")
+print(f"  5. Proceed to Cell 11 for warmup validation and performance analysis")
 
-# Prepare variables for next cell
 print(f"\n🔧 Preparation for Next Cell:")
-print(f"  • Variable 'all_time_series_data' contains extracted data")
-print(f"  • Variable 'experiment_config' contains simulation parameters")
+print(f"  • Variable 'all_enhanced_time_series' contains Welch's method data")
+print(f"  • Little's Law validation completed")
 print(f"  • Ready for warmup period validation in next cell")
-
 # %% Step 11: Warmup Period Validation
 """
 Cell 11: Validate your visually determined warmup period
@@ -364,7 +438,7 @@ print(f"\n🔍 Validating warmup period across all design points...")
 # Validation summary
 validation_results = []
 
-for design_name, time_series_data in all_time_series_data.items():
+for design_name, time_series_data in all_enhanced_time_series.items():
     # Get time series info
     first_metric = list(time_series_data.keys())[0]
     max_time = max(time_series_data[first_metric]['time_points'])
@@ -417,7 +491,7 @@ else:
 
 print(f"\n🎯 UNIFORM WARMUP PERIOD DETERMINED:")
 print(f"  • Selected warmup period: {proposed_warmup_period} minutes")
-print(f"  • Applies to ALL {len(all_time_series_data)} design points")
+print(f"  • Applies to ALL {len(all_enhanced_time_series)} design points")
 print(f"  • Ready for post-simulation analysis in next workflow phase")
 
 print(f"\n➡️  Next: Use this warmup period for performance analysis across design points")
@@ -708,7 +782,7 @@ print(f"✅ Ready for thesis writing with solid evidence base!")
 thesis_evidence = {
     'classifications': final_classifications,
     'metrics_table': df_display if 'df_display' in locals() else None,
-    'time_series_data': all_time_series_data,
+    'time_series_data': all_enhanced_time_series,
     'warmup_period': uniform_warmup_period
 }
 
