@@ -132,7 +132,7 @@ def _aggregate_summary_statistic(replication_summaries, entity_type, metric_name
         dict: Aggregated results for specific statistic types (mean, p95, etc.)
     """
     # Extract the summary statistics we want to aggregate
-    stats_to_aggregate = ['mean', 'p95', 'p50']  # Focus on key statistics
+    stats_to_aggregate = ['mean', 'std', 'p95', 'p50']  # Focus on key statistics
     
     aggregated_stats = {}
     
