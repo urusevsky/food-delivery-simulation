@@ -385,16 +385,16 @@ for design_name, design_results in study_results.items():
 
 print(f"\n✓ Extended metrics calculation complete")
 
-# %% Step 11: Evidence Table for Hypothesis Validation
+# %% Step 11: Enhanced Evidence Table with Within-Replication Variability
 print("\n" + "="*50)
-print("HYPOTHESIS VALIDATION: EVIDENCE TABLE")
+print("ENHANCED HYPOTHESIS VALIDATION: EVIDENCE TABLE")
 print("="*50)
 
 import pandas as pd
 
-print("Creating evidence table ordered by load ratio...")
+print("Creating enhanced evidence table with within-replication variability...")
 
-# Extract performance metrics
+# Extract performance metrics including within-replication std
 table_data = []
 
 for design_name, result in metrics_results.items():
@@ -404,22 +404,34 @@ for design_name, result in metrics_results.items():
     analysis = result['analysis']
     
     try:
-        # Extract assignment time
+        # Extract assignment time metrics
         entity_metrics = analysis.get('entity_metrics', {})
         orders_metrics = entity_metrics.get('orders', {})
         assignment_time_data = orders_metrics.get('assignment_time', {})
         
+        # Mean assignment time
         assignment_time_mean = None
+        assignment_time_mean_ci = None
         if assignment_time_data and 'mean' in assignment_time_data:
             assignment_time_mean = assignment_time_data['mean'].get('point_estimate')
             assignment_time_ci = assignment_time_data['mean'].get('confidence_interval', [None, None])
             if assignment_time_mean and assignment_time_ci[0] is not None:
                 ci_width = (assignment_time_ci[1] - assignment_time_ci[0]) / 2
-                assignment_formatted = f"{assignment_time_mean:.1f}±{ci_width:.1f}"
+                assignment_time_mean_ci = f"{assignment_time_mean:.1f}±{ci_width:.1f}"
             else:
-                assignment_formatted = f"{assignment_time_mean:.1f}" if assignment_time_mean else "N/A"
-        else:
-            assignment_formatted = "N/A"
+                assignment_time_mean_ci = f"{assignment_time_mean:.1f}" if assignment_time_mean else "N/A"
+        
+        # Within-replication standard deviation (NEW!)
+        assignment_time_std_mean = None
+        assignment_time_std_ci = None
+        if assignment_time_data and 'std' in assignment_time_data:
+            assignment_time_std_mean = assignment_time_data['std'].get('point_estimate')
+            assignment_time_std_ci_raw = assignment_time_data['std'].get('confidence_interval', [None, None])
+            if assignment_time_std_mean and assignment_time_std_ci_raw[0] is not None:
+                std_ci_width = (assignment_time_std_ci_raw[1] - assignment_time_std_ci_raw[0]) / 2
+                assignment_time_std_ci = f"{assignment_time_std_mean:.1f}±{std_ci_width:.1f}"
+            else:
+                assignment_time_std_ci = f"{assignment_time_std_mean:.1f}" if assignment_time_std_mean else "N/A"
         
         # Extract completion rate
         system_metrics = analysis.get('system_metrics', {})
@@ -435,50 +447,64 @@ for design_name, result in metrics_results.items():
         table_data.append({
             'Design Point': design_name.replace('_', ' ').title(),
             'Load Ratio': f"{load_ratio:.2f}",
-            'Assignment Time (min)': assignment_formatted,
+            'Mean Assignment Time': assignment_time_mean_ci,
+            'Within-Rep Std': assignment_time_std_ci,  # NEW COLUMN!
             'Completion Rate': completion_formatted,
             'Load Ratio Value': load_ratio,  # For sorting
-            'Assignment Value': assignment_time_mean if assignment_time_mean else 999,
-            'Completion Value': completion_rate if completion_rate else 0
+            'Mean Value': assignment_time_mean if assignment_time_mean else 999,
+            'Std Value': assignment_time_std_mean if assignment_time_std_mean else 0,  # For comparison
         })
         
     except Exception as e:
         print(f"  ⚠️  Error extracting metrics for {design_name}: {str(e)}")
 
-# Create and display table
+# Create and display enhanced table
 if table_data:
     df = pd.DataFrame(table_data)
-    df_display = df.sort_values('Load Ratio Value')[['Design Point', 'Load Ratio', 'Assignment Time (min)', 'Completion Rate']]
+    df_display = df.sort_values('Load Ratio Value')[['Design Point', 'Load Ratio', 'Mean Assignment Time', 'Within-Rep Std', 'Completion Rate']]
     
-    print("\n🎯 PERFORMANCE METRICS BY LOAD RATIO")
-    print("="*80)
+    print("\n🎯 ENHANCED PERFORMANCE METRICS BY LOAD RATIO")
+    print("="*100)
     print(df_display.to_string(index=False))
     
-    print(f"\n📊 HYPOTHESIS VALIDATION ANALYSIS:")
-    print(f"Examine if similar load ratios produce similar performance regardless of absolute values:")
+    print(f"\n📊 ROOM FOR ERROR HYPOTHESIS TEST:")
+    print(f"Testing: Medium Demand Low Supply should have higher within-replication variability")
     
-    print(f"\n🔬 Raw Data by Load Ratio (NO PRECONCEIVED BOUNDARIES):")
-    print("Observe patterns and determine boundaries empirically:")
+    # Extract within-replication std values for hypothesis test
+    high_demand_high_supply_std = None
+    medium_demand_low_supply_std = None
     
-    for _, row in df_display.iterrows():
-        print(f"  Load Ratio {row['Load Ratio']}: {row['Design Point']} → Assignment: {row['Assignment Time (min)']}, Completion: {row['Completion Rate']}")
+    for _, row in df.iterrows():
+        if 'High Demand High Supply' in row['Design Point']:
+            high_demand_high_supply_std = row['Std Value']
+        elif 'Medium Demand Low Supply' in row['Design Point']:
+            medium_demand_low_supply_std = row['Std Value']
     
-    print(f"\n📋 BOUNDARY DETERMINATION GUIDANCE:")
-    print(f"Look for natural breaks in performance metrics:")
-    print(f"• Where do completion rates drop significantly?")
-    print(f"• Where do assignment times increase dramatically?") 
-    print(f"• Do similar load ratios cluster in performance?")
-    print(f"• What load ratio thresholds emerge from the data?")
+    print(f"\n🔬 Within-Replication Variability Comparison:")
+    if high_demand_high_supply_std is not None and medium_demand_low_supply_std is not None:
+        print(f"  • High Demand High Supply (20 avg drivers): σ = {high_demand_high_supply_std:.1f} min")
+        print(f"  • Medium Demand Low Supply (10 avg drivers): σ = {medium_demand_low_supply_std:.1f} min")
+        
+        if medium_demand_low_supply_std > high_demand_high_supply_std:
+            ratio = medium_demand_low_supply_std / high_demand_high_supply_std
+            print(f"  ✅ HYPOTHESIS CONFIRMED: Low Supply has {ratio:.1f}× higher variability!")
+            print(f"      → Less buffer capacity = more sensitivity to fluctuations")
+        else:
+            print(f"  ❌ HYPOTHESIS NOT CONFIRMED: Expected higher variability in Low Supply")
+    else:
+        print(f"  ⚠️  Cannot compare - missing std data")
     
-    print(f"\n✅ EMPIRICAL EVIDENCE PRESENTED!")
-    print(f"Review both time series patterns AND performance metrics to validate:")
-    print(f"'Load ratio determines operational regime, not absolute arrival rates'")
+    print(f"\n💡 Key Insights:")
+    print(f"  • 'Mean Assignment Time': Across-replication average (central tendency)")
+    print(f"  • 'Within-Rep Std': System variability characterization (your hypothesis target)")
+    print(f"  • Higher within-rep std = more 'wild swings' in performance")
+    print(f"  • This tests 'room for error' theory independent of statistical precision")
 
 else:
-    print("⚠️  No valid data available for evidence table")
+    print("⚠️  No valid data available for enhanced evidence table")
 
-print(f"\n📚 COMPLETE STUDY FINISHED!")
-print(f"✓ Time series plots: Visual regime patterns by load ratio")
-print(f"✓ Performance table: Quantitative validation of hypothesis")
-print(f"✓ Ready for thesis analysis and conclusions")
+print(f"\n📚 METHODOLOGY VALIDATION COMPLETE!")
+print(f"✓ Within-replication vs across-replication variance distinguished")
+print(f"✓ 'Room for error' hypothesis quantitatively tested")
+print(f"✓ System characterization separated from statistical precision")
 # %%
