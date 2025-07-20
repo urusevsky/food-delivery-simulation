@@ -137,8 +137,8 @@ print("EXPERIMENT CONFIGURATION")
 print("="*50)
 
 experiment_config = ExperimentConfig(
-    simulation_duration=1000,  # Sufficient duration for regime observation
-    num_replications=3,        # Multiple replications for statistical validity
+    simulation_duration=2000,  # Sufficient duration for regime observation
+    num_replications=5,        # Multiple replications for statistical validity
     master_seed=42
 )
 
@@ -362,16 +362,16 @@ for design_name, design_results in study_results.items():
 
 print(f"\n✓ Metrics calculation complete")
 
-# %% Step 11: Evidence Table for Hypothesis Validation
+# %% Step 11: Enhanced Evidence Table with Within-Replication Variability
 print("\n" + "="*50)
-print("HYPOTHESIS VALIDATION: EVIDENCE TABLE")
+print("ENHANCED HYPOTHESIS VALIDATION: EVIDENCE TABLE")
 print("="*50)
 
 import pandas as pd
 
-print("Creating evidence table ordered by load ratio...")
+print("Creating enhanced evidence table with within-replication variability...")
 
-# Extract performance metrics
+# Extract performance metrics including within-replication std
 table_data = []
 
 for design_name, result in metrics_results.items():
@@ -381,22 +381,41 @@ for design_name, result in metrics_results.items():
     analysis = result['analysis']
     
     try:
-        # Extract assignment time
+        # Extract assignment time metrics
         entity_metrics = analysis.get('entity_metrics', {})
         orders_metrics = entity_metrics.get('orders', {})
         assignment_time_data = orders_metrics.get('assignment_time', {})
         
+        # Mean assignment time
         assignment_time_mean = None
+        assignment_time_mean_ci = None
         if assignment_time_data and 'mean' in assignment_time_data:
             assignment_time_mean = assignment_time_data['mean'].get('point_estimate')
             assignment_time_ci = assignment_time_data['mean'].get('confidence_interval', [None, None])
             if assignment_time_mean and assignment_time_ci[0] is not None:
                 ci_width = (assignment_time_ci[1] - assignment_time_ci[0]) / 2
-                assignment_formatted = f"{assignment_time_mean:.1f}±{ci_width:.1f}"
+                assignment_time_mean_ci = f"{assignment_time_mean:.1f}±{ci_width:.1f}"
             else:
-                assignment_formatted = f"{assignment_time_mean:.1f}" if assignment_time_mean else "N/A"
-        else:
-            assignment_formatted = "N/A"
+                assignment_time_mean_ci = f"{assignment_time_mean:.1f}" if assignment_time_mean else "N/A"
+        
+        # Within-replication standard deviation (NEW!)
+        assignment_time_std_mean = None
+        assignment_time_std_ci = None
+        if assignment_time_data and 'std' in assignment_time_data:
+            assignment_time_std_mean = assignment_time_data['std'].get('point_estimate')
+            assignment_time_std_ci_raw = assignment_time_data['std'].get('confidence_interval', [None, None])
+            if assignment_time_std_mean and assignment_time_std_ci_raw[0] is not None:
+                std_ci_width = (assignment_time_std_ci_raw[1] - assignment_time_std_ci_raw[0]) / 2
+                assignment_time_std_ci = f"{assignment_time_std_mean:.1f}±{std_ci_width:.1f}"
+            else:
+                assignment_time_std_ci = f"{assignment_time_std_mean:.1f}" if assignment_time_std_mean else "N/A"
+        
+        # Calculate Coefficient of Variation (CV)
+        cv = None
+        cv_formatted = "N/A"
+        if assignment_time_mean and assignment_time_std_mean and assignment_time_mean > 0:
+            cv = assignment_time_std_mean / assignment_time_mean
+            cv_formatted = f"{cv:.2f}"
         
         # Extract completion rate
         system_metrics = analysis.get('system_metrics', {})
@@ -412,50 +431,63 @@ for design_name, result in metrics_results.items():
         table_data.append({
             'Design Point': design_name.replace('_', ' ').title(),
             'Load Ratio': f"{load_ratio:.2f}",
-            'Assignment Time (min)': assignment_formatted,
+            'Mean Assignment Time': assignment_time_mean_ci,
+            'Within-Rep Std': assignment_time_std_ci,
+            'CV': cv_formatted,
             'Completion Rate': completion_formatted,
             'Load Ratio Value': load_ratio,  # For sorting
-            'Assignment Value': assignment_time_mean if assignment_time_mean else 999,
-            'Completion Value': completion_rate if completion_rate else 0
+            'Mean Value': assignment_time_mean if assignment_time_mean else 999,
+            'Std Value': assignment_time_std_mean if assignment_time_std_mean else 0,
+            'CV Value': cv if cv else 0  # For analysis
         })
         
     except Exception as e:
         print(f"  ⚠️  Error extracting metrics for {design_name}: {str(e)}")
 
-# Create and display table
+# Create and display enhanced table
 if table_data:
     df = pd.DataFrame(table_data)
-    df_display = df.sort_values('Load Ratio Value')[['Design Point', 'Load Ratio', 'Assignment Time (min)', 'Completion Rate']]
+    df_display = df.sort_values('Load Ratio Value')[['Design Point', 'Load Ratio', 'Mean Assignment Time', 'Within-Rep Std', 'CV', 'Completion Rate']]
     
-    print("\n🎯 PERFORMANCE METRICS BY LOAD RATIO")
-    print("="*80)
+    print("\n🎯 ENHANCED PERFORMANCE METRICS BY LOAD RATIO")
+    print("="*120)
     print(df_display.to_string(index=False))
     
-    print(f"\n📊 HYPOTHESIS VALIDATION ANALYSIS:")
-    print(f"Examine if similar load ratios produce similar performance regardless of absolute values:")
+    print(f"\n📊 COEFFICIENT OF VARIATION (CV) HYPOTHESIS TEST:")
+    print(f"Testing: Do similar load ratios have similar CV values?")
     
-    print(f"\n🔬 Raw Data by Load Ratio (NO PRECONCEIVED BOUNDARIES):")
-    print("Observe patterns and determine boundaries empirically:")
+    # Group by load ratio ranges for CV analysis
+    print(f"\n🔬 CV Analysis by Load Ratio Groups:")
     
-    for _, row in df_display.iterrows():
-        print(f"  Load Ratio {row['Load Ratio']}: {row['Design Point']} → Assignment: {row['Assignment Time (min)']}, Completion: {row['Completion Rate']}")
+    # Create load ratio groups based on your empirical boundaries
+    load_ratio_groups = {
+        'Stable (≤2.7)': df[df['Load Ratio Value'] <= 2.7],
+        'Transition (3.0-5.0)': df[(df['Load Ratio Value'] > 2.7) & (df['Load Ratio Value'] <= 5.0)],
+        'Failure (≥8.0)': df[df['Load Ratio Value'] >= 8.0]
+    }
     
-    print(f"\n📋 BOUNDARY DETERMINATION GUIDANCE:")
-    print(f"Look for natural breaks in performance metrics:")
-    print(f"• Where do completion rates drop significantly?")
-    print(f"• Where do assignment times increase dramatically?") 
-    print(f"• Do similar load ratios cluster in performance?")
-    print(f"• What load ratio thresholds emerge from the data?")
+    for group_name, group_df in load_ratio_groups.items():
+        if len(group_df) > 0:
+            valid_cvs = [row['CV Value'] for _, row in group_df.iterrows() if row['CV Value'] > 0]
+            if valid_cvs:
+                avg_cv = sum(valid_cvs) / len(valid_cvs)
+                cv_range = f"{min(valid_cvs):.2f}-{max(valid_cvs):.2f}" if len(valid_cvs) > 1 else f"{valid_cvs[0]:.2f}"
+                print(f"  {group_name}: {len(group_df)} points, CV range: {cv_range}, Avg CV: {avg_cv:.2f}")
+                
+                for _, row in group_df.iterrows():
+                    print(f"    - {row['Design Point']}: Load Ratio {row['Load Ratio']}, CV = {row['CV']}")
     
-    print(f"\n✅ EMPIRICAL EVIDENCE PRESENTED!")
-    print(f"Review both time series patterns AND performance metrics to validate:")
-    print(f"'Load ratio determines operational regime, not absolute arrival rates'")
+    print(f"\n📋 CV HYPOTHESIS INTERPRETATION:")
+    print(f"• Do design points with similar load ratios cluster around similar CV values?")
+    print(f"• Is CV relatively invariant within regime groups?")
+    print(f"• Does load ratio predict variability structure (CV) better than absolute performance?")
+    
+    print(f"\n✅ COMPLETE CV ANALYSIS READY!")
+    print(f"✓ Mean assignment times: Absolute performance levels")
+    print(f"✓ Within-rep std: System variability characterization")  
+    print(f"✓ CV values: Normalized variability for regime comparison")
+    print(f"✓ Load ratio hypothesis: Test if CV is the true invariant")
 
 else:
-    print("⚠️  No valid data available for evidence table")
-
-print(f"\n📚 COMPLETE STUDY FINISHED!")
-print(f"✓ Time series plots: Visual regime patterns by load ratio")
-print(f"✓ Performance table: Quantitative validation of hypothesis")
-print(f"✓ Ready for thesis analysis and conclusions")
+    print("⚠️  No valid data available for enhanced evidence table")
 # %%
