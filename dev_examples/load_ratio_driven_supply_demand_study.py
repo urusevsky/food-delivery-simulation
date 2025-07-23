@@ -6,8 +6,8 @@ Research Hypothesis: Load ratio determines operational regime characteristics,
 with systematic validation pairs testing robustness across different absolute arrival rates.
 
 Design Pattern: For each load ratio R:
-- Baseline Interval: (1.0, R) → "Baseline intensity"
-- 2x Baseline: (2.0, 2R) → "2x baseline intensity"
+- Baseline Interval: (1.0, R) → "Higher intensity" (1.0 orders/min, 1/R drivers/min)
+- 2x Baseline: (2.0, 2R) → "Half intensity" (0.5 orders/min, 1/2R drivers/min)
 
 Load Ratios Tested: [2.0, 2.5, 3.0, 3.5, 4.0, 5.0, 6.0, 7.0, 8.0]
 Total Design Points: 18 (9 load ratios × 2 validation pairs each)
