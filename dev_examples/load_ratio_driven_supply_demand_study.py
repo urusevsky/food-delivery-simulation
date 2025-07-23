@@ -79,7 +79,7 @@ base_params = {
     'pairing_enabled': False,
     'restaurants_proximity_threshold': None,
     'customers_proximity_threshold': None,
-    'immediate_assignment_threshold': 100,  # Always immediate assignment
+    'immediate_assignment_threshold': 100,  # All periodic assignment
     'mean_service_duration': 100,
     'service_duration_std_dev': 60,
     'min_service_duration': 30,

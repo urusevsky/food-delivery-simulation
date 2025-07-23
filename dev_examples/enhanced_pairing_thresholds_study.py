@@ -94,7 +94,7 @@ base_params = {
     'service_duration_std_dev': 60,
     'min_service_duration': 30,
     'max_service_duration': 200,
-    'immediate_assignment_threshold': 100,  # All immediate assignment
+    'immediate_assignment_threshold': 100,  # All periodic assignment
     'periodic_interval': 3.0
 }
 
