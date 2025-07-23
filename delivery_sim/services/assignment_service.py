@@ -223,16 +223,16 @@ class AssignmentService:
                         f"fairness: {score_components['fairness_score']:.3f})")
         
         # Business decision: Check if assignment meets threshold criteria
-        if priority_score >= self.config.immediate_assignment_threshold:
+        if priority_score > self.config.immediate_assignment_threshold:
             # Create the assignment
             self.logger.info(f"[t={self.env.now:.2f}] Immediate assignment: {entity_type} {entity_id} meets threshold "
-                           f"({priority_score:.2f} >= {self.config.immediate_assignment_threshold})")
+                           f"({priority_score:.2f} > {self.config.immediate_assignment_threshold})")
             self._create_assignment(best_driver, delivery_entity, "immediate", score_components)
             return True
         else:
             # Business outcome: Score below immediate assignment threshold
             self.logger.info(f"[t={self.env.now:.2f}] Immediate assignment deferred: {entity_type} {entity_id} below threshold "
-                           f"({priority_score:.2f} < {self.config.immediate_assignment_threshold})")
+                           f"({priority_score:.2f} <= {self.config.immediate_assignment_threshold})")
             return False
     
     def attempt_immediate_assignment_from_driver(self, driver):
@@ -269,16 +269,16 @@ class AssignmentService:
                         f"{entity_type} {entity_id} with priority score {priority_score:.2f}")
         
         # Business decision: Check if assignment meets threshold criteria
-        if priority_score >= self.config.immediate_assignment_threshold:
+        if priority_score > self.config.immediate_assignment_threshold:
             # Create the assignment
             self.logger.info(f"[t={self.env.now:.2f}] Immediate assignment: driver {driver.driver_id} to {entity_type} {entity_id} meets threshold "
-                           f"({priority_score:.2f} >= {self.config.immediate_assignment_threshold})")
+                           f"({priority_score:.2f} > {self.config.immediate_assignment_threshold})")
             self._create_assignment(driver, best_entity, "immediate", score_components)
             return True
         else:
             # Business outcome: Score below immediate assignment threshold
             self.logger.info(f"[t={self.env.now:.2f}] Immediate assignment deferred: driver {driver.driver_id} to {entity_type} {entity_id} below threshold "
-                           f"({priority_score:.2f} < {self.config.immediate_assignment_threshold})")
+                           f"({priority_score:.2f} <= {self.config.immediate_assignment_threshold})")
             return False
     
     # ===== Periodic Assignment Process =====
