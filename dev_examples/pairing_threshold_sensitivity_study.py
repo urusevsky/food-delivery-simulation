@@ -337,7 +337,13 @@ for design_name, result in metrics_results.items():
 # Create and display threshold sensitivity evidence table
 if table_data:
     df = pd.DataFrame(table_data)
-    df_display = df.sort_values(['Load Ratio Value', 'Threshold Config Value', 'Interval Type'])[
+    
+    # Define custom order for threshold configurations
+    threshold_order = {'conservative': 0, 'moderate': 1, 'liberal': 2}
+    df['Threshold Sort Order'] = df['Threshold Config Value'].map(threshold_order)
+    
+    # Sort with custom threshold order
+    df_display = df.sort_values(['Load Ratio Value', 'Threshold Sort Order', 'Interval Type'])[
         ['Threshold Config', 'Load Ratio', 'Interval Type', 'Pairing Effectiveness', 'Mean Assignment Time', 'Service Reliability (Std)', 'Completion Rate']
     ]
     
@@ -359,6 +365,7 @@ if table_data:
         
         load_ratio_subset = df[df['Load Ratio Value'] == load_ratio]
         
+        # Use the custom order for threshold configurations
         for threshold_config in ['conservative', 'moderate', 'liberal']:
             threshold_subset = load_ratio_subset[load_ratio_subset['Threshold Config Value'] == threshold_config]
             
