@@ -69,7 +69,7 @@ print("\n📋 Phase 1: Creating Infrastructure...")
 # Define structural configuration (physical environment)
 structural_config = StructuralConfig(
     delivery_area_size=10,  # 10x10 km area - modify to test different geographies
-    num_restaurants=5,     # 15 restaurants - try 10, 15, 20
+    num_restaurants=10,     # 15 restaurants - try 10, 15, 20
     driver_speed=0.5        # 0.5 km/min - doesn't affect spatial patterns
 )
 
