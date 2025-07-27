@@ -121,8 +121,10 @@ class ExperimentAnalysisPipeline:
         if 'order' in filtered_entities and filtered_entities['order']:
             order_metrics = {
                 'assignment_time': lambda order: calculate_all_order_metrics(order)['waiting_time'],
+                'travel_time': lambda order: calculate_all_order_metrics(order)['travel_time'],
                 'fulfillment_time': lambda order: calculate_all_order_metrics(order)['fulfillment_time']
             }
+            
             entity_summary['orders'] = aggregate_entity_metrics(
                 filtered_entities['order'], 
                 order_metrics

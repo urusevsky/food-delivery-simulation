@@ -151,17 +151,12 @@ class ScoringConfig:
                  max_orders_per_trip=2,
                  
                  # Strategic weights (business preferences)
-                 weight_distance=1/3,
-                 weight_throughput=1/3,
-                 weight_fairness=1/3,
+                 weight_distance=0.5,
+                 weight_throughput=0.5,
+                 weight_fairness=0,
                  
                  # Typical distance calculation settings
                  typical_distance_samples=1000):
-        
-        # Validate weights sum to 1 (with tolerance for floating point precision)
-        total_weight = weight_distance + weight_throughput + weight_fairness
-        if abs(total_weight - 1.0) > 0.001:
-            raise ValueError(f"Weights must sum to 1.0, got {total_weight}")
         
         # Business policy parameters
         self.max_distance_ratio_multiplier = max_distance_ratio_multiplier
