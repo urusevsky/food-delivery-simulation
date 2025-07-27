@@ -79,16 +79,14 @@ base_params = {
     'pairing_enabled': False,
     'restaurants_proximity_threshold': None,
     'customers_proximity_threshold': None,
-    'immediate_assignment_threshold': 100,  # All periodic assignment
     'mean_service_duration': 100,
     'service_duration_std_dev': 60,
     'min_service_duration': 30,
     'max_service_duration': 200,
-    'periodic_interval': 3.0
 }
 
 # Define target load ratios for systematic exploration
-target_load_ratios = [2.0, 2.5, 3.0, 3.5, 4.0, 5.0, 6.0, 7.0, 8.0]
+target_load_ratios = [2.5, 3.5, 5.0, 6.0, 7.0]
 
 print("Creating systematic load ratio-driven design points:")
 print("Pattern: Baseline Interval (1.0, R) + 2x Baseline (2.0, 2R)")
