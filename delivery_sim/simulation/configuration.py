@@ -62,9 +62,7 @@ class OperationalConfig:
                 f"pairing={'on' if self.pairing_enabled else 'off'}, "
                 f"restaurants_threshold={self.restaurants_proximity_threshold}km, "
                 f"customers_threshold={self.customers_proximity_threshold}km, "
-                f"assignment_threshold={self.immediate_assignment_threshold}, "
-                f"periodic_interval={self.periodic_interval}min, "
-                f"service_duration={self.mean_service_duration}±{self.service_duration_std_dev}min)")
+                f"assignment_threshold={self.immediate_assignment_threshold}, ")
 
 
 class ExperimentConfig:
