@@ -1,4 +1,4 @@
-# pairing_threshold_sensitivity_study.py
+# weight_strategies_study.py
 """
 Priority Scoring Weight Strategy Study: Multi-Objective Optimization Across Load Ratios
 
@@ -7,8 +7,7 @@ system performance across various load ratios and absolute scales?
 
 Weight Strategy Design:
 - Weight Configurations: Distance-focused (0.7,0.2,0.1), Throughput-focused (0.2,0.7,0.1), 
-  Fairness-focused (0.2,0.2,0.6), Balanced (0.33,0.33,0.34), Efficiency-only (0.5,0.5,0.0), 
-  Distance-throughput (0.6,0.4,0.0)
+  Fairness-focused (0.2,0.2,0.6), Balanced (0.33,0.33,0.34), Efficiency-only (0.5,0.5,0.0)
 - Load Ratios: [3.0, 5.0, 7.0] covering optimal, efficient, and stressed regimes
 - Baseline: (1.0, LR) vs 2x Baseline: (2.0, 2×LR) for each weight strategy × load ratio combination
 - Fixed Pairing Thresholds: Moderate (4.0km restaurants, 3.0km customers) to isolate weight effects
@@ -38,9 +37,9 @@ from delivery_sim.experimental.experimental_runner import ExperimentalRunner
 from delivery_sim.utils.logging_system import configure_logging
 
 print("="*80)
-print("THRESHOLD SENSITIVITY STUDY: PAIRING THRESHOLD CONFIGURATIONS")
+print("WEIGHT STRATEGY OPTIMIZATION STUDY: PRIORITY SCORING CONFIGURATIONS")
 print("="*80)
-print("Research Focus: Threshold × Load Ratio × Absolute Scale Interaction Effects")
+print("Research Focus: Weight Strategy × Load Ratio × Absolute Scale Interaction Effects")
 
 # %% Step 2: Logging Configuration
 logging_config = LoggingConfig(
@@ -111,8 +110,7 @@ weight_strategy_configurations = {
         'weight_distance': 0.5,
         'weight_throughput': 0.5,
         'weight_fairness': 0.0
-    },
-
+    }
 }
 
 # Load ratios to test (efficient subset for multi-objective analysis)
@@ -193,21 +191,21 @@ print(f"✓ Duration: {experiment_config.simulation_duration} minutes (consisten
 print(f"✓ Replications: {experiment_config.num_replications} (consistent)")
 print(f"✓ Total simulation runs: {len(design_points)} × {experiment_config.num_replications} = {len(design_points) * experiment_config.num_replications}")
 
-# %% Step 6: Execute Threshold Sensitivity Study
+# %% Step 6: Execute Weight Strategy Study
 print("\n" + "="*50)
-print("THRESHOLD SENSITIVITY EXECUTION")
+print("WEIGHT STRATEGY EXECUTION")
 print("="*50)
 
 runner = ExperimentalRunner()
 print("✓ ExperimentalRunner initialized")
 
-print(f"\nExecuting threshold sensitivity study with validation pairs...")
-print("Focus: How do different pairing thresholds affect effectiveness across load ratios and scales?")
+print(f"\nExecuting weight strategy study with validation pairs...")
+print("Focus: How do different priority scoring weights affect performance across load ratios and scales?")
 study_results = runner.run_experimental_study(design_points, experiment_config)
 
-print(f"\n✅ THRESHOLD SENSITIVITY STUDY COMPLETE!")
+print(f"\n✅ WEIGHT STRATEGY STUDY COMPLETE!")
 print(f"✓ All {len(design_points)} design points executed")
-print(f"✓ Results contain threshold × load ratio × scale interaction data")
+print(f"✓ Results contain weight strategy × load ratio × scale interaction data")
 
 # %% Step 7: Warmup Period (From Previous Study)
 print("\n" + "="*50)
@@ -221,15 +219,15 @@ print(f"✓ Using verified warmup period: {uniform_warmup_period} minutes")
 print(f"✓ Based on visual inspection from load_ratio_driven_supply_demand_study.py")
 print(f"✓ Streamlined approach - no warmup detection needed")
 
-# %% Step 8: Threshold Sensitivity Performance Metrics Analysis
+# %% Step 8: Weight Strategy Performance Metrics Analysis
 print("\n" + "="*50)
-print("THRESHOLD SENSITIVITY PERFORMANCE METRICS WITH SERVICE RELIABILITY")
+print("WEIGHT STRATEGY PERFORMANCE METRICS WITH SERVICE RELIABILITY")
 print("="*50)
 
 from delivery_sim.analysis_pipeline.pipeline_coordinator import analyze_single_configuration
 
-print(f"Calculating threshold sensitivity metrics including within-replication variability...")
-print(f"Focus: How pairing threshold configurations affect effectiveness across load ratios and scales")
+print(f"Calculating weight strategy metrics including within-replication variability...")
+print(f"Focus: How priority scoring weight configurations affect performance across load ratios and scales")
 
 metrics_results = {}
 
@@ -257,7 +255,7 @@ for design_name, design_results in study_results.items():
             'error': str(e)
         }
 
-print(f"\n✓ Threshold sensitivity metrics calculation complete")
+print(f"\n✓ Weight strategy metrics calculation complete")
 
 # %% Step 9: Weight Strategy Evidence Table with Multi-Objective Performance Analysis
 print("\n" + "="*50)
@@ -278,14 +276,37 @@ for design_name, result in metrics_results.items():
     analysis = result['analysis']
     
     try:
+        # Debug: Print the actual design name being parsed  
+        print(f"Parsing design name: {design_name}")
+        
         # Parse weight strategy, load ratio, and interval type from design name
         # Expected format: {weight_strategy}_LR{load_ratio}_{interval_type}
-        parts = design_name.split('_LR')
-        weight_strategy = parts[0]  # distance_focused, throughput_focused, etc.
-        
-        remainder = parts[1].split('_')
-        load_ratio = float(remainder[0])  # extract load ratio value
-        interval_type = "Baseline" if "baseline" in remainder[1] and "2x" not in remainder[1] else "2x Baseline"
+        if '_LR' in design_name:
+            parts = design_name.split('_LR')
+            weight_strategy = parts[0]  # distance_focused, throughput_focused, etc.
+            
+            remainder = parts[1]  # e.g., "3.0_baseline" or "3.0_2x_baseline"
+            
+            # More robust interval type detection
+            if remainder.endswith('_2x_baseline'):
+                load_ratio_str = remainder.replace('_2x_baseline', '')
+                interval_type = "2x Baseline"
+            elif remainder.endswith('_baseline'):
+                load_ratio_str = remainder.replace('_baseline', '')
+                interval_type = "Baseline"
+            else:
+                print(f"⚠️ Cannot parse interval type from: {remainder}")
+                continue
+                
+            try:
+                load_ratio = float(load_ratio_str)
+            except ValueError:
+                print(f"⚠️ Cannot parse load ratio from: {load_ratio_str}")
+                continue
+                
+        else:
+            print(f"⚠️ Design name format unexpected: {design_name}")
+            continue
         
         # Extract assignment time metrics
         entity_metrics = analysis.get('entity_metrics', {})
@@ -349,14 +370,13 @@ for design_name, result in metrics_results.items():
 if table_data:
     df = pd.DataFrame(table_data)
     
-    # Define custom order for weight strategies
+    # Define custom order for weight strategies (matching your 5 strategies)
     weight_order = {
         'distance_focused': 0, 
         'throughput_focused': 1, 
         'fairness_focused': 2, 
         'balanced': 3, 
-        'efficiency_only': 4, 
-        'distance_throughput': 5
+        'efficiency_only': 4
     }
     df['Weight Strategy Sort Order'] = df['Weight Strategy Value'].map(weight_order)
     
