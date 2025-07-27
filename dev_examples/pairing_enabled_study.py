@@ -88,8 +88,6 @@ base_params = {
     'service_duration_std_dev': 60,
     'min_service_duration': 30,
     'max_service_duration': 200,
-    'immediate_assignment_threshold': 100,  # All periodic assignment
-    'periodic_interval': 3.0
 }
 
 # Pairing configuration
@@ -107,7 +105,7 @@ no_pairing_params = {
 }
 
 # Enhanced design with validation pairs
-target_load_ratios = [2.0, 3.5, 5.0, 7.0]
+target_load_ratios = [3.0, 5.0, 7.0, 8.0]
 
 print(f"\nEnhanced Design Pattern:")
 print(f"Load Ratios: {target_load_ratios}")
