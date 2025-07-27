@@ -63,10 +63,7 @@ class AssignmentService:
         
         # Log service initialization with configuration details
         self.logger.info(f"[t={self.env.now:.2f}] AssignmentService initialized with priority scoring system")
-        self.logger.info(f"[t={self.env.now:.2f}] Configuration: "
-                        f"threshold={config.immediate_assignment_threshold}, "
-                        f"periodic_interval={config.periodic_interval} min")
-        
+
         # Register event handlers based on pairing configuration
         if config.pairing_enabled:
             # In pair mode, listen for pairing outcomes
@@ -86,10 +83,6 @@ class AssignmentService:
         
         self.logger.simulation_event(f"[t={self.env.now:.2f}] Registering handler for DriverAvailableForAssignmentEvent")
         event_dispatcher.register(DriverAvailableForAssignmentEvent, self.handle_driver_available_for_assignment)
-        
-        # Start the periodic assignment process
-        self.logger.info(f"[t={self.env.now:.2f}] Starting periodic assignment process with interval {config.periodic_interval} minutes")
-        self.process = env.process(self._periodic_assignment_process())
     
     # ===== Event Handlers (Entry Points) =====
     
@@ -281,102 +274,7 @@ class AssignmentService:
                            f"({priority_score:.2f} <= {self.config.immediate_assignment_threshold})")
             return False
     
-    # ===== Periodic Assignment Process =====
-    
-    def _periodic_assignment_process(self):
-        """SimPy process for periodic global optimization."""
-        interval = self.config.periodic_interval
-        
-        while True:
-            # Wait for the next periodic assignment interval
-            yield self.env.timeout(interval)
-            
-            # Perform periodic assignment
-            self.perform_periodic_assignment()
-    
-    def perform_periodic_assignment(self):
-        """
-        Perform periodic global optimization using Hungarian algorithm.
-        
-        This method collects all waiting entities and available drivers,
-        then uses optimization to find the globally optimal assignments.
-        """
-        self.logger.info(f"[t={self.env.now:.2f}] Starting periodic assignment optimization")
-        
-        # Collect entities waiting for assignment
-        waiting_entities = []
-        waiting_entities.extend(self.order_repository.find_by_state(OrderState.CREATED))
-        waiting_entities.extend(self.pair_repository.find_by_state(PairState.CREATED))
-        
-        # Collect available drivers
-        available_drivers = self.driver_repository.find_available_drivers()
-        
-        self.logger.info(f"[t={self.env.now:.2f}] Periodic optimization: {len(waiting_entities)} entities, {len(available_drivers)} drivers")
-        
-        # Check if optimization is needed
-        if not waiting_entities or not available_drivers:
-            self.logger.info(f"[t={self.env.now:.2f}] Periodic optimization skipped: insufficient entities or drivers")
-            return
-        
-        # Generate score matrix and cache components for optimization
-        score_matrix, score_components_cache = self._generate_score_matrix(waiting_entities, available_drivers)
-        
-        # Apply Hungarian algorithm (maximize scores)
-        row_indices, col_indices = linear_sum_assignment(score_matrix, maximize=True)
-        
-        # Log the optimization results
-        self.logger.info(f"[t={self.env.now:.2f}] Periodic optimization completed: {len(row_indices)} assignments identified")
-        
-        # Execute the optimal assignments using cached components
-        assignments_created = 0
-        for row, col in zip(row_indices, col_indices):
-            entity = waiting_entities[row]
-            driver = available_drivers[col]
-            
-            # Retrieve cached score components (no need to recalculate!)
-            score_components = score_components_cache[(row, col)]
-            
-            # Create the assignment (detailed logging happens inside this method)
-            delivery_unit = self._create_assignment(driver, entity, "periodic", score_components)
-            if delivery_unit:
-                assignments_created += 1
-        
-        self.logger.info(f"[t={self.env.now:.2f}] Periodic optimization execution completed: {assignments_created} assignments created")
-    
-    def _generate_score_matrix(self, waiting_entities, available_drivers):
-        """
-        Generate score matrix for Hungarian algorithm optimization.
-        
-        Args:
-            waiting_entities: List of unassigned orders and pairs
-            available_drivers: List of available drivers
-            
-        Returns:
-            tuple: (score_matrix, score_components_cache)
-                - score_matrix: numpy.ndarray of priority scores
-                - score_components_cache: dict mapping (row, col) to score components
-        """
-        score_matrix = []
-        score_components_cache = {}
-        
-        for i, entity in enumerate(waiting_entities):
-            row = []
-            entity_type = entity.entity_type
-            entity_id = entity.order_id if entity_type == EntityType.ORDER else entity.pair_id
-            
-            for j, driver in enumerate(available_drivers):
-                priority_score, components = self.priority_scorer.calculate_priority_score(driver, entity)
-                row.append(priority_score)
-                
-                # Cache components using matrix indices
-                score_components_cache[(i, j)] = components
-                
-                self.logger.debug(f"[t={self.env.now:.2f}] Score matrix entry: {entity_type} {entity_id} to driver {driver.driver_id} = {priority_score:.2f}")
-            
-            score_matrix.append(row)
-        
-        return np.array(score_matrix), score_components_cache
-    
+    # ===== Helper methods =====
     def _find_best_match(self, fixed_entity, candidates):
         """
         Find the best matching entity from a list of candidates.
