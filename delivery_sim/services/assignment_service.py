@@ -1,17 +1,22 @@
 # delivery_sim/services/assignment_service.py
 """
-Assignment Service - Driver-Entity Assignment with Priority Scoring
+Assignment Service - Pure Event-Driven Driver-Entity Assignment
 
-This service implements a hybrid assignment approach:
-1. Immediate assignment for clear opportunities
-2. Periodic global optimization using Hungarian algorithm
+This service implements a pure event-driven assignment approach that responds
+immediately to system events without artificial delays or batch optimization.
 
-Core change: Replaced adjusted cost framework with multi-criteria priority scoring
-for more principled assignment decisions.
+Key characteristics:
+1. Responds to driver availability events (login, delivery completion)
+2. Responds to delivery entity availability events (order creation, pair formation/failure)
+3. Always assigns the best available match using priority scoring
+4. No thresholds or delays - pure responsiveness optimization
+
+The priority scoring system balances multiple objectives:
+- Distance efficiency (infrastructure-aware geographical optimization)
+- Throughput optimization (orders per trip maximization)
+- Fairness considerations (wait time-based priority)
 """
 
-import numpy as np
-from scipy.optimize import linear_sum_assignment
 from delivery_sim.entities.states import OrderState, DriverState, PairState
 from delivery_sim.entities.delivery_unit import DeliveryUnit
 from delivery_sim.events.order_events import OrderCreatedEvent
@@ -25,18 +30,22 @@ from delivery_sim.utils.entity_type_utils import EntityType
 
 class AssignmentService:
     """
-    Service responsible for assigning drivers to delivery entities (orders or pairs).
+    Pure event-driven assignment service for food delivery systems.
     
-    Uses priority scoring system to evaluate assignment opportunities based on:
-    - Distance efficiency (infrastructure-aware)
-    - Throughput optimization (orders per trip)
-    - Fairness considerations (wait time)
+    This service responds immediately to two types of events:
+    1. Driver becomes available → Find best waiting entity to assign
+    2. Delivery entity becomes available → Find best available driver to assign
+    
+    Assignment decisions use multi-criteria priority scoring that balances:
+    - Distance efficiency (geographical optimization)
+    - Throughput optimization (capacity utilization)
+    - Fairness considerations (service equity)
     """
     
     def __init__(self, env, event_dispatcher, order_repository, driver_repository, 
                  pair_repository, delivery_unit_repository, priority_scorer, config):
         """
-        Initialize the assignment service with its dependencies.
+        Initialize the pure event-driven assignment service.
         
         Args:
             env: SimPy environment
@@ -46,7 +55,7 @@ class AssignmentService:
             pair_repository: Repository for pairs
             delivery_unit_repository: Repository for delivery units
             priority_scorer: PriorityScorer instance for assignment evaluation
-            config: Configuration object containing assignment parameters
+            config: Configuration object containing priority scoring weights
         """
         # Get a logger instance specific to this component
         self.logger = get_logger("services.assignment")
@@ -61,9 +70,13 @@ class AssignmentService:
         self.priority_scorer = priority_scorer
         self.config = config
         
-        # Log service initialization with configuration details
-        self.logger.info(f"[t={self.env.now:.2f}] AssignmentService initialized with priority scoring system")
-
+        # Log service initialization
+        self.logger.info(f"[t={self.env.now:.2f}] Pure event-driven AssignmentService initialized")
+        self.logger.info(f"[t={self.env.now:.2f}] Priority scoring weights: "
+                        f"distance={config.weight_distance:.3f}, "
+                        f"throughput={config.weight_throughput:.3f}, "
+                        f"fairness={config.weight_fairness:.3f}")
+        
         # Register event handlers based on pairing configuration
         if config.pairing_enabled:
             # In pair mode, listen for pairing outcomes
@@ -83,6 +96,8 @@ class AssignmentService:
         
         self.logger.simulation_event(f"[t={self.env.now:.2f}] Registering handler for DriverAvailableForAssignmentEvent")
         event_dispatcher.register(DriverAvailableForAssignmentEvent, self.handle_driver_available_for_assignment)
+        
+        self.logger.info(f"[t={self.env.now:.2f}] Event-driven assignment service ready - listening for assignment events")
     
     # ===== Event Handlers (Entry Points) =====
     
@@ -101,8 +116,8 @@ class AssignmentService:
             self.logger.error(f"[t={self.env.now:.2f}] Order {event.order_id} not found in repository")
             return
         
-        # Attempt immediate assignment
-        self.attempt_immediate_assignment_from_delivery_entity(order)
+        # Attempt event-driven assignment
+        self.attempt_event_driven_assignment_from_delivery_entity(order)
     
     def handle_pair_created(self, event):
         """
@@ -119,12 +134,12 @@ class AssignmentService:
             self.logger.error(f"[t={self.env.now:.2f}] Pair {event.pair_id} not found in repository")
             return
         
-        # Attempt immediate assignment
-        self.attempt_immediate_assignment_from_delivery_entity(pair)
+        # Attempt event-driven assignment
+        self.attempt_event_driven_assignment_from_delivery_entity(pair)
     
     def handle_pairing_failed(self, event):
         """
-        Handler for PairingFailedEvent - single order bypassed pairing.
+        Handler for PairingFailedEvent - order failed to pair and needs assignment.
         
         Args:
             event: PairingFailedEvent containing order_id
@@ -137,12 +152,12 @@ class AssignmentService:
             self.logger.error(f"[t={self.env.now:.2f}] Order {event.order_id} not found in repository")
             return
         
-        # Attempt immediate assignment of the single order
-        self.attempt_immediate_assignment_from_delivery_entity(order)
+        # Attempt event-driven assignment
+        self.attempt_event_driven_assignment_from_delivery_entity(order)
     
     def handle_driver_login(self, event):
         """
-        Handler for DriverLoggedInEvent.
+        Handler for DriverLoggedInEvent - new driver available for work.
         
         Args:
             event: DriverLoggedInEvent containing driver_id
@@ -155,12 +170,12 @@ class AssignmentService:
             self.logger.error(f"[t={self.env.now:.2f}] Driver {event.driver_id} not found in repository")
             return
         
-        # Attempt immediate assignment from this new driver
-        self.attempt_immediate_assignment_from_driver(driver)
+        # Attempt event-driven assignment
+        self.attempt_event_driven_assignment_from_driver(driver)
     
     def handle_driver_available_for_assignment(self, event):
         """
-        Handler for DriverAvailableForAssignmentEvent.
+        Handler for DriverAvailableForAssignmentEvent - driver completed delivery and ready for new work.
         
         Args:
             event: DriverAvailableForAssignmentEvent containing driver_id
@@ -173,64 +188,15 @@ class AssignmentService:
             self.logger.error(f"[t={self.env.now:.2f}] Driver {event.driver_id} not found in repository")
             return
         
-        # Attempt immediate assignment from this available driver
-        self.attempt_immediate_assignment_from_driver(driver)
+        # Attempt event-driven assignment
+        self.attempt_event_driven_assignment_from_driver(driver)
     
-    # ===== Assignment Operations =====
+    # ===== Core Assignment Logic =====
     
-    def attempt_immediate_assignment_from_delivery_entity(self, delivery_entity):
+    def attempt_event_driven_assignment_from_driver(self, driver):
         """
-        Try to find a driver for a delivery entity immediately upon creation.
-        
-        This operation implements the business logic for immediate assignment decisions,
-        determining if a clear opportunity exists to assign a driver immediately.
-        
-        Args:
-            delivery_entity: The order or pair to assign
-            
-        Returns:
-            bool: True if assignment succeeded, False otherwise
-        """
-        # Get entity type directly from the entity
-        entity_type = delivery_entity.entity_type
-        entity_id = delivery_entity.order_id if entity_type == EntityType.ORDER else delivery_entity.pair_id
-        
-        self.logger.info(f"[t={self.env.now:.2f}] Attempting immediate assignment for {entity_type} {entity_id}")
-        
-        # Business logic: Check for available drivers
-        available_drivers = self.driver_repository.find_available_drivers()
-        if not available_drivers:
-            # Business outcome: No drivers available to make assignment
-            self.logger.info(f"[t={self.env.now:.2f}] No available drivers for {entity_type} {entity_id}, assignment deferred")
-            return False
-        
-        self.logger.debug(f"[t={self.env.now:.2f}] Found {len(available_drivers)} available drivers for {entity_type} {entity_id}")
-        
-        # Find best driver for this entity
-        best_driver, priority_score, score_components = self._find_best_match(delivery_entity, available_drivers)
-        
-        self.logger.debug(f"[t={self.env.now:.2f}] Best match for {entity_type} {entity_id}: "
-                        f"driver {best_driver.driver_id} with priority score {priority_score:.2f} "
-                        f"(distance: {score_components['distance_score']:.3f}, "
-                        f"throughput: {score_components['throughput_score']:.3f}, "
-                        f"fairness: {score_components['fairness_score']:.3f})")
-        
-        # Business decision: Check if assignment meets threshold criteria
-        if priority_score > self.config.immediate_assignment_threshold:
-            # Create the assignment
-            self.logger.info(f"[t={self.env.now:.2f}] Immediate assignment: {entity_type} {entity_id} meets threshold "
-                           f"({priority_score:.2f} > {self.config.immediate_assignment_threshold})")
-            self._create_assignment(best_driver, delivery_entity, "immediate", score_components)
-            return True
-        else:
-            # Business outcome: Score below immediate assignment threshold
-            self.logger.info(f"[t={self.env.now:.2f}] Immediate assignment deferred: {entity_type} {entity_id} below threshold "
-                           f"({priority_score:.2f} <= {self.config.immediate_assignment_threshold})")
-            return False
-    
-    def attempt_immediate_assignment_from_driver(self, driver):
-        """
-        Try to find the best delivery entity for a newly available driver.
+        Event-driven assignment when driver becomes available.
+        Always assigns to the best available entity using priority scoring.
         
         Args:
             driver: The driver to find work for
@@ -238,7 +204,7 @@ class AssignmentService:
         Returns:
             bool: True if assignment succeeded, False otherwise
         """
-        self.logger.info(f"[t={self.env.now:.2f}] Attempting immediate assignment for driver {driver.driver_id}")
+        self.logger.info(f"[t={self.env.now:.2f}] Attempting event-driven assignment for driver {driver.driver_id}")
         
         # Business logic: Collect all available delivery entities
         waiting_entities = []
@@ -252,7 +218,7 @@ class AssignmentService:
         
         self.logger.debug(f"[t={self.env.now:.2f}] Found {len(waiting_entities)} waiting entities for driver {driver.driver_id}")
         
-        # Find best entity for this driver
+        # Find best entity for this driver using unified matching logic
         best_entity, priority_score, score_components = self._find_best_match(driver, waiting_entities)
         
         entity_type = best_entity.entity_type
@@ -261,20 +227,54 @@ class AssignmentService:
         self.logger.debug(f"[t={self.env.now:.2f}] Best match for driver {driver.driver_id}: "
                         f"{entity_type} {entity_id} with priority score {priority_score:.2f}")
         
-        # Business decision: Check if assignment meets threshold criteria
-        if priority_score > self.config.immediate_assignment_threshold:
-            # Create the assignment
-            self.logger.info(f"[t={self.env.now:.2f}] Immediate assignment: driver {driver.driver_id} to {entity_type} {entity_id} meets threshold "
-                           f"({priority_score:.2f} > {self.config.immediate_assignment_threshold})")
-            self._create_assignment(driver, best_entity, "immediate", score_components)
-            return True
-        else:
-            # Business outcome: Score below immediate assignment threshold
-            self.logger.info(f"[t={self.env.now:.2f}] Immediate assignment deferred: driver {driver.driver_id} to {entity_type} {entity_id} below threshold "
-                           f"({priority_score:.2f} <= {self.config.immediate_assignment_threshold})")
-            return False
+        # Always assign the best match - no threshold checking
+        self.logger.info(f"[t={self.env.now:.2f}] Event-driven assignment: driver {driver.driver_id} to {entity_type} {entity_id} "
+                       f"with priority score {priority_score:.2f}")
+        
+        self._create_assignment(driver, best_entity, score_components)
+        return True
     
-    # ===== Helper methods =====
+    def attempt_event_driven_assignment_from_delivery_entity(self, entity):
+        """
+        Event-driven assignment when delivery entity becomes available.
+        Always assigns to the best available driver using priority scoring.
+        
+        Args:
+            entity: The delivery entity (order or pair) needing assignment
+            
+        Returns:
+            bool: True if assignment succeeded, False otherwise
+        """
+        entity_type = entity.entity_type
+        entity_id = entity.order_id if entity_type == EntityType.ORDER else entity.pair_id
+        
+        self.logger.info(f"[t={self.env.now:.2f}] Attempting event-driven assignment for {entity_type} {entity_id}")
+        
+        # Business logic: Find all available drivers
+        available_drivers = self.driver_repository.find_available_drivers()
+        
+        if not available_drivers:
+            # Business outcome: No drivers available for assignment
+            self.logger.info(f"[t={self.env.now:.2f}] No available drivers for {entity_type} {entity_id}")
+            return False
+        
+        self.logger.debug(f"[t={self.env.now:.2f}] Found {len(available_drivers)} available drivers for {entity_type} {entity_id}")
+        
+        # Find best driver for this entity using unified matching logic
+        best_driver, priority_score, score_components = self._find_best_match(entity, available_drivers)
+        
+        self.logger.debug(f"[t={self.env.now:.2f}] Best match for {entity_type} {entity_id}: "
+                        f"driver {best_driver.driver_id} with priority score {priority_score:.2f}")
+        
+        # Always assign to best driver - no threshold checking
+        self.logger.info(f"[t={self.env.now:.2f}] Event-driven assignment: {entity_type} {entity_id} to driver {best_driver.driver_id} "
+                       f"with priority score {priority_score:.2f}")
+        
+        self._create_assignment(best_driver, entity, score_components)
+        return True
+    
+    # ===== Helper Methods =====
+    
     def _find_best_match(self, fixed_entity, candidates):
         """
         Find the best matching entity from a list of candidates.
@@ -314,14 +314,14 @@ class AssignmentService:
         
         return best_match, best_priority_score, best_components
     
-    def _create_assignment(self, driver, entity, assignment_path, score_components):
+    def _create_assignment(self, driver, entity, score_components):
         """
         Create a delivery unit and update entity states.
         
         Args:
             driver: The driver to assign
             entity: The order or pair to assign
-            assignment_path: How this assignment was made ('immediate' or 'periodic')
+            assignment_path: How this assignment was made ('event_driven')
             score_components: Dictionary with score calculation components
             
         Returns:
@@ -341,7 +341,6 @@ class AssignmentService:
                         f"{entity_type} {entity_id}")
         
         delivery_unit = DeliveryUnit(entity, driver, self.env.now)
-        delivery_unit.assignment_path = assignment_path
         
         # Record score components (replacing old cost storage)
         delivery_unit.assignment_scores = {
@@ -389,7 +388,7 @@ class AssignmentService:
         ))
         
         # Log assignment completion
-        self.logger.info(f"[t={self.env.now:.2f}] Created {assignment_path} assignment: "
+        self.logger.info(f"[t={self.env.now:.2f}] Created assignment: "
                        f"Driver {driver.driver_id} assigned to {entity_type} {entity_id} "
                        f"(priority score: {delivery_unit.assignment_scores['priority_score_0_100']:.2f}, "
                        f"distance: {score_components['total_distance']:.2f}km)")

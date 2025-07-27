@@ -37,10 +37,7 @@ class OperationalConfig:
                  service_duration_std_dev,         # minutes
                  min_service_duration,             # minutes
                  max_service_duration,             # minutes
-                 
-                 # Assignment parameters
-                 immediate_assignment_threshold,   # priority score threshold
-                 periodic_interval):               # minutes between optimizations
+                 ):               
 
         # Arrival process parameters
         self.mean_order_inter_arrival_time = mean_order_inter_arrival_time
@@ -56,10 +53,6 @@ class OperationalConfig:
         self.service_duration_std_dev = service_duration_std_dev
         self.min_service_duration = min_service_duration
         self.max_service_duration = max_service_duration
-        
-        # Assignment logic parameters
-        self.immediate_assignment_threshold = immediate_assignment_threshold
-        self.periodic_interval = periodic_interval
 
     def __str__(self):
         """String representation for debugging and logging."""

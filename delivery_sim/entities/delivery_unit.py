@@ -45,7 +45,6 @@ class DeliveryUnit:
         self.completion_time = None
         
         # Assignment decision information (priority scoring system)
-        self.assignment_path = None  # "immediate" or "periodic"
         self.assignment_scores = {
             "distance_score": None,        # Distance efficiency score (0-1)
             "throughput_score": None,      # Throughput optimization score (0-1) 

@@ -25,6 +25,3 @@ class DeliveryUnitRepository:
         return [unit for unit in self.delivery_units.values() 
                 if unit.driver.driver_id == driver_id]
                 
-    def find_by_assignment_path(self, path):
-        return [unit for unit in self.delivery_units.values() 
-                if unit.assignment_path == path]
