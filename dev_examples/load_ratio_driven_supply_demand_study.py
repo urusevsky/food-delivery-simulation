@@ -86,7 +86,7 @@ base_params = {
 }
 
 # Define target load ratios for systematic exploration
-target_load_ratios = [2.5, 3.5, 5.0, 6.0, 7.0]
+target_load_ratios = [2.5, 3.5, 4.0, 5.0, 5.5, 6.0, 7.0]
 
 print("Creating systematic load ratio-driven design points:")
 print("Pattern: Baseline Interval (1.0, R) + 2x Baseline (2.0, 2R)")
