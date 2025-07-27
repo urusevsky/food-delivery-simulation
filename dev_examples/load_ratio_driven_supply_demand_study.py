@@ -8,9 +8,6 @@ with systematic validation pairs testing robustness across different absolute ar
 Design Pattern: For each load ratio R:
 - Baseline Interval: (1.0, R) → "Higher intensity" (1.0 orders/min, 1/R drivers/min)
 - 2x Baseline: (2.0, 2R) → "Half intensity" (0.5 orders/min, 1/2R drivers/min)
-
-Load Ratios Tested: [2.0, 2.5, 3.0, 3.5, 4.0, 5.0, 6.0, 7.0, 8.0]
-Total Design Points: 18 (9 load ratios × 2 validation pairs each)
 """
 
 # %% Step 1: Setup and Imports
@@ -449,13 +446,6 @@ for design_name, result in metrics_results.items():
             else:
                 assignment_time_std_ci = f"{assignment_time_std_mean:.1f}" if assignment_time_std_mean else "N/A"
         
-        # Calculate Coefficient of Variation (CV)
-        cv = None
-        cv_formatted = "N/A"
-        if assignment_time_mean and assignment_time_std_mean and assignment_time_mean > 0:
-            cv = assignment_time_std_mean / assignment_time_mean
-            cv_formatted = f"{cv:.2f}"
-        
         # Extract completion rate
         system_metrics = analysis.get('system_metrics', {})
         completion_rate_data = system_metrics.get('system_completion_rate', {})
@@ -468,12 +458,10 @@ for design_name, result in metrics_results.items():
             'Design Point': f"LR{load_ratio:.1f}_{interval_type.replace(' ', '')}",
             'Mean Assignment Time': assignment_time_mean_ci,
             'Within-Rep Std': assignment_time_std_ci,
-            'CV': cv_formatted,
             'Completion Rate': completion_formatted,
             'Load Ratio Value': load_ratio,  # For sorting
             'Mean Value': assignment_time_mean if assignment_time_mean else 999,
             'Std Value': assignment_time_std_mean if assignment_time_std_mean else 0,
-            'CV Value': cv if cv else 0,  # For validation analysis
             'Completion Value': completion_rate if completion_rate else 0
         })
         
@@ -483,63 +471,11 @@ for design_name, result in metrics_results.items():
 # Create and display systematic validation table
 if table_data:
     df = pd.DataFrame(table_data)
-    df_display = df.sort_values(['Load Ratio Value', 'Interval Type'])[['Load Ratio', 'Interval Type', 'Mean Assignment Time', 'Within-Rep Std', 'CV', 'Completion Rate']]
+    df_display = df.sort_values(['Load Ratio Value', 'Interval Type'])[['Load Ratio', 'Interval Type', 'Mean Assignment Time', 'Within-Rep Std', 'Completion Rate']]
     
     print("\n🎯 SYSTEMATIC LOAD RATIO VALIDATION: EVIDENCE TABLE")
     print("="*120)
     print(df_display.to_string(index=False))
     
-    print(f"\n📊 SYSTEMATIC VALIDATION ANALYSIS:")
-    print(f"Testing: Do validation pairs (Baseline vs 2x Baseline) show consistent CV patterns?")
-    
-    # Group by load ratio for systematic validation analysis
-    print(f"\n🔬 Load Ratio Validation Analysis:")
-    
-    for load_ratio in sorted(df['Load Ratio Value'].unique()):
-        load_ratio_subset = df[df['Load Ratio Value'] == load_ratio]
-        
-        if len(load_ratio_subset) == 2:  # Should have both baseline and 2x baseline
-            baseline_row = load_ratio_subset[load_ratio_subset['Interval Type'] == 'Baseline'].iloc[0]
-            double_baseline_row = load_ratio_subset[load_ratio_subset['Interval Type'] == '2x Baseline'].iloc[0]
-            
-            baseline_cv = baseline_row['CV Value']
-            double_baseline_cv = double_baseline_row['CV Value']
-            baseline_completion = baseline_row['Completion Value']
-            double_baseline_completion = double_baseline_row['Completion Value']
-            
-            if baseline_cv > 0 and double_baseline_cv > 0:
-                cv_ratio = double_baseline_cv / baseline_cv
-                cv_difference = abs(double_baseline_cv - baseline_cv)
-                completion_difference = abs(double_baseline_completion - baseline_completion)
-                
-                print(f"  Load Ratio {load_ratio:.1f}:")
-                print(f"    • CV: Baseline {baseline_cv:.2f} vs 2x Baseline {double_baseline_cv:.2f} (ratio: {cv_ratio:.2f})")
-                print(f"    • Completion: Baseline {baseline_completion:.1%} vs 2x Baseline {double_baseline_completion:.1%}")
-                
-                if cv_ratio > 0.8 and cv_ratio < 1.2:  # Within 20%
-                    print(f"    ✅ CV patterns consistent (ratio within 20%)")
-                else:
-                    print(f"    ⚠️  CV patterns differ significantly")
-    
-    print(f"\n📋 SYSTEMATIC VALIDATION INTERPRETATION:")
-    print(f"• Do validation pairs show consistent CV values across different load ratios?")
-    print(f"• Is load ratio the primary determinant of variability structure?")
-    print(f"• Are there any load ratios where validation pairs show inconsistent behavior?")
-    print(f"• Do systematic patterns confirm the load ratio→regime hypothesis?")
-    
-    print(f"\n✅ SYSTEMATIC LOAD RATIO VALIDATION COMPLETE!")
-    print(f"✓ 18 design points tested across 9 load ratios")
-    print(f"✓ Systematic validation pairs provide robustness evidence")
-    print(f"✓ Ready for thesis-level regime classification and boundary identification")
 
-else:
-    print("⚠️  No valid data available for systematic validation table")
-
-print(f"\n" + "="*80)
-print("SYSTEMATIC LOAD RATIO-DRIVEN STUDY COMPLETE")
-print("="*80)
-print("✓ Hypothesis: Load ratio determines operational regime characteristics")
-print("✓ Method: Systematic validation pairs across load ratio spectrum")
-print("✓ Evidence: Time series patterns + Performance metrics + CV analysis")
-print("✓ Coverage: Load ratios 2.0-8.0 with systematic validation")
 # %%
