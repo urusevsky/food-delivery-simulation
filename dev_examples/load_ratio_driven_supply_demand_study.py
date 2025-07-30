@@ -417,7 +417,7 @@ for design_name, result in metrics_results.items():
         load_ratio = float(name_parts[2])
         interval_type = "2x Baseline" if "2x" in design_name else "Baseline"
         
-        # Extract assignment time metrics
+        # Extract assignment time metrics (existing code)
         entity_metrics = analysis.get('entity_metrics', {})
         orders_metrics = entity_metrics.get('orders', {})
         assignment_time_data = orders_metrics.get('assignment_time', {})
@@ -434,7 +434,7 @@ for design_name, result in metrics_results.items():
             else:
                 assignment_time_mean_ci = f"{assignment_time_mean:.1f}" if assignment_time_mean else "N/A"
         
-        # Within-replication standard deviation
+        # Within-replication standard deviation for assignment time
         assignment_time_std_mean = None
         assignment_time_std_ci = None
         if assignment_time_data and 'std' in assignment_time_data:
@@ -446,7 +446,33 @@ for design_name, result in metrics_results.items():
             else:
                 assignment_time_std_ci = f"{assignment_time_std_mean:.1f}" if assignment_time_std_mean else "N/A"
         
-        # Extract completion rate
+        # NEW: Extract travel time metrics
+        travel_time_data = orders_metrics.get('travel_time', {})
+        travel_time_mean = None
+        travel_time_mean_ci = None
+        if travel_time_data and 'mean' in travel_time_data:
+            travel_time_mean = travel_time_data['mean'].get('point_estimate')
+            travel_time_ci = travel_time_data['mean'].get('confidence_interval', [None, None])
+            if travel_time_mean and travel_time_ci[0] is not None:
+                ci_width = (travel_time_ci[1] - travel_time_ci[0]) / 2
+                travel_time_mean_ci = f"{travel_time_mean:.1f}±{ci_width:.1f}"
+            else:
+                travel_time_mean_ci = f"{travel_time_mean:.1f}" if travel_time_mean else "N/A"
+        
+        # NEW: Extract fulfillment time metrics  
+        fulfillment_time_data = orders_metrics.get('fulfillment_time', {})
+        fulfillment_time_mean = None
+        fulfillment_time_mean_ci = None
+        if fulfillment_time_data and 'mean' in fulfillment_time_data:
+            fulfillment_time_mean = fulfillment_time_data['mean'].get('point_estimate')
+            fulfillment_time_ci = fulfillment_time_data['mean'].get('confidence_interval', [None, None])
+            if fulfillment_time_mean and fulfillment_time_ci[0] is not None:
+                ci_width = (fulfillment_time_ci[1] - fulfillment_time_ci[0]) / 2
+                fulfillment_time_mean_ci = f"{fulfillment_time_mean:.1f}±{ci_width:.1f}"
+            else:
+                fulfillment_time_mean_ci = f"{fulfillment_time_mean:.1f}" if fulfillment_time_mean else "N/A"
+        
+        # Extract completion rate (existing code)
         system_metrics = analysis.get('system_metrics', {})
         completion_rate_data = system_metrics.get('system_completion_rate', {})
         completion_rate = completion_rate_data.get('point_estimate') if completion_rate_data else None
@@ -457,10 +483,14 @@ for design_name, result in metrics_results.items():
             'Interval Type': interval_type,
             'Design Point': f"LR{load_ratio:.1f}_{interval_type.replace(' ', '')}",
             'Mean Assignment Time': assignment_time_mean_ci,
+            'Mean Travel Time': travel_time_mean_ci,          # NEW
+            'Mean Fulfillment Time': fulfillment_time_mean_ci, # NEW
             'Within-Rep Std': assignment_time_std_ci,
             'Completion Rate': completion_formatted,
             'Load Ratio Value': load_ratio,  # For sorting
-            'Mean Value': assignment_time_mean if assignment_time_mean else 999,
+            'Mean Assignment Value': assignment_time_mean if assignment_time_mean else 999,
+            'Mean Travel Value': travel_time_mean if travel_time_mean else 999,     # NEW
+            'Mean Fulfillment Value': fulfillment_time_mean if fulfillment_time_mean else 999, # NEW
             'Std Value': assignment_time_std_mean if assignment_time_std_mean else 0,
             'Completion Value': completion_rate if completion_rate else 0
         })
@@ -471,11 +501,27 @@ for design_name, result in metrics_results.items():
 # Create and display systematic validation table
 if table_data:
     df = pd.DataFrame(table_data)
-    df_display = df.sort_values(['Load Ratio Value', 'Interval Type'])[['Load Ratio', 'Interval Type', 'Mean Assignment Time', 'Within-Rep Std', 'Completion Rate']]
+    df_display = df.sort_values(['Load Ratio Value', 'Interval Type'])[
+        ['Load Ratio', 'Interval Type', 'Mean Assignment Time', 'Mean Travel Time', 
+         'Mean Fulfillment Time', 'Within-Rep Std', 'Completion Rate']
+    ]
     
     print("\n🎯 SYSTEMATIC LOAD RATIO VALIDATION: EVIDENCE TABLE")
-    print("="*120)
+    print("="*140)  # Increased width for additional columns
     print(df_display.to_string(index=False))
+    
+    # Optional: Display summary statistics for the new metrics
+    print(f"\n📊 SUMMARY STATISTICS:")
+    print(f"Mean Travel Time Range: {df['Mean Travel Value'].min():.1f} - {df['Mean Travel Value'].max():.1f} minutes")
+    print(f"Mean Fulfillment Time Range: {df['Mean Fulfillment Value'].min():.1f} - {df['Mean Fulfillment Value'].max():.1f} minutes")
+    
+    # Optional: Save to CSV for further analysis
+    #csv_filename = "systematic_validation_evidence_table.csv"
+    #df_display.to_csv(csv_filename, index=False)
+    #print(f"✓ Table saved to: {csv_filename}")
+
+else:
+    print("⚠️  No valid data points for systematic validation table")
     
 
 # %%
