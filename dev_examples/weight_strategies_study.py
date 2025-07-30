@@ -113,6 +113,13 @@ weight_strategy_configurations = {
     }
 }
 
+base_params = {
+    'mean_service_duration': 100,     # Match threshold study
+    'service_duration_std_dev': 60,   # Match threshold study  
+    'min_service_duration': 30,      # Match threshold study
+    'max_service_duration': 200,     # Match threshold study
+}
+
 # Load ratios to test (efficient subset for multi-objective analysis)
 target_load_ratios = [3.0, 5.0, 7.0]  # Optimal, Efficient, Stressed regimes
 
@@ -135,11 +142,7 @@ for weight_strategy_name, weight_config in weight_strategy_configurations.items(
                 restaurants_proximity_threshold=FIXED_PAIRING_CONFIG['restaurants_proximity_threshold'],
                 customers_proximity_threshold=FIXED_PAIRING_CONFIG['customers_proximity_threshold'],
                 
-                # Driver service configuration (same as before)
-                mean_service_duration=120,
-                service_duration_std_dev=30,
-                min_service_duration=60,
-                max_service_duration=240
+                **base_params  # Use consistent service parameters
             )
             
             # Create scoring config with experimental weight strategy
