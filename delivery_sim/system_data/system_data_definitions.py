@@ -34,31 +34,26 @@ class SystemDataDefinitions:
         return {
             'timestamp': timestamp,
             
-            # Existing metrics for system performance analysis
-            'active_orders_count': self.count_active_orders(),
-            'waiting_pairs_count': self.count_waiting_pairs(),
-            'total_waiting_entities': self.count_total_waiting_entities(),
+            # System performance analysis metrics
+            'unassigned_orders_count': self.count_unassigned_orders(),
+            'unassigned_pairs_count': self.count_unassigned_pairs(),
             'available_drivers_count': self.count_available_drivers(),
             'delivering_drivers_count': self.count_delivering_drivers(),
             
-            # NEW: Warmup detection metrics
+            # Warmup detection and supply-demand dynamics metrics
             'active_drivers': self.count_active_drivers(),
-            'active_delivery_entities': self.count_active_delivery_entities()
+            'unassigned_delivery_entities': self.count_unassigned_delivery_entities()
         }
     
-    # ===== Existing System Performance Metrics =====
+    # ===== System Performance Metrics =====
     
-    def count_active_orders(self):
+    def count_unassigned_orders(self):
         """Count orders waiting for assignment (not yet assigned to drivers)."""
         return len(self.repositories['order'].find_by_state(OrderState.CREATED))
     
-    def count_waiting_pairs(self):
+    def count_unassigned_pairs(self):
         """Count pairs waiting for assignment (formed but not assigned)."""
         return len(self.repositories['pair'].find_by_state(PairState.CREATED))
-    
-    def count_total_waiting_entities(self):
-        """Count all entities (orders + pairs) waiting for driver assignment."""
-        return self.count_active_orders() + self.count_waiting_pairs()
     
     def count_available_drivers(self):
         """Count drivers available for new assignments."""
@@ -68,16 +63,17 @@ class SystemDataDefinitions:
         """Count drivers currently performing deliveries."""
         return len(self.repositories['driver'].find_by_state(DriverState.DELIVERING))
     
-    # ===== NEW: Warmup Detection Metrics =====
+    # ===== Warmup Detection and Supply-Demand Dynamics Metrics =====
     
     def count_active_drivers(self):
         """
         Count all drivers who are actively participating in the system.
         
         This includes both available and delivering drivers, but excludes
-        drivers who have logged out. This metric is key for warmup detection
+        drivers who have logged out. This metric is KEY FOR WARMUP DETECTION
         as it shows the system's progression from zero drivers to stable
-        driver population levels.
+        driver population levels. Should converge to Little's Law theoretical
+        average in steady state.
         
         Returns:
             int: Number of active drivers (AVAILABLE + DELIVERING)
@@ -87,7 +83,7 @@ class SystemDataDefinitions:
                          if driver.state != DriverState.OFFLINE]
         return len(active_drivers)
     
-    def count_active_delivery_entities(self):
+    def count_unassigned_delivery_entities(self):
         """
         Count all delivery entities that exist in the system but are unassigned.
         
@@ -95,10 +91,10 @@ class SystemDataDefinitions:
         - Orders in CREATED state (waiting for pairing or assignment)
         - Pairs in CREATED state (waiting for assignment)
         
-        This metric is crucial for warmup detection as it reflects the
-        supply-demand balance. In steady state, this should stabilize
-        around some level. If it grows indefinitely, the system may be
-        in failure mode (demand >> supply).
+        This metric shows SUPPLY-DEMAND RESPONSE DYNAMICS by revealing how
+        order backlog varies in response to driver capacity fluctuations.
+        Juxtaposed with 'active_drivers', it demonstrates the system's
+        supply-demand balance evolution over time.
         
         Note: "delivery_entities" refers to assignable units (orders/pairs),
         not to "delivery_units" which are assignment contracts.
