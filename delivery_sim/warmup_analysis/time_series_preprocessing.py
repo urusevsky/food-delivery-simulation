@@ -22,7 +22,7 @@ class TimeSeriesPreprocessor:
         self.logger = get_logger("warmup_analysis.preprocessor")
     
     def extract_cross_replication_averages(self, multi_replication_snapshots, 
-                                         metrics=['active_drivers', 'active_delivery_entities'],
+                                         metrics=['active_drivers', 'unassigned_delivery_entities'],
                                          collection_interval=1.0,
                                          moving_average_window=50):
         """
@@ -206,7 +206,7 @@ class TimeSeriesPreprocessor:
 
 def extract_time_series_for_welch_analysis(multi_replication_snapshots, 
                                           design_points_dict=None,
-                                          metrics=['active_drivers', 'active_delivery_entities'],
+                                          metrics=['active_drivers', 'unassigned_delivery_entities'],
                                           collection_interval=0.5,
                                           moving_average_window=50):
     """

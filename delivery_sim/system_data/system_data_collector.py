@@ -38,7 +38,6 @@ class SystemDataCollector:
             self.snapshot_repository.add_snapshot(snapshot_data)
             
             self.logger.debug(f"[t={self.env.now:.2f}] Collected snapshot: "
-                            f"waiting={snapshot_data['total_waiting_entities']}, "
                             f"available_drivers={snapshot_data['available_drivers_count']}")
             
             # Wait for next collection interval

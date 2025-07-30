@@ -209,7 +209,7 @@ for design_name, design_results in study_results.items():
     # Extract time series with Welch's method
     basic_data = preprocessor.extract_cross_replication_averages(
         multi_replication_snapshots=replication_snapshots,
-        metrics=['active_drivers', 'active_delivery_entities'],
+        metrics=['active_drivers', 'unassigned_delivery_entities'],
         collection_interval=0.5,
         moving_average_window=100  # Larger window for 2000-minute simulation
     )
@@ -306,7 +306,7 @@ print(f"\n🎯 Systematic validation plots complete!")
 print(f"\n📋 LOAD RATIO VALIDATION GUIDANCE:")
 print(f"For each load ratio, compare Baseline vs 2x Baseline patterns:")
 print(f"• Active Drivers (top): Should both converge to Little's Law predictions")
-print(f"• Active Delivery Entities (bottom): Should show SAME regime pattern")
+print(f"• Unassigned Delivery Entities (bottom): Should show SAME regime pattern")
 print(f"• If hypothesis holds: Same qualitative behavior, different quantitative performance")
 
 # %% Step 9: Warmup Period Determination for Extended Data
