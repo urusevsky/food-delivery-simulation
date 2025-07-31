@@ -62,8 +62,7 @@ analyzer = InfrastructureAnalyzer(infrastructure)
 analysis_results = analyzer.analyze_complete_infrastructure()
 
 print(f"✓ Infrastructure: {infrastructure}")
-print(f"✓ Typical distance (median): {analysis_results['typical_distance']:.3f}km")
-print(f"✓ Typical distance (mean): {analysis_results['typical_distance_mean']:.3f}km")
+print(f"✓ Typical distance: {analysis_results['typical_distance']:.3f}km")
 
 # %% Step 4: Systematic Load Ratio-Driven Design Points Creation
 print("\n" + "="*50)
