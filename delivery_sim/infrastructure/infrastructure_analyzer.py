@@ -66,7 +66,7 @@ class InfrastructureAnalyzer:
         
         # Calculate typical distance (Monte Carlo sampling - expensive)
         sample_size = getattr(scoring_config, 'typical_distance_samples', 1000) if scoring_config else 1000
-        typical_distance = self.calculate_typical_distance(sample_size)
+        distance_stats = self.calculate_typical_distance(sample_size)
         
         # Analyze restaurant spatial patterns (for pairing parameter design)
         restaurant_analysis = self.analyze_restaurant_spatial_patterns()
@@ -78,7 +78,9 @@ class InfrastructureAnalyzer:
         complete_analysis = {
             # Basic characteristics
             **basic_characteristics,
-            'typical_distance': typical_distance,
+            'typical_distance': distance_stats['median'],  # Keep median as default
+            'typical_distance_mean': distance_stats['mean'],  # Add mean
+            'distance_statistics': distance_stats,  # Full stats
             
             # Spatial pattern analysis  
             'restaurant_spatial_analysis': restaurant_analysis,
@@ -92,7 +94,8 @@ class InfrastructureAnalyzer:
         # Cache results in Infrastructure instance
         self.infrastructure.set_analysis_results(complete_analysis)
         
-        self.logger.info(f"Infrastructure analysis complete: typical_distance={typical_distance:.3f}km, "
+        self.logger.info(f"Infrastructure analysis complete: typical_distance(median)={distance_stats['median']:.3f}km, "
+                        f"typical_distance(mean)={distance_stats['mean']:.3f}km, "
                         f"restaurant_patterns=analyzed, customer_patterns=analyzed")
         
         return complete_analysis

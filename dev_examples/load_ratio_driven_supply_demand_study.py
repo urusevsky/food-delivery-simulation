@@ -38,7 +38,7 @@ logging_config = LoggingConfig(
     component_levels={
         "services": "ERROR", "entities": "ERROR", "repositories": "ERROR",
         "utils": "ERROR", "system_data": "ERROR",
-        "simulation.runner": "INFO", "infrastructure": "INFO", 
+        "simulation.runner": "INFO", "utils.infrastructure_analyzer": "INFO", 
         "experimental.runner": "INFO",
     }
 )
@@ -62,7 +62,8 @@ analyzer = InfrastructureAnalyzer(infrastructure)
 analysis_results = analyzer.analyze_complete_infrastructure()
 
 print(f"✓ Infrastructure: {infrastructure}")
-print(f"✓ Typical distance: {analysis_results['typical_distance']:.3f}km")
+print(f"✓ Typical distance (median): {analysis_results['typical_distance']:.3f}km")
+print(f"✓ Typical distance (mean): {analysis_results['typical_distance_mean']:.3f}km")
 
 # %% Step 4: Systematic Load Ratio-Driven Design Points Creation
 print("\n" + "="*50)
