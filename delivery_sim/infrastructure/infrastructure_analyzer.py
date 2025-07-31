@@ -102,16 +102,16 @@ class InfrastructureAnalyzer:
     
     def calculate_typical_distance(self, sample_size=1000):
         """
-        Calculate characteristic single-order delivery distance for scoring normalization.
+        Calculate characteristic single-order delivery distance statistics for scoring normalization.
         
-        This is the original method used for priority scoring system normalization.
-        Uses Monte Carlo sampling to determine typical distance in this infrastructure.
+        Uses Monte Carlo sampling to determine typical distance characteristics in this infrastructure.
+        Returns both median and mean for comparison and methodological choice.
         
         Args:
             sample_size: Number of samples for Monte Carlo estimation
             
         Returns:
-            float: Typical distance for this geographic configuration
+            dict: Distance statistics containing 'median', 'mean', and 'samples_count'
         """
         samples = []
         restaurants = self.restaurant_repository.find_all()
@@ -140,14 +140,24 @@ class InfrastructureAnalyzer:
             )
             samples.append(distance)
         
-        # Use median for robustness to outliers
-        typical_distance = np.median(samples)
+        # Calculate both statistics for comparison
+        median_distance = np.median(samples)
+        mean_distance = np.mean(samples)
+        std_distance = np.std(samples)
         
-        self.logger.debug(f"Typical distance calculated: {typical_distance:.3f}km")
-        self.logger.debug(f"Distance distribution: min={np.min(samples):.3f}, "
-                         f"mean={np.mean(samples):.3f}, max={np.max(samples):.3f}")
+        self.logger.info(f"Distance statistics: median={median_distance:.3f}km, mean={mean_distance:.3f}km")
+        self.logger.debug(f"Full distribution: min={np.min(samples):.3f}km, "
+                        f"std={std_distance:.3f}km, max={np.max(samples):.3f}km")
         
-        return typical_distance
+        # Return comprehensive statistics
+        return {
+            'median': median_distance,
+            'mean': mean_distance,
+            'std': std_distance,
+            'min': np.min(samples),
+            'max': np.max(samples),
+            'samples_count': len(samples)
+        }
     
     def analyze_restaurant_spatial_patterns(self):
         """
