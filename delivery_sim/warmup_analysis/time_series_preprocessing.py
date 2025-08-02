@@ -206,23 +206,21 @@ class TimeSeriesPreprocessor:
         return cross_rep_averages.tolist()
     
     def _detect_collection_interval(self, multi_replication_snapshots):
-        """Auto-detect collection interval from snapshot timestamps."""
         for replication_snapshots in multi_replication_snapshots:
             if len(replication_snapshots) >= 2:
-                # Calculate intervals between consecutive snapshots
-                intervals = []
-                for i in range(len(replication_snapshots) - 1):
-                    interval = replication_snapshots[i+1]['timestamp'] - replication_snapshots[i]['timestamp']
-                    intervals.append(interval)
+                # Calculate first interval
+                interval = replication_snapshots[1]['timestamp'] - replication_snapshots[0]['timestamp']
                 
-                # Use median interval (robust to any timing irregularities)
-                detected_interval = np.median(intervals)
-                self.logger.info(f"Auto-detected collection interval: {detected_interval:.2f} minutes")
-                return detected_interval
+                # Verify all intervals are the same (optional validation)
+                # for i in range(1, len(replication_snapshots) - 1):
+                #     next_interval = replication_snapshots[i+1]['timestamp'] - replication_snapshots[i]['timestamp']
+                #     if abs(next_interval - interval) > 1e-6:
+                #         self.logger.warning(f"Inconsistent intervals detected: {interval} vs {next_interval}")
+                
+                self.logger.info(f"Detected collection interval: {interval:.2f} minutes")
+                return interval
         
-        # Fallback if no data
-        self.logger.warning("Could not detect collection interval, using fallback: 1.0 minutes")
-        return 1.0
+        return 1.0  # fallback
 
 
 def extract_time_series_for_welch_analysis(multi_replication_snapshots, 
