@@ -150,7 +150,8 @@ print("="*50)
 experiment_config = ExperimentConfig(
     simulation_duration=2000,  # Extended duration for regime pattern analysis
     num_replications=5,        # Multiple replications for statistical robustness
-    master_seed=42
+    master_seed=42,
+    collection_interval=1.0
 )
 
 print(f"✓ Extended duration: {experiment_config.simulation_duration} minutes")
@@ -210,7 +211,7 @@ for design_name, design_results in study_results.items():
     basic_data = preprocessor.extract_cross_replication_averages(
         multi_replication_snapshots=replication_snapshots,
         metrics=['active_drivers', 'unassigned_delivery_entities'],
-        collection_interval=0.5,
+        collection_interval=experiment_config.collection_interval,
         moving_average_window=100  # Larger window for 2000-minute simulation
     )
     

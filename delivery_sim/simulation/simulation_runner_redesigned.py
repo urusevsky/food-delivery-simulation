@@ -302,7 +302,7 @@ class SimulationRunner:
         self.system_data_definitions = SystemDataDefinitions(repositories_dict)
         
         # Create collector that will run during simulation
-        collection_interval = 0.5  # Collect every 0.5 simulation minutes for warmup analysis
+        collection_interval = self.config.collection_interval
         self.system_data_collector = SystemDataCollector(
             env=self.env,
             system_data_definitions=self.system_data_definitions,
