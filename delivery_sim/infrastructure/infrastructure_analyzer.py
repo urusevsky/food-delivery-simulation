@@ -46,16 +46,13 @@ class InfrastructureAnalyzer:
         
         self.logger.debug(f"InfrastructureAnalyzer initialized for: {infrastructure}")
     
-    def analyze_complete_infrastructure(self, scoring_config=None):
+    def analyze_complete_infrastructure(self):
         """
         Orchestrate comprehensive infrastructure analysis.
         
         This method performs all analysis types and caches results in the
         Infrastructure instance for reuse across experimental configurations.
         
-        Args:
-            scoring_config: Optional ScoringConfig for analysis parameters
-            
         Returns:
             dict: Complete analysis results with all analysis types
         """
@@ -65,7 +62,7 @@ class InfrastructureAnalyzer:
         basic_characteristics = self.infrastructure.get_basic_characteristics()
         
         # Calculate typical distance (Monte Carlo sampling - expensive)
-        sample_size = getattr(scoring_config, 'typical_distance_samples', 1000) if scoring_config else 1000
+        sample_size = self.structural_config.typical_distance_samples
         typical_distance = self.calculate_typical_distance(sample_size)
         
         # Analyze restaurant spatial patterns (for pairing parameter design)
@@ -354,76 +351,3 @@ class InfrastructureAnalyzer:
         
         return fig
     
-    def generate_parameter_design_report(self):
-        """
-        Generate comprehensive parameter design report for experimental design.
-        
-        This method provides guidance for setting pairing thresholds and other
-        operational parameters based on infrastructure characteristics.
-        
-        Returns:
-            dict: Parameter design recommendations based on infrastructure analysis
-        """
-        # Ensure infrastructure has been analyzed
-        if not self.infrastructure.has_analysis_results():
-            self.logger.info("Infrastructure not analyzed yet - running analysis...")
-            self.analyze_complete_infrastructure()
-        
-        analysis = self.infrastructure.get_analysis_results()
-        
-        # Restaurant threshold recommendations
-        restaurant_stats = analysis['restaurant_spatial_analysis']['distance_statistics']
-        restaurant_recommendations = {
-            'conservative': restaurant_stats['p25'],  # 25th percentile - pairs closest restaurants
-            'moderate': restaurant_stats['p50'],      # 50th percentile - pairs about half
-            'aggressive': restaurant_stats['p75']     # 75th percentile - pairs most restaurants
-        }
-        
-        # Customer threshold recommendations  
-        customer_stats = analysis['customer_distance_analysis']['distance_statistics']
-        customer_recommendations = {
-            'conservative': customer_stats['p25'],   # 25th percentile - nearby customers only
-            'moderate': customer_stats['p50'],       # 50th percentile - moderate distance customers
-            'aggressive': customer_stats['p75']      # 75th percentile - wider customer range
-        }
-        
-        # Scoring system characteristics
-        scoring_characteristics = {
-            'typical_distance': analysis['typical_distance'],
-            'distance_efficiency_range': f"0km (perfect) to {analysis['typical_distance'] * 2:.1f}km (unacceptable)",
-            'geographic_context': f"{analysis['area_size']}x{analysis['area_size']}km area"
-        }
-        
-        self.logger.info("Parameter design report generated based on infrastructure analysis")
-        
-        return {
-            'infrastructure_summary': {
-                'area_size': analysis['area_size'],
-                'restaurant_count': analysis['restaurant_count'],
-                'typical_distance': analysis['typical_distance']
-            },
-            'pairing_parameter_recommendations': {
-                'restaurant_threshold_options': restaurant_recommendations,
-                'customer_threshold_options': customer_recommendations,
-                'pairing_feasibility_note': "Check analysis['restaurant_spatial_analysis']['pairing_feasibility_curve'] for detailed threshold impacts"
-            },
-            'scoring_system_characteristics': scoring_characteristics
-        }
-
-
-def analyze_infrastructure_for_experiment(infrastructure, scoring_config=None):
-    """
-    Convenience function for comprehensive infrastructure analysis.
-    
-    Creates InfrastructureAnalyzer and performs complete analysis in one call.
-    Results are automatically cached in the Infrastructure instance.
-    
-    Args:
-        infrastructure: Infrastructure instance to analyze
-        scoring_config: Optional ScoringConfig for analysis parameters
-        
-    Returns:
-        dict: Complete analysis results
-    """
-    analyzer = InfrastructureAnalyzer(infrastructure)
-    return analyzer.analyze_complete_infrastructure(scoring_config)

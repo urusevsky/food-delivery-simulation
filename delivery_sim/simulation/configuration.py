@@ -6,18 +6,21 @@ class StructuralConfig:
     def __init__(self, 
                  delivery_area_size,  # km (square area)
                  num_restaurants,
-                 driver_speed):       # km per minute
+                 driver_speed,        # km per minute
+                 typical_distance_samples=1000):  # Add this parameter
         
         self.delivery_area_size = delivery_area_size
         self.num_restaurants = num_restaurants
         self.driver_speed = driver_speed
+        self.typical_distance_samples = typical_distance_samples  # Add this line
         
     def __str__(self):
         """String representation for debugging and logging."""
         return (f"StructuralConfig("
                 f"area_size={self.delivery_area_size}km, "
                 f"restaurants={self.num_restaurants}, "
-                f"driver_speed={self.driver_speed}km/min)")
+                f"driver_speed={self.driver_speed}km/min, "
+                f"typical_distance_samples={self.typical_distance_samples})")
     
 class OperationalConfig:
     """Configuration for dynamic operational elements of the simulation."""
@@ -144,10 +147,8 @@ class ScoringConfig:
                  # Strategic weights (business preferences)
                  weight_distance=0.5,
                  weight_throughput=0.5,
-                 weight_fairness=0,
-                 
-                 # Typical distance calculation settings
-                 typical_distance_samples=1000):
+                 weight_fairness=0):
+
         
         # Business policy parameters
         self.max_distance_ratio_multiplier = max_distance_ratio_multiplier
@@ -159,8 +160,7 @@ class ScoringConfig:
         self.weight_throughput = weight_throughput
         self.weight_fairness = weight_fairness
         
-        # Calculation settings
-        self.typical_distance_samples = typical_distance_samples
+
     
     def __str__(self):
         """String representation for debugging and logging."""
@@ -168,8 +168,7 @@ class ScoringConfig:
                 f"weights=({self.weight_distance:.3f},{self.weight_throughput:.3f},{self.weight_fairness:.3f}), "
                 f"max_ratio={self.max_distance_ratio_multiplier}, "
                 f"max_wait={self.max_acceptable_delay}min, "
-                f"max_orders={self.max_orders_per_trip}, "
-                f"typical_distance_samples={self.typical_distance_samples})")
+                f"max_orders={self.max_orders_per_trip})")
 
 class FlatConfig:
     """
