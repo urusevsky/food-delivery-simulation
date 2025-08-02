@@ -226,32 +226,40 @@ class TimeSeriesPreprocessor:
 def extract_time_series_for_welch_analysis(multi_replication_snapshots, 
                                           design_points_dict=None,
                                           metrics=['active_drivers', 'unassigned_delivery_entities'],
-                                          collection_interval=0.5,
                                           moving_average_window=50):
     """
     Convenience function for extracting enhanced time series data with Welch's method.
     
+    This function encapsulates the standard workflow for time series preprocessing:
+    1. Auto-detect collection interval from snapshot timestamps
+    2. Extract cross-replication averages for specified metrics
+    3. Apply Welch's method (moving average smoothing) for trend detection
+    4. Add Little's Law theoretical validation (if design points provided)
+    
     Args:
         multi_replication_snapshots: List of snapshot lists from simulation results
         design_points_dict: Optional dict of DesignPoint instances for Little's Law validation
-        metrics: List of metric names to analyze
-        collection_interval: Time between snapshots
+        metrics: List of metric names to analyze (default: active drivers + unassigned entities)
         moving_average_window: Window size for moving average smoothing
         
     Returns:
         dict: Enhanced time series data ready for Welch's method visualization
+              Format: {metric_name: {time_points, cross_rep_averages, moving_averages, ...}}
     """
     preprocessor = TimeSeriesPreprocessor()
     
-    # Extract cross-replication averages with moving average smoothing
+    # Step 1 & 2 & 3: Extract cross-replication averages with auto-detected interval and Welch's smoothing
     time_series_data = preprocessor.extract_cross_replication_averages(
-        multi_replication_snapshots, metrics, collection_interval, moving_average_window
+        multi_replication_snapshots=multi_replication_snapshots,
+        metrics=metrics,
+        moving_average_window=moving_average_window
     )
     
-    # Add Little's Law theoretical values if design points provided
+    # Step 4: Add Little's Law theoretical values for validation (if design points provided)
     if design_points_dict:
         time_series_data = preprocessor.add_little_law_theoretical_values(
-            time_series_data, design_points_dict
+            time_series_data=time_series_data, 
+            design_points_dict=design_points_dict
         )
     
     return time_series_data

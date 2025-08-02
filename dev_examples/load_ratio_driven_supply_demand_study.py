@@ -182,15 +182,13 @@ print("\n" + "="*50)
 print("TIME SERIES ANALYSIS FOR LOAD RATIO VALIDATION")
 print("="*50)
 
-from delivery_sim.warmup_analysis.time_series_preprocessing import TimeSeriesPreprocessor
+from delivery_sim.warmup_analysis.time_series_preprocessing import extract_time_series_for_welch_analysis
 from delivery_sim.warmup_analysis.visualization import WelchMethodVisualization
 import matplotlib.pyplot as plt
 
 print("Extracting time series data for systematic load ratio validation...")
 
-preprocessor = TimeSeriesPreprocessor()
 viz = WelchMethodVisualization(figsize=(16, 10))  # Larger plots for detailed analysis
-
 all_time_series_data = {}
 
 for design_name, design_results in study_results.items():
@@ -207,25 +205,19 @@ for design_name, design_results in study_results.items():
         print(f"    ⚠️  Warning: Only {len(replication_snapshots)} replications")
         continue
     
-    # Extract time series with Welch's method
-    basic_data = preprocessor.extract_cross_replication_averages(
-        multi_replication_snapshots=replication_snapshots,
-        metrics=['active_drivers', 'unassigned_delivery_entities'],
-        collection_interval=experiment_config.collection_interval,
-        moving_average_window=100  # Larger window for 2000-minute simulation
-    )
-    
-    # Add Little's Law validation
+    # Use convenience function for complete preprocessing workflow
     single_design_dict = {design_name: design_points[design_name]}
-    enhanced_data = preprocessor.add_little_law_theoretical_values(
-        time_series_data={design_name: basic_data},
-        design_points_dict=single_design_dict
+    enhanced_data = extract_time_series_for_welch_analysis(
+        multi_replication_snapshots=replication_snapshots,
+        design_points_dict=single_design_dict,
+        metrics=['active_drivers', 'unassigned_delivery_entities'],
+        moving_average_window=100  # Larger window for 2000-minute simulation
     )
     
     all_time_series_data[design_name] = enhanced_data[design_name]
     
-    # Extract load ratio from design name for analysis
-    load_ratio_str = design_name.split('_')[2]  # Extract from "load_ratio_X.X_..."
+    # Log validation info
+    load_ratio_str = design_name.split('_')[2]
     load_ratio = float(load_ratio_str)
     
     if 'active_drivers' in enhanced_data[design_name] and 'theoretical_value' in enhanced_data[design_name]['active_drivers']:
