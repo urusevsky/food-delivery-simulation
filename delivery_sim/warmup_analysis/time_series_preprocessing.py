@@ -248,18 +248,25 @@ def extract_time_series_for_welch_analysis(multi_replication_snapshots,
     """
     preprocessor = TimeSeriesPreprocessor()
     
-    # Step 1 & 2 & 3: Extract cross-replication averages with auto-detected interval and Welch's smoothing
+    # Step 1 & 2 & 3: Extract cross-replication averages
     time_series_data = preprocessor.extract_cross_replication_averages(
         multi_replication_snapshots=multi_replication_snapshots,
         metrics=metrics,
         moving_average_window=moving_average_window
     )
     
-    # Step 4: Add Little's Law theoretical values for validation (if design points provided)
+    # Step 4: Add Little's Law theoretical values (if design points provided)
     if design_points_dict:
-        time_series_data = preprocessor.add_little_law_theoretical_values(
-            time_series_data=time_series_data, 
+        # Restructure data for add_little_law_theoretical_values()
+        design_name = list(design_points_dict.keys())[0]  # Get the design name
+        restructured_data = {design_name: time_series_data}  # Wrap with design name
+        
+        enhanced_data = preprocessor.add_little_law_theoretical_values(
+            time_series_data=restructured_data, 
             design_points_dict=design_points_dict
         )
-    
-    return time_series_data
+        
+        return enhanced_data  # Returns {design_name: {metric_data...}}
+    else:
+        # If no design points, return data organized by first design name (for consistency)
+        return {'single_design': time_series_data}
