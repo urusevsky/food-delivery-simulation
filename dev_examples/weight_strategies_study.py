@@ -18,6 +18,9 @@ This reveals:
 3. Trade-offs between distance efficiency, throughput optimization, and fairness considerations
 4. Context-sensitive priority scoring strategies for different operational regimes
 """
+# %% Enable Autoreload (ALWAYS put this at the top of research scripts)
+%load_ext autoreload
+%autoreload 2
 
 # %% Step 1: Setup and Imports
 import sys

@@ -10,6 +10,9 @@ Experimental Design:
 - Pairing Thresholds: restaurants=4.0km, customers=3.0km
 
 """
+# %% Enable Autoreload (ALWAYS put this at the top of research scripts)
+%load_ext autoreload
+%autoreload 2
 
 # %% Step 1: Setup and Imports
 import sys
