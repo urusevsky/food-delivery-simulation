@@ -234,30 +234,3 @@ class PriorityScorer:
         
         assignment_delay_minutes = self.env.now - earliest_arrival
         return assignment_delay_minutes
-
-
-def create_priority_scorer(infrastructure_characteristics, scoring_config, env):
-    """
-    Factory function to create a PriorityScorer for a specific replication.
-    
-    This creates a variant component that uses pre-calculated infrastructure characteristics
-    but is bound to a specific simulation environment.
-    
-    Args:
-        infrastructure_characteristics: Dict containing 'typical_distance' and other metrics
-        scoring_config: ScoringConfig instance from configuration.py
-        env: SimPy environment for this replication
-        
-    Returns:
-        PriorityScorer: Configured scoring system for this replication
-    """
-    typical_distance = infrastructure_characteristics['typical_distance']
-    
-    # Create scorer bound to this replication's environment
-    scorer = PriorityScorer(
-        scoring_config=scoring_config,
-        typical_distance=typical_distance,
-        env=env
-    )
-    
-    return scorer
