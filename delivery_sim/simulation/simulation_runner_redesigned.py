@@ -32,6 +32,7 @@ from delivery_sim.utils.priority_scoring import create_priority_scorer
 from delivery_sim.system_data.system_data_definitions import SystemDataDefinitions
 from delivery_sim.system_data.system_data_collector import SystemDataCollector
 from delivery_sim.system_data.system_snapshot_repository import SystemSnapshotRepository
+from delivery_sim.utils.priority_scoring import PriorityScorer
 
 
 class SimulationRunner:
@@ -52,20 +53,19 @@ class SimulationRunner:
         """
         self.logger = get_logger("simulation.runner")
         
-        # Store provided infrastructure (invariant across configurations)
-        self.infrastructure = infrastructure
-        
         # Validate infrastructure has been analyzed
         if not infrastructure.has_analysis_results():
-            raise ValueError("Infrastructure must be analyzed before use in SimulationRunner. "
-                           "Use InfrastructureAnalyzer.analyze_complete_infrastructure() first.")
+            raise ValueError("Infrastructure must be analyzed before use in SimulationRunner.")
         
-        # Extract infrastructure components for reuse
+        # Extract ONLY what we actually need from infrastructure
+        analysis_results = infrastructure.get_analysis_results()
+        self.typical_distance = analysis_results['typical_distance']  # Only this!
+        
+        # Store infrastructure components for reuse
         self.restaurant_repository = infrastructure.get_restaurant_repository()
-        self.infrastructure_characteristics = infrastructure.get_analysis_results()
         self.structural_config = infrastructure.structural_config
         
-        self.logger.info(f"SimulationRunner initialized with infrastructure: {infrastructure}")
+        self.logger.info(f"SimulationRunner initialized with typical_distance={self.typical_distance:.3f}km")
         
         # Variant components (fresh per configuration/replication)
         self.operational_config = None
@@ -132,8 +132,7 @@ class SimulationRunner:
         # ===== RETURN RESULTS =====
         experiment_result = {
             'replication_results': replication_results,
-            'infrastructure_characteristics': self.infrastructure_characteristics,
-            'infrastructure_signature': self.infrastructure.get_infrastructure_signature(),
+            'typical_distance': self.typical_distance,  # Only essential infrastructure data
             'config_summary': f"Op: {operational_config}, Exp: {experiment_config}",
             'num_replications': len(replication_results)
         }
@@ -188,14 +187,12 @@ class SimulationRunner:
         self.pair_repository = PairRepository()
         self.delivery_unit_repository = DeliveryUnitRepository()
         
-        # 5. Create priority scorer for this replication using infrastructure analysis
-        self.priority_scorer = create_priority_scorer(
-            infrastructure_characteristics=self.infrastructure_characteristics,
-            scoring_config=self.scoring_config,  # Direct reference to scoring config
+        # 5. SIMPLIFIED: Create priority scorer directly - no factory function
+        self.priority_scorer = PriorityScorer(
+            scoring_config=self.scoring_config,
+            typical_distance=self.typical_distance,  # Direct access to only what we need
             env=self.env
         )
-        self.logger.debug(f"Priority scorer created for replication {replication_number}")
-        
         # 6. Create services (connect infrastructure to variant environment)
         self._create_services()
         
