@@ -110,8 +110,6 @@ class SimulationRunner:
         self.config = self._create_service_config()
         
         self.logger.info(f"Starting experiment with {experiment_config.num_replications} replications")
-        self.logger.info(f"Reusing infrastructure: {self.infrastructure}")
-        self.logger.debug(f"Operational config: {operational_config}")
         
         # ===== RUN MULTIPLE REPLICATIONS =====
         replication_results = []
