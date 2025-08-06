@@ -179,54 +179,30 @@ print(f"✓ Validation pairs: {len(target_load_ratios)}")
 print(f"✓ Total design points executed: {len(study_results)}")
 print(f"✓ Ready for systematic regime validation analysis")
 
-# %% Step 7: Time Series Analysis for Load Ratio Validation
+# %% Step 7: Time Series Data Processing for Warmup Analysis
 print("\n" + "="*50)
-print("TIME SERIES ANALYSIS FOR LOAD RATIO VALIDATION")
+print("TIME SERIES DATA PROCESSING FOR WARMUP ANALYSIS")
 print("="*50)
 
-from delivery_sim.warmup_analysis.time_series_preprocessing import extract_time_series_for_welch_analysis
+from delivery_sim.warmup_analysis.time_series_processing import extract_warmup_time_series
 from delivery_sim.warmup_analysis.visualization import WelchMethodVisualization
-import matplotlib.pyplot as plt
 
-print("Extracting time series data for systematic load ratio validation...")
+print("Processing time series data for warmup detection...")
 
-viz = WelchMethodVisualization(figsize=(16, 10))  # Larger plots for detailed analysis
-all_time_series_data = {}
+# Simple, direct extraction - no complex data restructuring
+all_time_series_data = extract_warmup_time_series(
+    study_results=study_results,
+    design_points=design_points,
+    metrics=['active_drivers', 'unassigned_delivery_entities'],
+    moving_average_window=100  # Larger window for 2000-minute simulation
+)
 
-for design_name, design_results in study_results.items():
-    print(f"  Processing {design_name}...")
-    
-    # Extract system snapshots from replications
-    replication_snapshots = []
-    for replication_result in design_results['replication_results']:
-        snapshots = replication_result['system_snapshots']
-        if snapshots:
-            replication_snapshots.append(snapshots)
-    
-    if len(replication_snapshots) < 2:
-        print(f"    ⚠️  Warning: Only {len(replication_snapshots)} replications")
-        continue
-    
-    # Use convenience function for complete preprocessing workflow
-    single_design_dict = {design_name: design_points[design_name]}
-    enhanced_data = extract_time_series_for_welch_analysis(
-        multi_replication_snapshots=replication_snapshots,
-        design_points_dict=single_design_dict,
-        metrics=['active_drivers', 'unassigned_delivery_entities'],
-        moving_average_window=100  # Larger window for 2000-minute simulation
-    )
-    
-    all_time_series_data[design_name] = enhanced_data[design_name]
-    
-    # Log validation info
-    load_ratio_str = design_name.split('_')[2]
-    load_ratio = float(load_ratio_str)
-    
-    if 'active_drivers' in enhanced_data[design_name] and 'theoretical_value' in enhanced_data[design_name]['active_drivers']:
-        theoretical_value = enhanced_data[design_name]['active_drivers']['theoretical_value']
-        print(f"    ✓ Load Ratio: {load_ratio:.1f}, Little's Law: {theoretical_value:.1f} drivers")
+# Initialize visualization object
+viz = WelchMethodVisualization(figsize=(16, 10))
 
-print(f"\n✓ Time series extraction complete for {len(all_time_series_data)} design points")
+print(f"✓ Time series processing complete for {len(all_time_series_data)} design points")
+print(f"✓ Each design point has {len(next(iter(all_time_series_data.values())))} metrics")
+print(f"✓ Ready for warmup analysis visualization")
 
 # %% Step 8: Systematic Load Ratio Visualization (Validation Pairs)
 print("\n" + "="*50)
