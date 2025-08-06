@@ -28,7 +28,6 @@ from delivery_sim.services.delivery_service import DeliveryService
 from delivery_sim.services.driver_scheduling_service import DriverSchedulingService
 from delivery_sim.utils.id_generator import PrefixedIdGenerator
 from delivery_sim.utils.logging_system import get_logger, configure_logging
-from delivery_sim.utils.priority_scoring import create_priority_scorer
 from delivery_sim.system_data.system_data_definitions import SystemDataDefinitions
 from delivery_sim.system_data.system_data_collector import SystemDataCollector
 from delivery_sim.system_data.system_snapshot_repository import SystemSnapshotRepository
