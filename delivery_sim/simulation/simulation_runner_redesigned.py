@@ -148,11 +148,11 @@ class SimulationRunner:
         from delivery_sim.simulation.configuration import FlatConfig
         
         return FlatConfig(
-            self.infrastructure.structural_config,  # From infrastructure
-            self.operational_config,                # Method argument
-            self.experiment_config,                 # Method argument
-            None,                                   # No logging config needed
-            self.scoring_config                     # Method argument or default
+            self.structural_config,                 
+            self.operational_config,                
+            self.experiment_config,                 
+            None,                                  
+            self.scoring_config                    
         )
     
 
