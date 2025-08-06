@@ -286,7 +286,3 @@ def create_welch_inspection_plots(time_series_data, show_combined=True, show_ind
     
     return figures
 
-
-# Maintain backward compatibility with old naming
-TimeSeriesVisualization = WelchMethodVisualization
-create_inspection_plots = create_welch_inspection_plots
