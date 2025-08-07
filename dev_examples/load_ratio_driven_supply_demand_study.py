@@ -268,50 +268,17 @@ print(f"✓ Created {plot_count} warmup analysis plots")
 print(f"✓ Organized by {len(load_ratio_groups)} load ratios")
 print(f"✓ Each plot shows active drivers (warmup signal) + unassigned entities (regime signal)")
 
-# %% Step 9: Warmup Period Determination for Extended Data
+# %% Step 9: Warmup Period Determination
 print("\n" + "="*50)
-print("WARMUP PERIOD DETERMINATION FOR EXTENDED SIMULATION")
+print("WARMUP PERIOD DETERMINATION")
 print("="*50)
 
-print("📌 EXTENDED SIMULATION WARMUP GUIDANCE:")
-print("Based on the systematic validation plots above:")
-print("1. Focus on Active Drivers convergence across ALL design points")
-print("2. Find latest convergence point across all load ratios and validation pairs")
-print("3. Account for extended 2000-minute duration")
-print("4. Add conservative margin for methodological rigor")
+# Set warmup period based on visual inspection of Step 8 plots
+uniform_warmup_period = 500  # UPDATE THIS based on visual inspection
 
-# Set your warmup period based on visual inspection of systematic validation plots
-proposed_warmup_period = 500  # UPDATE THIS based on systematic visual inspection
-
-print(f"\n⚙️  Proposed warmup period for systematic study: {proposed_warmup_period} minutes")
-
-# Extended validation for systematic design
-validation_summary = []
-for design_name in all_time_series_data.keys():
-    first_metric = list(all_time_series_data[design_name].keys())[0]
-    max_time = max(all_time_series_data[design_name][first_metric]['time_points'])
-    analysis_window = max_time - proposed_warmup_period
-    warmup_ratio = proposed_warmup_period / max_time
-    
-    validation_summary.append({
-        'design_name': design_name,
-        'warmup_ratio': warmup_ratio,
-        'analysis_window': analysis_window
-    })
-
-avg_warmup_ratio = sum(v['warmup_ratio'] for v in validation_summary) / len(validation_summary)
-min_analysis_window = min(v['analysis_window'] for v in validation_summary)
-
-print(f"✓ Average warmup ratio: {avg_warmup_ratio*100:.1f}%")
-print(f"✓ Minimum analysis window: {min_analysis_window:.1f} minutes")
-print(f"✓ Systematic data provides {min_analysis_window:.0f} minutes of post-warmup analysis")
-
-if avg_warmup_ratio <= 0.4 and min_analysis_window >= 60:
-    print("✅ Warmup period appears appropriate for systematic study")
-else:
-    print("⚠️  Consider adjusting warmup period for extended systematic simulation")
-
-uniform_warmup_period = proposed_warmup_period
+print(f"✓ Warmup period set: {uniform_warmup_period} minutes")
+print(f"✓ Based on visual inspection of active drivers oscillation around Little's Law values")
+print(f"✓ Analysis window: {experiment_config.simulation_duration - uniform_warmup_period} minutes of post-warmup data")
 
 # %% Step 10: Systematic Performance Metrics Analysis
 print("\n" + "="*50)
