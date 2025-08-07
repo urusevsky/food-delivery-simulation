@@ -280,44 +280,31 @@ print(f"✓ Warmup period set: {uniform_warmup_period} minutes")
 print(f"✓ Based on visual inspection of active drivers oscillation around Little's Law values")
 print(f"✓ Analysis window: {experiment_config.simulation_duration - uniform_warmup_period} minutes of post-warmup data")
 
-# %% Step 10: Systematic Performance Metrics Analysis
+# %% Step 10: Performance Metrics Analysis (Simplified for Research)
 print("\n" + "="*50)
-print("SYSTEMATIC PERFORMANCE METRICS CALCULATION")
+print("PERFORMANCE METRICS CALCULATION")
 print("="*50)
 
 from delivery_sim.analysis_pipeline.pipeline_coordinator import analyze_single_configuration
 
-print(f"Calculating systematic performance metrics for {len(study_results)} design points...")
-print(f"Using uniform warmup period: {uniform_warmup_period} minutes")
-print(f"Extended analysis focus: Load ratio validation across baseline vs 2x baseline pairs")
+print(f"Processing {len(study_results)} design points with warmup period: {uniform_warmup_period} minutes")
 
 metrics_results = {}
 
 for design_name, design_results in study_results.items():
     print(f"  Processing {design_name}...")
     
-    try:
-        analysis_result = analyze_single_configuration(
-            simulation_results=design_results,
-            warmup_period=uniform_warmup_period,
-            confidence_level=0.95
-        )
-        
-        metrics_results[design_name] = {
-            'analysis': analysis_result,
-            'status': 'success'
-        }
-        print(f"    ✓ Success")
-        
-    except Exception as e:
-        print(f"    ✗ Error: {str(e)}")
-        metrics_results[design_name] = {
-            'analysis': None,
-            'status': 'error',
-            'error': str(e)
-        }
+    # Direct call - let errors surface immediately for debugging
+    analysis_result = analyze_single_configuration(
+        simulation_results=design_results,
+        warmup_period=uniform_warmup_period,
+        confidence_level=0.95
+    )
+    
+    metrics_results[design_name] = analysis_result
+    print(f"    ✓ Complete")
 
-print(f"\n✓ Systematic metrics calculation complete")
+print(f"✓ All design points processed successfully")
 
 # %% Step 11: Systematic Validation Evidence Table
 print("\n" + "="*50)
