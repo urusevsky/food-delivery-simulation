@@ -204,81 +204,69 @@ print(f"✓ Time series processing complete for {len(all_time_series_data)} desi
 print(f"✓ Each design point has {len(next(iter(all_time_series_data.values())))} metrics")
 print(f"✓ Ready for warmup analysis visualization")
 
-# %% Step 8: Systematic Load Ratio Visualization (Validation Pairs)
+# %% Step 8: Simplified Warmup Analysis Visualization
 print("\n" + "="*50)
-print("SYSTEMATIC LOAD RATIO VALIDATION: PAIRED COMPARISONS")
+print("WARMUP ANALYSIS VISUALIZATION: SIMPLIFIED APPROACH")
 print("="*50)
 
-print("Creating systematic validation plots by load ratio...")
-print("Hypothesis test: Validation pairs should show same regime patterns")
+from delivery_sim.warmup_analysis.visualization import WelchMethodVisualization
+import matplotlib.pyplot as plt
 
-# Sort and group design points by load ratio for systematic comparison
+print("Creating warmup analysis plots using simplified visualization...")
+
+# Initialize visualization object
+viz = WelchMethodVisualization(figsize=(16, 10))
+
+# Group design points by load ratio for organized display
 load_ratio_groups = {}
 for design_name in all_time_series_data.keys():
-    load_ratio_str = design_name.split('_')[2]  # Extract from "load_ratio_X.X_..."
+    # Extract load ratio from design name (e.g., "load_ratio_3.0_baseline")
+    load_ratio_str = design_name.split('_')[2]  # "3.0"
     load_ratio = float(load_ratio_str)
     
     if load_ratio not in load_ratio_groups:
         load_ratio_groups[load_ratio] = []
     load_ratio_groups[load_ratio].append(design_name)
 
-# Create paired plots for each load ratio
+print(f"✓ Grouped {len(all_time_series_data)} design points by {len(load_ratio_groups)} load ratios")
+
+# Create plots systematically by load ratio
 plot_count = 0
 for load_ratio in sorted(load_ratio_groups.keys()):
     design_names = load_ratio_groups[load_ratio]
     
-    if len(design_names) != 2:
-        print(f"⚠️  Load ratio {load_ratio} has {len(design_names)} design points, expected 2")
-        continue
+    print(f"\n--- Load Ratio {load_ratio:.1f} ---")
     
-    # Sort by baseline vs 2x baseline
-    baseline_design = [name for name in design_names if 'baseline' in name and '2x' not in name][0]
-    double_baseline_design = [name for name in design_names if '2x_baseline' in name][0]
+    # Sort design names for consistent ordering (baseline first, then 2x baseline)
+    design_names_sorted = sorted(design_names, key=lambda x: (load_ratio, '2x' in x))
     
-    print(f"\n--- Load Ratio {load_ratio:.1f} Validation Pair ---")
-    print(f"  Baseline: {baseline_design}")
-    print(f"  2x Baseline: {double_baseline_design}")
-    
-    # Create side-by-side comparison plots
-    for i, (design_name, label) in enumerate([(baseline_design, 'Baseline'), (double_baseline_design, '2x Baseline')]):
+    for design_name in design_names_sorted:
         plot_count += 1
-        enhanced_data = all_time_series_data[design_name]
         
-        # Get simulation info
-        if 'active_drivers' in enhanced_data:
-            first_metric_data = enhanced_data['active_drivers']
-            total_duration = max(first_metric_data['time_points'])
-            replication_count = first_metric_data['replication_count']
-            
-            # Little's Law validation
-            if 'theoretical_value' in first_metric_data:
-                theoretical_value = first_metric_data['theoretical_value']
-                moving_averages = first_metric_data['moving_averages']
-                final_ma_value = moving_averages[-1] if moving_averages else 0
-                convergence_error = abs(final_ma_value - theoretical_value) / theoretical_value * 100
-                print(f"    {label}: Little's Law {theoretical_value:.1f} vs Final {final_ma_value:.1f} (Error: {convergence_error:.1f}%)")
+        # Determine interval type for title
+        interval_type = "2x Baseline" if "2x_baseline" in design_name else "Baseline"
         
-        # Create validation plot
-        fig = viz.create_combined_welch_inspection_plot(
-            enhanced_data, 
-            title=f'Load Ratio {load_ratio:.1f}: {label} Interval Pattern'
-        )
+        # Extract intervals directly from configuration (no conversion needed)
+        order_interval = 1.0 if interval_type == "Baseline" else 2.0
+        driver_interval = load_ratio if interval_type == "Baseline" else 2.0 * load_ratio
         
-        # Add validation annotation
-        fig.text(0.5, 0.01, 
-                 f'Validation Test: Compare regime patterns between Baseline vs 2x Baseline for Load Ratio {load_ratio:.1f}',
-                 ha='center', fontsize=11, weight='bold',
-                 bbox=dict(boxstyle='round', facecolor='lightgreen', alpha=0.8))
+        # Create plot title with actual configuration intervals
+        plot_title = (f'Load Ratio {load_ratio:.1f} - {interval_type} Interval\n'
+                     f'(Order: {order_interval:.1f}min, Driver: {driver_interval:.1f}min)')
+        
+        print(f"  Creating plot {plot_count}: {interval_type}")
+        
+        # Use simplified visualization - one function call!
+        time_series_data = all_time_series_data[design_name]
+        fig = viz.create_warmup_analysis_plot(time_series_data, title=plot_title)
         
         plt.show()
-        print(f"    ✓ {label} plot displayed")
+        print(f"    ✓ {design_name} plot displayed")
 
-print(f"\n🎯 Systematic validation plots complete!")
-print(f"\n📋 LOAD RATIO VALIDATION GUIDANCE:")
-print(f"For each load ratio, compare Baseline vs 2x Baseline patterns:")
-print(f"• Active Drivers (top): Should both converge to Little's Law predictions")
-print(f"• Unassigned Delivery Entities (bottom): Should show SAME regime pattern")
-print(f"• If hypothesis holds: Same qualitative behavior, different quantitative performance")
+print(f"\n🎯 WARMUP ANALYSIS COMPLETE!")
+print(f"✓ Created {plot_count} warmup analysis plots")
+print(f"✓ Organized by {len(load_ratio_groups)} load ratios")
+print(f"✓ Each plot shows active drivers (warmup signal) + unassigned entities (regime signal)")
 
 # %% Step 9: Warmup Period Determination for Extended Data
 print("\n" + "="*50)
