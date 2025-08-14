@@ -1,107 +1,180 @@
 # delivery_sim/simulation/data_preparation.py
 """
-Data preparation and filtering for metrics analysis.
+Revamped data preparation module for analysis pipeline.
 
-This module provides functions to filter raw simulation data and prepare it
-for metrics calculation, including warmup period filtering and entity validation.
+This module provides centralized population creation for all analytical needs.
+Each population is clearly defined based on the specific research question it serves.
+All filtering logic lives here - metric calculation functions only do calculations.
 """
 
+from delivery_sim.utils.entity_type_utils import EntityType
 
-def filter_entities_for_analysis(repositories, warmup_period):
+
+class AnalyticalPopulations:
     """
-    Filter entities from repositories to exclude warmup period data.
+    Centralized factory for creating analytical populations.
     
-    This function applies warmup filtering to different entity types based on
-    their relevant timing attributes, preparing clean datasets for metrics analysis.
+    This class serves as the single source of truth for all data filtering logic.
+    Each method creates a specific population tailored to particular metric needs.
+    """
     
-    Args:
-        repositories: Dict containing entity repositories
-        warmup_period: Duration (in simulation time) to exclude from analysis
+    def __init__(self, repositories, warmup_period):
+        """
+        Initialize the population factory.
         
-    Returns:
-        dict: Filtered entities by type, ready for metrics calculation
-    """
-    filtered_entities = {}
+        Args:
+            repositories: Dict containing all entity repositories from simulation
+            warmup_period: Duration to exclude from analysis (warmup bias elimination)
+        """
+        self._repositories = repositories
+        self._warmup_period = warmup_period
     
-    # Filter orders: arrived after warmup AND completed (full lifecycle)
-    if 'order' in repositories:
-        filtered_entities['order'] = _filter_orders_by_warmup(
-            repositories['order'], warmup_period
-        )
-    
-    # Filter delivery units: constituent orders arrived after warmup AND delivery completed
-    if 'delivery_unit' in repositories:
-        filtered_entities['delivery_unit'] = _filter_delivery_units_by_warmup(
-            repositories['delivery_unit'], warmup_period
-        )
-    
-    return filtered_entities
-
-
-def count_orders_arrived_during_analysis(order_repository, warmup_period):
-    """
-    Count orders that arrived during analysis period (regardless of completion status).
-    
-    This is used for calculating completion rates in system metrics.
-    
-    Args:
-        order_repository: Repository containing all orders
-        warmup_period: Duration to exclude from start
+    def get_cohort_orders(self):
+        """
+        Get all cohort orders (arrived post-warmup).
         
-    Returns:
-        int: Number of orders that arrived after warmup period
-    """
-    all_orders = order_repository.find_all()
-    return len([
-        order for order in all_orders 
-        if order.arrival_time >= warmup_period
-    ])
-
-
-def _filter_orders_by_warmup(order_repository, warmup_period):
-    """
-    Filter orders that arrived after warmup period AND were delivered (complete lifecycle).
-    """
-    all_orders = order_repository.find_all()
-    return [
-        order for order in all_orders 
-        if (order.arrival_time >= warmup_period and 
-            order.delivery_time is not None)
-    ]
-
-
-def _filter_delivery_units_by_warmup(delivery_unit_repository, warmup_period):
-    """
-    Filter delivery units where ALL constituent orders arrived after warmup period
-    AND the delivery unit was completed (complete lifecycle).
-    
-    This ensures delivery units represent complete lifecycles during the 
-    representative period, not hybrid startup/steady-state behavior.
-    """
-    from delivery_sim.utils.entity_type_utils import EntityType
-    
-    all_units = delivery_unit_repository.find_all()
-    valid_units = []
-    
-    for unit in all_units:
-        # Must be completed (complete lifecycle requirement)
-        if not unit.completion_time:
-            continue
+        This population defines the complete set of orders the system was 
+        responsible for during the representative period. Used as denominator 
+        for system-wide effectiveness metrics like completion rate.
+        
+        Research Question: "What was the total demand placed on the system 
+        during its normal operational state?"
+        
+        Returns:
+            list: All orders with arrival_time >= warmup_period, regardless of completion status
+        """
+        if 'order' not in self._repositories:
+            return []
             
-        entity = unit.delivery_entity
-        
-        if entity.entity_type == EntityType.ORDER:
-            # Single order: order must have arrived after warmup
-            if entity.arrival_time >= warmup_period:
-                valid_units.append(unit)
-                
-        elif entity.entity_type == EntityType.PAIR:
-            # Paired orders: BOTH orders must have arrived after warmup
-            if (entity.order1.arrival_time >= warmup_period and 
-                entity.order2.arrival_time >= warmup_period):
-                valid_units.append(unit)
+        all_orders = self._repositories['order'].find_all()
+        return [
+            order for order in all_orders 
+            if order.arrival_time >= self._warmup_period
+        ]
     
-    return valid_units
+    def get_cohort_completed_orders(self):
+        """
+        Get all cohort orders that were completed (arrived post-warmup and delivered).
+        
+        This population serves dual purposes:
+        1. System effectiveness numerator (how many cohort orders were successfully delivered)
+        2. Unbiased performance sample (for calculating averages of completed orders)
+        
+        Since orders are atomic entities, completed cohort orders represent 
+        both successful outcomes and an unbiased performance sample.
+        
+        Research Questions: 
+        - "Of all cohort orders, how many were delivered?"
+        - "For completed cohort orders, what was their typical performance?"
+        
+        Returns:
+            list: All cohort orders that were delivered
+        """
+        cohort = self.get_cohort_orders()
+        return [
+            order for order in cohort 
+            if order.delivery_time is not None
+        ]
+    
+    def get_cohort_delivery_units(self):
+        """
+        Get cohort delivery units for calculating unbiased average performance metrics.
+        
+        This population applies strict filtering to ensure no contamination 
+        bias from warmup period. For delivery units, ALL constituent orders must 
+        have arrived post-warmup, explicitly excluding "hybrid" pairs.
+        
+        Research Question: "For delivery units representing pure steady-state 
+        operations, what is their expected performance?"
+        
+        Returns:
+            list: Completed delivery units where all constituent orders arrived post-warmup
+        """
+        if 'delivery_unit' not in self._repositories:
+            return []
+            
+        all_units = self._repositories['delivery_unit'].find_all()
+        unbiased_units = []
+        
+        for unit in all_units:
+            # Must be completed (complete lifecycle requirement)
+            if not unit.completion_time:
+                continue
+                
+            entity = unit.delivery_entity
+            
+            if entity.entity_type == EntityType.ORDER:
+                # Single order: order must have arrived after warmup
+                if entity.arrival_time >= self._warmup_period:
+                    unbiased_units.append(unit)
+                    
+            elif entity.entity_type == EntityType.PAIR:
+                # Paired orders: BOTH orders must have arrived after warmup (strict filtering)
+                if (entity.order1.arrival_time >= self._warmup_period and 
+                    entity.order2.arrival_time >= self._warmup_period):
+                    unbiased_units.append(unit)
+        
+        return unbiased_units
+    
+    def get_cohort_paired_orders(self):
+        """
+        Get all cohort orders that were successfully paired.
+        
+        This captures the pairing decision for cohort orders regardless of whether 
+        the pair was subsequently assigned to a driver. Used for calculating pairing 
+        effectiveness and related system metrics.
+        
+        Research Question: "Of all cohort orders, how many were successfully 
+        paired with another order?"
+        
+        Returns:
+            list: Cohort orders that were paired
+        """
+        cohort = self.get_cohort_orders()
+        return [
+            order for order in cohort 
+            if order.pair is not None
+        ]
+
+
+class AnalysisData:
+    """
+    Container object holding all analytical populations for a replication.
+    
+    This object serves as the single source of truth passed to all metric 
+    calculation functions, providing clean and consistent interfaces.
+    """
+    
+    def __init__(self, populations):
+        """
+        Initialize with pre-computed populations.
+        
+        Args:
+            populations: AnalyticalPopulations instance
+        """
+        # Create all populations upfront for this replication
+        self.cohort_orders = populations.get_cohort_orders()
+        self.cohort_completed_orders = populations.get_cohort_completed_orders()
+        self.cohort_delivery_units = populations.get_cohort_delivery_units()
+        self.cohort_paired_orders = populations.get_cohort_paired_orders()
+
+
+def prepare_analysis_data(repositories, warmup_period):
+    """
+    Main entry point for creating analysis-ready data populations.
+    
+    This function creates all analytical populations needed for metrics calculation
+    and packages them in a clean container object.
+    
+    Args:
+        repositories: Dict containing all entity repositories from simulation
+        warmup_period: Duration to exclude from analysis
+        
+    Returns:
+        AnalysisData: Container with all populations ready for metric calculations
+    """
+    populations = AnalyticalPopulations(repositories, warmup_period)
+    return AnalysisData(populations)
 
 
 def get_analysis_time_window(simulation_duration, warmup_period):
@@ -119,6 +192,9 @@ def get_analysis_time_window(simulation_duration, warmup_period):
     analysis_end_time = simulation_duration
     
     if analysis_start_time >= analysis_end_time:
-        raise ValueError(f"Warmup period ({warmup_period}) must be less than simulation duration ({simulation_duration})")
+        raise ValueError(
+            f"Warmup period ({warmup_period}) must be less than "
+            f"simulation duration ({simulation_duration})"
+        )
     
     return analysis_start_time, analysis_end_time
