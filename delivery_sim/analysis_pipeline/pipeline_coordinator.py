@@ -4,9 +4,11 @@ Pipeline coordinator for end-to-end experiment analysis.
 
 This module orchestrates the complete analysis pipeline from raw simulation results
 to experiment-level summaries with confidence intervals.
+
+Updated to use the new centralized data preparation approach with AnalysisData.
 """
 
-from delivery_sim.analysis_pipeline.data_preparation import filter_entities_for_analysis
+from delivery_sim.analysis_pipeline.data_preparation import prepare_analysis_data
 from delivery_sim.analysis_pipeline.replication_level_aggregation.entity_replication_summaries import aggregate_entity_metrics
 from delivery_sim.metrics.system.entity_derived_metrics import calculate_all_entity_derived_system_metrics
 from delivery_sim.analysis_pipeline.experiment_level_aggregation.experiment_summaries import create_complete_experiment_summary
@@ -19,6 +21,8 @@ class ExperimentAnalysisPipeline:
     
     Takes raw simulation results (multiple replications) and produces
     experiment-level summaries with confidence intervals.
+    
+    Updated to use centralized data preparation with AnalysisData objects.
     """
     
     def __init__(self, warmup_period, confidence_level=0.95):
@@ -43,7 +47,7 @@ class ExperimentAnalysisPipeline:
             simulation_results: Results from simulation_runner.run_experiment()
                 Expected structure: {
                     'replication_results': [repo_dict1, repo_dict2, ...],
-                    'infrastructure_characteristics': {...},
+                    'typical_distance': float,
                     'config_summary': str,
                     'num_replications': int
                 }
@@ -63,19 +67,21 @@ class ExperimentAnalysisPipeline:
         for i, replication_result in enumerate(replication_results):
             self.logger.debug(f"Processing replication {i+1}/{num_replications}")
 
-            # FIXED: Extract repositories from enhanced structure
+            # Extract repositories from enhanced structure
             repositories = replication_result['repositories']
             
-            # Step 1: Data preparation (filtering)
-            filtered_entities = filter_entities_for_analysis(repositories, self.warmup_period)
+            # Step 1: Centralized data preparation (NEW APPROACH)
+            analysis_data = prepare_analysis_data(repositories, self.warmup_period)
             
-            # Step 2: Entity metrics (if any filtered entities exist)
-            entity_summary = self._process_entity_metrics(filtered_entities)
+            self.logger.debug(f"Prepared analysis data with {len(analysis_data.cohort_orders)} cohort orders")
+            
+            # Step 2: Entity metrics (if any completed entities exist)
+            entity_summary = self._process_entity_metrics(analysis_data)
             if entity_summary:
                 entity_summaries.append(entity_summary)
             
-            # Step 3: System metrics
-            system_summary = self._process_system_metrics(repositories, filtered_entities)
+            # Step 3: System metrics (using clean AnalysisData interface)
+            system_summary = self._process_system_metrics(analysis_data)
             system_summaries.append(system_summary)
         
         self.logger.info(f"Processed {len(entity_summaries)} entity summaries and {len(system_summaries)} system summaries")
@@ -90,25 +96,27 @@ class ExperimentAnalysisPipeline:
         # Add metadata
         experiment_summary.update({
             'warmup_period': self.warmup_period,
-            'infrastructure_characteristics': simulation_results.get('infrastructure_characteristics'),
-            'config_summary': simulation_results.get('config_summary')
+            'typical_distance': simulation_results.get('typical_distance'),
+            'config_summary': simulation_results.get('config_summary'),
+            'num_replications': simulation_results.get('num_replications')
         })
         
         self.logger.info("Analysis pipeline completed successfully")
         return experiment_summary
     
-    def _process_entity_metrics(self, filtered_entities):
+    def _process_entity_metrics(self, analysis_data):
         """
-        Process entity metrics for a single replication.
+        Process entity metrics for a single replication using AnalysisData.
         
         Args:
-            filtered_entities: Dictionary of filtered entity lists
+            analysis_data: AnalysisData object with pre-filtered populations
             
         Returns:
             dict: Entity replication summary or empty dict if no entities
         """
-        if not filtered_entities:
-            self.logger.debug("No filtered entities - skipping entity metrics")
+        # Check if we have any completed entities to process (for performance metrics)
+        if not (analysis_data.cohort_completed_orders or analysis_data.cohort_completed_delivery_units):
+            self.logger.debug("No completed entities in cohort - skipping entity metrics")
             return {}
         
         # Import metric functions
@@ -117,8 +125,8 @@ class ExperimentAnalysisPipeline:
         
         entity_summary = {}
         
-        # Process orders if available
-        if 'order' in filtered_entities and filtered_entities['order']:
+        # Process completed orders if available (for performance averages)
+        if analysis_data.cohort_completed_orders:
             order_metrics = {
                 'assignment_time': lambda order: calculate_all_order_metrics(order)['waiting_time'],
                 'travel_time': lambda order: calculate_all_order_metrics(order)['travel_time'],
@@ -126,43 +134,38 @@ class ExperimentAnalysisPipeline:
             }
             
             entity_summary['orders'] = aggregate_entity_metrics(
-                filtered_entities['order'], 
+                analysis_data.cohort_completed_orders, 
                 order_metrics
             )
             
-            self.logger.debug(f"Processed {len(filtered_entities['order'])} orders")
+            self.logger.debug(f"Processed {len(analysis_data.cohort_completed_orders)} completed orders")
         
-        # Process delivery units if available
-        if 'delivery_unit' in filtered_entities and filtered_entities['delivery_unit']:
+        # Process completed delivery units if available (for performance averages)
+        if analysis_data.cohort_completed_delivery_units:
             delivery_unit_metrics = {
                 'total_distance': lambda unit: calculate_all_delivery_unit_metrics(unit)['total_distance']
             }
             entity_summary['delivery_units'] = aggregate_entity_metrics(
-                filtered_entities['delivery_unit'],
+                analysis_data.cohort_completed_delivery_units,
                 delivery_unit_metrics
             )
             
-            self.logger.debug(f"Processed {len(filtered_entities['delivery_unit'])} delivery units")
+            self.logger.debug(f"Processed {len(analysis_data.cohort_completed_delivery_units)} completed delivery units")
         
         return entity_summary
     
-    def _process_system_metrics(self, repositories, filtered_entities):
+    def _process_system_metrics(self, analysis_data):
         """
-        Process system metrics for a single replication.
+        Process system metrics for a single replication using clean AnalysisData interface.
         
         Args:
-            repositories: Dictionary of entity repositories
-            filtered_entities: Dictionary of filtered entity lists
+            analysis_data: AnalysisData object with pre-filtered populations
             
         Returns:
             dict: System metrics for this replication
         """
-        # Calculate system metrics directly
-        system_metrics = calculate_all_entity_derived_system_metrics(
-            repositories, 
-            filtered_entities, 
-            self.warmup_period
-        )
+        # Calculate system metrics using the new clean interface
+        system_metrics = calculate_all_entity_derived_system_metrics(analysis_data)
         
         self.logger.debug(f"Calculated system metrics: {list(system_metrics.keys())}")
         return system_metrics
@@ -172,61 +175,15 @@ def analyze_single_configuration(simulation_results, warmup_period, confidence_l
     """
     Convenience function for analyzing a single configuration experiment.
     
+    Updated to use the new pipeline coordinator approach.
+    
     Args:
-        simulation_results: Results from simulation_runner.run_experiment()
-        warmup_period: Duration to exclude from analysis
-        confidence_level: Confidence level for intervals (default: 0.95)
+        simulation_results: Results from simulation run containing repositories
+        warmup_period: Warmup period for analysis
+        confidence_level: Confidence level for statistical analysis
         
     Returns:
-        dict: Complete experiment summary with confidence intervals
+        dict: Complete analysis results for the configuration
     """
     pipeline = ExperimentAnalysisPipeline(warmup_period, confidence_level)
     return pipeline.analyze_experiment(simulation_results)
-
-
-def quick_summary(experiment_summary, metrics_of_interest=None):
-    """
-    Generate a quick summary of key metrics for thesis writing.
-    
-    Args:
-        experiment_summary: Results from analyze_single_configuration()
-        metrics_of_interest: List of metric names to focus on (default: all)
-        
-    Returns:
-        dict: Simplified summary with just point estimates and CI widths
-    """
-    if metrics_of_interest is None:
-        metrics_of_interest = ['completion_rate', 'assignment_time', 'total_distance']
-    
-    quick_results = {}
-    
-    # System metrics
-    system_metrics = experiment_summary.get('system_metrics', {})
-    for metric_name in metrics_of_interest:
-        if metric_name in system_metrics:
-            result = system_metrics[metric_name]
-            if result['point_estimate'] is not None:
-                ci_lower, ci_upper = result['confidence_interval']
-                ci_width = ci_upper - ci_lower
-                quick_results[metric_name] = {
-                    'value': result['point_estimate'],
-                    'ci_width': ci_width,
-                    'formatted': f"{result['point_estimate']:.3f} ± {ci_width/2:.3f}"
-                }
-    
-    # Entity metrics (focusing on means)
-    entity_metrics = experiment_summary.get('entity_metrics', {})
-    for entity_type, metrics in entity_metrics.items():
-        for metric_name, stats in metrics.items():
-            if metric_name in metrics_of_interest and 'mean' in stats:
-                result = stats['mean']
-                if result['point_estimate'] is not None:
-                    ci_lower, ci_upper = result['confidence_interval']
-                    ci_width = ci_upper - ci_lower
-                    quick_results[f"{entity_type}_{metric_name}_mean"] = {
-                        'value': result['point_estimate'],
-                        'ci_width': ci_width,
-                        'formatted': f"{result['point_estimate']:.3f} ± {ci_width/2:.3f}"
-                    }
-    
-    return quick_results
