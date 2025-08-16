@@ -76,16 +76,18 @@ class AnalyticalPopulations:
             if order.delivery_time is not None
         ]
     
-    def get_cohort_delivery_units(self):
+    def get_cohort_completed_delivery_units(self):
         """
-        Get cohort delivery units for calculating unbiased average performance metrics.
+        Get completed cohort delivery units for calculating unbiased average performance metrics.
         
         This population applies strict filtering to ensure no contamination 
         bias from warmup period. For delivery units, ALL constituent orders must 
         have arrived post-warmup, explicitly excluding "hybrid" pairs.
         
+        Only completed delivery units are included to ensure complete lifecycle data.
+        
         Research Question: "For delivery units representing pure steady-state 
-        operations, what is their expected performance?"
+        operations that were completed, what is their expected performance?"
         
         Returns:
             list: Completed delivery units where all constituent orders arrived post-warmup
@@ -155,7 +157,7 @@ class AnalysisData:
         # Create all populations upfront for this replication
         self.cohort_orders = populations.get_cohort_orders()
         self.cohort_completed_orders = populations.get_cohort_completed_orders()
-        self.cohort_delivery_units = populations.get_cohort_delivery_units()
+        self.cohort_delivery_units = populations.get_cohort_completed_delivery_units()
         self.cohort_paired_orders = populations.get_cohort_paired_orders()
 
 
