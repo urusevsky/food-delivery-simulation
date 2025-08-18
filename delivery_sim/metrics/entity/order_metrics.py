@@ -78,7 +78,7 @@ def calculate_all_order_metrics(order):
               or None for metrics that cannot be calculated (incomplete orders)
     """
     return {
-        'waiting_time': calculate_order_assignment_time(order),
+        'assignment_time': calculate_order_assignment_time(order),
         'travel_time': calculate_order_travel_time(order),
         'fulfillment_time': calculate_order_fulfillment_time(order)
     }
