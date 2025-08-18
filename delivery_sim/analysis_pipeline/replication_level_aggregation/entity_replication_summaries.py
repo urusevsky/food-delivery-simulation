@@ -62,28 +62,3 @@ def calculate_summary_statistics(metric_values):
     }
 
 
-def aggregate_entity_metrics(entities, metric_functions):
-    """
-    Apply multiple metric functions to a collection of entities and aggregate results.
-    
-    This convenience function applies metric calculation functions to entities
-    and returns aggregated summary statistics for each metric.
-    
-    Args:
-        entities: List of entity objects
-        metric_functions: Dict mapping metric names to calculation functions
-                         e.g., {'total_distance': calculate_delivery_unit_total_distance}
-        
-    Returns:
-        dict: Nested dictionary with metric names as keys and summary statistics as values
-    """
-    aggregated_results = {}
-    
-    for metric_name, metric_function in metric_functions.items():
-        # Calculate metric for all entities
-        metric_values = [metric_function(entity) for entity in entities]
-        
-        # Aggregate into summary statistics
-        aggregated_results[metric_name] = calculate_summary_statistics(metric_values)
-    
-    return aggregated_results

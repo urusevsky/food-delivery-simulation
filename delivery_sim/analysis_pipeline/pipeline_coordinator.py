@@ -106,7 +106,7 @@ class ExperimentAnalysisPipeline:
     
     def _process_entity_metrics(self, analysis_data):
         """
-        Process entity metrics for a single replication using AnalysisData.
+        Process entity metrics for a single replication - direct calculation approach.
         
         Args:
             analysis_data: AnalysisData object with pre-filtered populations
@@ -114,41 +114,51 @@ class ExperimentAnalysisPipeline:
         Returns:
             dict: Entity replication summary or empty dict if no entities
         """
-        # Check if we have any completed entities to process (for performance metrics)
+        # Check if we have any completed entities to process
         if not (analysis_data.cohort_completed_orders or analysis_data.cohort_completed_delivery_units):
             self.logger.debug("No completed entities in cohort - skipping entity metrics")
             return {}
         
-        # Import metric functions
+        # Import metric functions and statistical aggregation
         from delivery_sim.metrics.entity.order_metrics import calculate_all_order_metrics
         from delivery_sim.metrics.entity.delivery_unit_metrics import calculate_all_delivery_unit_metrics
+        from delivery_sim.analysis_pipeline.replication_level_aggregation.entity_replication_summaries import calculate_summary_statistics
         
         entity_summary = {}
         
-        # Process completed orders if available (for performance averages)
+        # Process completed orders if available
         if analysis_data.cohort_completed_orders:
-            order_metrics = {
-                'assignment_time': lambda order: calculate_all_order_metrics(order)['waiting_time'],
-                'travel_time': lambda order: calculate_all_order_metrics(order)['travel_time'],
-                'fulfillment_time': lambda order: calculate_all_order_metrics(order)['fulfillment_time']
-            }
+            # Calculate all individual order metrics at once
+            individual_order_metrics = [
+                calculate_all_order_metrics(order) 
+                for order in analysis_data.cohort_completed_orders
+            ]
             
-            entity_summary['orders'] = aggregate_entity_metrics(
-                analysis_data.cohort_completed_orders, 
-                order_metrics
-            )
+            # Extract and aggregate each metric type
+            entity_summary['orders'] = {}
+            
+            # Process each metric type (note: using fixed naming after your update)
+            for metric_name in ['assignment_time', 'travel_time', 'fulfillment_time']:
+                metric_values = [metrics[metric_name] for metrics in individual_order_metrics]
+                entity_summary['orders'][metric_name] = calculate_summary_statistics(metric_values)
             
             self.logger.debug(f"Processed {len(analysis_data.cohort_completed_orders)} completed orders")
         
-        # Process completed delivery units if available (for performance averages)
+        # Process completed delivery units if available
         if analysis_data.cohort_completed_delivery_units:
-            delivery_unit_metrics = {
-                'total_distance': lambda unit: calculate_all_delivery_unit_metrics(unit)['total_distance']
-            }
-            entity_summary['delivery_units'] = aggregate_entity_metrics(
-                analysis_data.cohort_completed_delivery_units,
-                delivery_unit_metrics
-            )
+            # Calculate all individual delivery unit metrics at once
+            individual_unit_metrics = [
+                calculate_all_delivery_unit_metrics(unit)
+                for unit in analysis_data.cohort_completed_delivery_units
+            ]
+            
+            # Extract and aggregate each metric type
+            entity_summary['delivery_units'] = {}
+            
+            # Process each metric type (extend as needed)
+            for metric_name in ['total_distance']:  # Add more delivery unit metrics here
+                metric_values = [metrics[metric_name] for metrics in individual_unit_metrics]
+                entity_summary['delivery_units'][metric_name] = calculate_summary_statistics(metric_values)
             
             self.logger.debug(f"Processed {len(analysis_data.cohort_completed_delivery_units)} completed delivery units")
         
