@@ -318,7 +318,7 @@ for i, (design_name, design_results) in enumerate(study_results.items(), 1):
         # Quick validation - check if we have the expected structure
         if ('results' in analysis_result and 
             'order_metrics' in analysis_result['results'] and
-            'orders' in analysis_result['results']['order_metrics']):
+            'order' in analysis_result['results']['order_metrics']):
             print(f"    ✓ Successfully processed {analysis_result['num_replications']} replications")
         else:
             print(f"    ⚠ Warning: Unexpected result structure for {design_name}")
@@ -385,7 +385,7 @@ assignment_time_results = []
 for design_name, analysis_result in design_analysis_results.items():
     try:
         # Navigate to assignment time metrics
-        order_metrics = analysis_result['results']['order_metrics']['orders']['assignment_time']
+        order_metrics = analysis_result['results']['order_metrics']['order']['assignment_time']
         
         # Extract the three statistics of interest
         mean_of_means_data = order_metrics['mean_of_means']
@@ -444,3 +444,4 @@ for result in assignment_time_results:
 print("=" * 100)
 print(f"✓ Extracted and displayed metrics from {len(assignment_time_results)} design points")
 print("Results stored in 'assignment_time_results' for further analysis")
+# %%
