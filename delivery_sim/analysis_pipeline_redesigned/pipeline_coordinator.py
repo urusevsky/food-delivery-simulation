@@ -14,8 +14,9 @@ Clean, focused design:
 """
 
 from delivery_sim.utils.logging_system import get_logger
-from delivery_sim.analysis_pipeline.data_preparation import prepare_analysis_data
-from analysis_pipeline_redesigned.aggregation_processor import AggregationProcessor
+from delivery_sim.analysis_pipeline_redesigned.data_preparation import prepare_analysis_data
+from delivery_sim.analysis_pipeline_redesigned.aggregation_processor import AggregationProcessor
+from delivery_sim.analysis_pipeline_redesigned.confidence_intervals import construct_confidence_intervals_for_experiment
 
 
 class ExperimentAnalysisPipeline:
@@ -160,7 +161,6 @@ class ExperimentAnalysisPipeline:
         Returns:
             dict: Experiment results with CIs added for configured statistics/metrics
         """
-        from analysis_pipeline_redesigned.confidence_intervals import construct_confidence_intervals_for_experiment
         
         return construct_confidence_intervals_for_experiment(
             experiment_statistics,

@@ -18,8 +18,8 @@ One-level pattern:
 
 import importlib
 from delivery_sim.utils.logging_system import get_logger
-from analysis_pipeline_redesigned.statistics_engine import StatisticsEngine
-from analysis_pipeline_redesigned.metric_configurations import (
+from delivery_sim.analysis_pipeline_redesigned.statistics_engine import StatisticsEngine
+from delivery_sim.analysis_pipeline_redesigned.metric_configurations import (
     get_metric_configuration,
     get_experiment_statistics
 )

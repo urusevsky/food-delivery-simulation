@@ -15,12 +15,12 @@ Design philosophy:
 import numpy as np
 from scipy import stats
 from delivery_sim.utils.logging_system import get_logger
-from analysis_pipeline_redesigned.metric_configurations import (
+from delivery_sim.analysis_pipeline_redesigned.metric_configurations import (
     get_aggregation_pattern, 
     get_ci_configuration, 
     get_ci_method
 )
-from analysis_pipeline_redesigned.statistics_engine import StatisticsEngine
+from delivery_sim.analysis_pipeline_redesigned.statistics_engine import StatisticsEngine
 
 logger = get_logger("analysis_pipeline_redesigned.confidence_intervals")
 
