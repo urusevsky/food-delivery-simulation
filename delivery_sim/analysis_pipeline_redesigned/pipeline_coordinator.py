@@ -14,7 +14,7 @@ Clean, focused design:
 """
 
 from delivery_sim.utils.logging_system import get_logger
-from delivery_sim.analysis_pipeline_redesigned.data_preparation import prepare_analysis_data
+from delivery_sim.analysis_pipeline.data_preparation import prepare_analysis_data
 from analysis_pipeline_redesigned.aggregation_processor import AggregationProcessor
 
 
@@ -53,11 +53,17 @@ class ExperimentAnalysisPipeline:
         This is the main entry point that processes all replications and produces
         experiment-level results using configuration-driven processing.
         
+        Processing flow:
+        1. Replication-level processing (descriptive stats per replication)
+        2. Experiment-level aggregation (descriptive stats across replications) 
+        3. Confidence interval construction (granular control via configuration)
+        4. Metadata addition and finalization
+        
         Args:
             simulation_results: Results from simulation_runner.run_experiment()
                 
         Returns:
-            dict: Complete experiment summary with statistics and confidence intervals
+            dict: Complete experiment summary with statistics (and CIs for configured metrics)
         """
         replication_results = simulation_results['replication_results']
         num_replications = len(replication_results)
@@ -68,11 +74,11 @@ class ExperimentAnalysisPipeline:
         # Step 1: Process replication-level for all metric types
         all_replication_summaries = self._process_all_replications(replication_results)
         
-        # Step 2: Process experiment-level aggregation  
+        # Step 2: Process experiment-level aggregation (descriptive statistics)
         experiment_statistics = self._process_experiment_level(all_replication_summaries)
         
-        # Step 3: Construct confidence intervals
-        experiment_with_cis = self._construct_confidence_intervals(experiment_statistics)
+        # Step 3: Construct confidence intervals (granular control via configuration)
+        experiment_with_cis = self._construct_confidence_intervals(experiment_statistics, all_replication_summaries)
         
         # Step 4: Add metadata and return
         return self._finalize_experiment_summary(experiment_with_cis, simulation_results)
@@ -140,25 +146,28 @@ class ExperimentAnalysisPipeline:
         
         return experiment_statistics
     
-    def _construct_confidence_intervals(self, experiment_statistics):
+    def _construct_confidence_intervals(self, experiment_statistics, all_replication_summaries):
         """
-        Construct confidence intervals from experiment-level statistics.
+        Construct confidence intervals based on granular configuration.
         
-        This is the separate CI construction step that was missing from the design.
+        Uses configuration to determine which specific statistics/metrics get CIs
+        and which statistical method to use for each one.
         
         Args:
             experiment_statistics: Experiment-level statistics from previous step
+            all_replication_summaries: Original replication data needed for CI construction
             
         Returns:
-            dict: Experiment results with confidence intervals added
+            dict: Experiment results with CIs added for configured statistics/metrics
         """
-        # TODO: Implement CI construction module
-        # This should be a separate module (confidence_intervals.py) that takes
-        # experiment statistics and adds CI information
+        from analysis_pipeline_redesigned.confidence_intervals import construct_confidence_intervals_for_experiment
         
-        # For now, return statistics as-is with placeholder for CI construction
-        self.logger.warning("CI construction not yet implemented - returning statistics only")
-        return experiment_statistics
+        return construct_confidence_intervals_for_experiment(
+            experiment_statistics,
+            all_replication_summaries, 
+            self.enabled_metric_types,
+            self.confidence_level
+        )
     
     def _finalize_experiment_summary(self, experiment_with_cis, simulation_results):
         """
