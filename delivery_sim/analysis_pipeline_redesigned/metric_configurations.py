@@ -24,14 +24,18 @@ logger = get_logger("analysis_pipeline_redesigned.configurations")
 
 METRIC_CONFIGURATIONS = {
     
-    # Two-level aggregation pattern: Individual entities -> Statistics -> Statistics-of-statistics
+    # Two-level aggregation pattern
     'order_metrics': {
         'aggregation_pattern': 'two_level',
         'metric_module': 'delivery_sim.metrics.entity.order_metrics',
         'metric_function': 'calculate_all_order_metrics',
-        'entity_data_key': 'cohort_completed_orders',  # Which AnalysisData attribute to use
-        'experiment_stats': ['mean_of_means', 'std_of_means', 'mean_of_variances'],
-        'description': 'Individual order performance metrics (assignment time, travel time, etc.)'
+        'entity_data_key': 'cohort_completed_orders',
+        'experiment_stats': [
+            {'name': 'mean_of_means', 'extract': 'mean', 'compute': 'mean'},
+            {'name': 'std_of_means', 'extract': 'mean', 'compute': 'std'},
+            {'name': 'mean_of_variances', 'extract': 'variance', 'compute': 'mean'}
+        ],
+        'description': 'Individual order performance metrics'
     },
     
     'delivery_unit_metrics': {
@@ -39,20 +43,22 @@ METRIC_CONFIGURATIONS = {
         'metric_module': 'delivery_sim.metrics.entity.delivery_unit_metrics',
         'metric_function': 'calculate_all_delivery_unit_metrics',
         'entity_data_key': 'cohort_completed_delivery_units',
-        'experiment_stats': ['mean_of_means', 'std_of_means'],
-        'description': 'Delivery unit performance metrics (total distance, efficiency, etc.)'
+        'experiment_stats': [
+            {'name': 'mean_of_means', 'extract': 'mean', 'compute': 'mean'},
+            {'name': 'std_of_means', 'extract': 'mean', 'compute': 'std'}
+        ],
+        'description': 'Delivery unit performance metrics'
     },
     
-    # One-level aggregation pattern: Repositories -> Scalar values -> Standard statistics
+    # One-level aggregation pattern
     'system_metrics': {
         'aggregation_pattern': 'one_level',
         'metric_module': 'delivery_sim.metrics.system.entity_derived_metrics', 
         'metric_function': 'calculate_all_entity_derived_system_metrics',
         'entity_data_key': None,  # Function takes full AnalysisData object
-        'description': 'System-wide performance metrics (completion rate, pairing rate, etc.)'
+        'description': 'System-wide performance metrics'
     }
 }
-
 # ==============================================================================
 # CONFIGURATION ACCESS FUNCTIONS
 # ==============================================================================
