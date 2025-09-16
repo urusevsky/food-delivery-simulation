@@ -31,9 +31,27 @@ METRIC_CONFIGURATIONS = {
         'metric_function': 'calculate_all_order_metrics',
         'entity_data_key': 'cohort_completed_orders',
         'experiment_stats': [
-            {'name': 'mean_of_means', 'extract': 'mean', 'compute': 'mean'},
-            {'name': 'std_of_means', 'extract': 'mean', 'compute': 'std'},
-            {'name': 'mean_of_variances', 'extract': 'variance', 'compute': 'mean'}
+            {
+                'name': 'mean_of_means', 
+                'extract': 'mean', 
+                'compute': 'mean',
+                'construct_ci': True,
+                'description': 'Average of assignment time means across replications'
+            },
+            {
+                'name': 'std_of_means', 
+                'extract': 'mean', 
+                'compute': 'std',
+                'construct_ci': False,  # Descriptive only - insufficient replications
+                'description': 'Variability of means across replications'
+            },
+            {
+                'name': 'mean_of_variances', 
+                'extract': 'variance', 
+                'compute': 'mean',
+                'construct_ci': True,
+                'description': 'Average within-replication variance'
+            }
         ],
         'description': 'Individual order performance metrics'
     },
@@ -44,8 +62,18 @@ METRIC_CONFIGURATIONS = {
         'metric_function': 'calculate_all_delivery_unit_metrics',
         'entity_data_key': 'cohort_completed_delivery_units',
         'experiment_stats': [
-            {'name': 'mean_of_means', 'extract': 'mean', 'compute': 'mean'},
-            {'name': 'std_of_means', 'extract': 'mean', 'compute': 'std'}
+            {
+                'name': 'mean_of_means', 
+                'extract': 'mean', 
+                'compute': 'mean',
+                'construct_ci': True
+            },
+            {
+                'name': 'std_of_means', 
+                'extract': 'mean', 
+                'compute': 'std',
+                'construct_ci': False  # Descriptive only
+            }
         ],
         'description': 'Delivery unit performance metrics'
     },
@@ -56,6 +84,18 @@ METRIC_CONFIGURATIONS = {
         'metric_module': 'delivery_sim.metrics.system.entity_derived_metrics', 
         'metric_function': 'calculate_all_entity_derived_system_metrics',
         'entity_data_key': None,  # Function takes full AnalysisData object
+        'ci_config': [
+            {
+                'metric_name': 'completion_rate',
+                'construct_ci': True,
+                'description': 'System completion rate with CI'
+            },
+            {
+                'metric_name': 'pairing_rate', 
+                'construct_ci': True,
+                'description': 'System pairing rate with CI'
+            }
+        ],
         'description': 'System-wide performance metrics'
     }
 }
