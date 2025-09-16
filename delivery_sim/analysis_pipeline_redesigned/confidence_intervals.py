@@ -15,6 +15,12 @@ Design philosophy:
 import numpy as np
 from scipy import stats
 from delivery_sim.utils.logging_system import get_logger
+from analysis_pipeline_redesigned.metric_configurations import (
+    get_aggregation_pattern, 
+    get_ci_configuration, 
+    get_ci_method
+)
+from analysis_pipeline_redesigned.statistics_engine import StatisticsEngine
 
 logger = get_logger("analysis_pipeline_redesigned.confidence_intervals")
 
@@ -63,7 +69,6 @@ def _construct_cis_for_metric_type(metric_statistics, replication_summaries, met
     Handles both two-level and one-level patterns by re-extracting the
     underlying values that were used to compute the statistics.
     """
-    from analysis_pipeline_redesigned.metric_configurations import get_aggregation_pattern
     
     pattern = get_aggregation_pattern(metric_type)
     
@@ -82,8 +87,6 @@ def _construct_cis_for_two_level(metric_statistics, replication_summaries, metri
     Only constructs CIs for statistics that have construct_ci=True in configuration.
     Automatically determines the correct statistical method based on compute field.
     """
-    from analysis_pipeline_redesigned.statistics_engine import StatisticsEngine
-    from analysis_pipeline_redesigned.metric_configurations import get_ci_configuration, get_ci_method
     
     statistics_engine = StatisticsEngine()
     ci_configurations = get_ci_configuration(metric_type)  # Only get stats that need CIs
@@ -135,10 +138,9 @@ def _construct_cis_for_one_level(metric_statistics, replication_summaries, metri
     Construct CIs for one-level pattern (system metrics).
     
     Only constructs CIs for metrics that have construct_ci=True in configuration.
-    Automatically uses t-distribution since we're always estimating means for system metrics.
+    Automatically uses t-distribution since we're always estimating means fo system metrics.
     """
-    from analysis_pipeline_redesigned.metric_configurations import get_ci_configuration
-    
+
     ci_configurations = get_ci_configuration(metric_type)
     results_with_cis = {}
     
