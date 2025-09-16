@@ -280,161 +280,167 @@ print(f"✓ Warmup period set: {uniform_warmup_period} minutes")
 print(f"✓ Based on visual inspection of active drivers oscillation around Little's Law values")
 print(f"✓ Analysis window: {experiment_config.simulation_duration - uniform_warmup_period} minutes of post-warmup data")
 
-# %% Step 10: Performance Metrics Analysis (Simplified for Research)
-print("\n" + "="*50)
-print("PERFORMANCE METRICS CALCULATION")
-print("="*50)
+# %%
+# ==================================================================================
+# STEP 10: EXPERIMENTAL ANALYSIS USING NEW REDESIGNED PIPELINE
+# ==================================================================================
 
-from delivery_sim.analysis_pipeline.pipeline_coordinator import analyze_single_configuration
+print(f"\n{'='*80}")
+print("STEP 10: EXPERIMENTAL ANALYSIS USING NEW REDESIGNED PIPELINE")
+print(f"{'='*80}\n")
 
-print(f"Processing {len(study_results)} design points with warmup period: {uniform_warmup_period} minutes")
+# Import the new redesigned pipeline
+from delivery_sim.analysis_pipeline_redesigned.pipeline_coordinator import ExperimentAnalysisPipeline
 
-metrics_results = {}
+# Initialize pipeline focused on order metrics only
+pipeline = ExperimentAnalysisPipeline(
+    warmup_period=uniform_warmup_period,  # 500 minutes from Step 9
+    enabled_metric_types=['order_metrics'],  # Focus on order metrics only
+    confidence_level=0.95
+)
 
-for design_name, design_results in study_results.items():
-    print(f"  Processing {design_name}...")
-    
-    # Direct call - let errors surface immediately for debugging
-    analysis_result = analyze_single_configuration(
-        simulation_results=design_results,
-        warmup_period=uniform_warmup_period,
-        confidence_level=0.95
-    )
-    
-    metrics_results[design_name] = analysis_result
-    print(f"    ✓ Complete")
+# Process each design point through the new pipeline
+design_analysis_results = {}
 
-print(f"✓ All design points processed successfully")
+print(f"Processing {len(study_results)} design points through redesigned analysis pipeline...")
+print(f"Warmup period: {uniform_warmup_period} minutes")
+print(f"Confidence level: 95%")
+print(f"Focus metric: Order Assignment Time\n")
 
-# %% Step 11: Systematic Validation Evidence Table
-print("\n" + "="*50)
-print("SYSTEMATIC LOAD RATIO VALIDATION: EVIDENCE TABLE")
-print("="*50)
-
-import pandas as pd
-
-print("Creating systematic validation evidence table...")
-
-# Extract performance metrics with systematic organization
-table_data = []
-
-for design_name, result in metrics_results.items():
-    if result['status'] != 'success':
-        continue
-    
-    analysis = result['analysis']
+for i, (design_name, design_results) in enumerate(study_results.items(), 1):
+    print(f"[{i:2d}/{len(study_results)}] Analyzing {design_name}...")
     
     try:
-        # Extract load ratio and interval type from design name
-        name_parts = design_name.split('_')
-        load_ratio = float(name_parts[2])
-        interval_type = "2x Baseline" if "2x" in design_name else "Baseline"
+        # Run the new analysis pipeline
+        analysis_result = pipeline.analyze_experiment(design_results)
+        design_analysis_results[design_name] = analysis_result
         
-        # Extract assignment time metrics (existing code)
-        entity_metrics = analysis.get('entity_metrics', {})
-        orders_metrics = entity_metrics.get('orders', {})
-        assignment_time_data = orders_metrics.get('assignment_time', {})
-        
-        # Mean assignment time
-        assignment_time_mean = None
-        assignment_time_mean_ci = None
-        if assignment_time_data and 'mean' in assignment_time_data:
-            assignment_time_mean = assignment_time_data['mean'].get('point_estimate')
-            assignment_time_ci = assignment_time_data['mean'].get('confidence_interval', [None, None])
-            if assignment_time_mean and assignment_time_ci[0] is not None:
-                ci_width = (assignment_time_ci[1] - assignment_time_ci[0]) / 2
-                assignment_time_mean_ci = f"{assignment_time_mean:.1f}±{ci_width:.1f}"
-            else:
-                assignment_time_mean_ci = f"{assignment_time_mean:.1f}" if assignment_time_mean else "N/A"
-        
-        # Within-replication standard deviation for assignment time
-        assignment_time_std_mean = None
-        assignment_time_std_ci = None
-        if assignment_time_data and 'std' in assignment_time_data:
-            assignment_time_std_mean = assignment_time_data['std'].get('point_estimate')
-            assignment_time_std_ci_raw = assignment_time_data['std'].get('confidence_interval', [None, None])
-            if assignment_time_std_mean and assignment_time_std_ci_raw[0] is not None:
-                std_ci_width = (assignment_time_std_ci_raw[1] - assignment_time_std_ci_raw[0]) / 2
-                assignment_time_std_ci = f"{assignment_time_std_mean:.1f}±{std_ci_width:.1f}"
-            else:
-                assignment_time_std_ci = f"{assignment_time_std_mean:.1f}" if assignment_time_std_mean else "N/A"
-        
-        # NEW: Extract travel time metrics
-        travel_time_data = orders_metrics.get('travel_time', {})
-        travel_time_mean = None
-        travel_time_mean_ci = None
-        if travel_time_data and 'mean' in travel_time_data:
-            travel_time_mean = travel_time_data['mean'].get('point_estimate')
-            travel_time_ci = travel_time_data['mean'].get('confidence_interval', [None, None])
-            if travel_time_mean and travel_time_ci[0] is not None:
-                ci_width = (travel_time_ci[1] - travel_time_ci[0]) / 2
-                travel_time_mean_ci = f"{travel_time_mean:.1f}±{ci_width:.1f}"
-            else:
-                travel_time_mean_ci = f"{travel_time_mean:.1f}" if travel_time_mean else "N/A"
-        
-        # NEW: Extract fulfillment time metrics  
-        fulfillment_time_data = orders_metrics.get('fulfillment_time', {})
-        fulfillment_time_mean = None
-        fulfillment_time_mean_ci = None
-        if fulfillment_time_data and 'mean' in fulfillment_time_data:
-            fulfillment_time_mean = fulfillment_time_data['mean'].get('point_estimate')
-            fulfillment_time_ci = fulfillment_time_data['mean'].get('confidence_interval', [None, None])
-            if fulfillment_time_mean and fulfillment_time_ci[0] is not None:
-                ci_width = (fulfillment_time_ci[1] - fulfillment_time_ci[0]) / 2
-                fulfillment_time_mean_ci = f"{fulfillment_time_mean:.1f}±{ci_width:.1f}"
-            else:
-                fulfillment_time_mean_ci = f"{fulfillment_time_mean:.1f}" if fulfillment_time_mean else "N/A"
-        
-        # Extract completion rate (existing code)
-        system_metrics = analysis.get('system_metrics', {})
-        completion_rate_data = system_metrics.get('system_completion_rate', {})
-        completion_rate = completion_rate_data.get('point_estimate') if completion_rate_data else None
-        completion_formatted = f"{completion_rate:.1%}" if completion_rate else "N/A"
-        
-        table_data.append({
-            'Load Ratio': f"{load_ratio:.1f}",
-            'Interval Type': interval_type,
-            'Design Point': f"LR{load_ratio:.1f}_{interval_type.replace(' ', '')}",
-            'Mean Assignment Time': assignment_time_mean_ci,
-            'Mean Travel Time': travel_time_mean_ci,          # NEW
-            'Mean Fulfillment Time': fulfillment_time_mean_ci, # NEW
-            'Within-Rep Std': assignment_time_std_ci,
-            'Completion Rate': completion_formatted,
-            'Load Ratio Value': load_ratio,  # For sorting
-            'Mean Assignment Value': assignment_time_mean if assignment_time_mean else 999,
-            'Mean Travel Value': travel_time_mean if travel_time_mean else 999,     # NEW
-            'Mean Fulfillment Value': fulfillment_time_mean if fulfillment_time_mean else 999, # NEW
-            'Std Value': assignment_time_std_mean if assignment_time_std_mean else 0,
-            'Completion Value': completion_rate if completion_rate else 0
-        })
-        
+        # Quick validation - check if we have the expected structure
+        if ('results' in analysis_result and 
+            'order_metrics' in analysis_result['results'] and
+            'orders' in analysis_result['results']['order_metrics']):
+            print(f"    ✓ Successfully processed {analysis_result['num_replications']} replications")
+        else:
+            print(f"    ⚠ Warning: Unexpected result structure for {design_name}")
+    
     except Exception as e:
-        print(f"  ⚠️  Error extracting metrics for {design_name}: {str(e)}")
+        print(f"    ✗ Error processing {design_name}: {str(e)}")
+        raise  # Re-raise for debugging
 
-# Create and display systematic validation table
-if table_data:
-    df = pd.DataFrame(table_data)
-    df_display = df.sort_values(['Load Ratio Value', 'Interval Type'])[
-        ['Load Ratio', 'Interval Type', 'Mean Assignment Time', 'Mean Travel Time', 
-         'Mean Fulfillment Time', 'Within-Rep Std', 'Completion Rate']
-    ]
-    
-    print("\n🎯 SYSTEMATIC LOAD RATIO VALIDATION: EVIDENCE TABLE")
-    print("="*140)  # Increased width for additional columns
-    print(df_display.to_string(index=False))
-    
-    # Optional: Display summary statistics for the new metrics
-    print(f"\n📊 SUMMARY STATISTICS:")
-    print(f"Mean Travel Time Range: {df['Mean Travel Value'].min():.1f} - {df['Mean Travel Value'].max():.1f} minutes")
-    print(f"Mean Fulfillment Time Range: {df['Mean Fulfillment Value'].min():.1f} - {df['Mean Fulfillment Value'].max():.1f} minutes")
-    
-    # Optional: Save to CSV for further analysis
-    #csv_filename = "systematic_validation_evidence_table.csv"
-    #df_display.to_csv(csv_filename, index=False)
-    #print(f"✓ Table saved to: {csv_filename}")
-
-else:
-    print("⚠️  No valid data points for systematic validation table")
-    
+print(f"\n✓ Completed analysis for all {len(design_analysis_results)} design points")
+print("Analysis results stored in 'design_analysis_results'")
 
 # %%
+# ==================================================================================
+# STEP 11: EXTRACT AND PRESENT FOCUSED ORDER ASSIGNMENT TIME METRICS
+# ==================================================================================
+
+print(f"\n{'='*80}")
+print("STEP 11: ORDER ASSIGNMENT TIME STATISTICS EXTRACTION AND PRESENTATION")
+print(f"{'='*80}\n")
+
+import re
+
+def extract_load_ratio_and_type(design_name):
+    """Extract load ratio and interval type from design point name."""
+    pattern = r"load_ratio_(\d+\.?\d*)_(.+)"
+    match = re.match(pattern, design_name)
+    
+    if match:
+        load_ratio = float(match.group(1))
+        interval_suffix = match.group(2)
+        
+        if interval_suffix == "baseline":
+            interval_type = "Baseline"
+        elif interval_suffix == "2x_baseline":
+            interval_type = "2x Baseline"
+        else:
+            interval_type = interval_suffix.replace("_", " ").title()
+        
+        return load_ratio, interval_type
+    else:
+        return None, design_name
+
+def format_metric_value(value, decimal_places=2):
+    """Format metric value for display."""
+    if value is None:
+        return "N/A"
+    return f"{value:.{decimal_places}f}"
+
+def format_ci_value(point_estimate, ci_bounds, decimal_places=2):
+    """Format value with confidence interval."""
+    if point_estimate is None:
+        return "N/A"
+    
+    if ci_bounds and ci_bounds[0] is not None and ci_bounds[1] is not None:
+        lower, upper = ci_bounds
+        margin = (upper - lower) / 2
+        return f"{point_estimate:.{decimal_places}f} ± {margin:.{decimal_places}f}"
+    else:
+        return f"{point_estimate:.{decimal_places}f}"
+
+# Extract metrics from analysis results
+assignment_time_results = []
+
+for design_name, analysis_result in design_analysis_results.items():
+    try:
+        # Navigate to assignment time metrics
+        order_metrics = analysis_result['results']['order_metrics']['orders']['assignment_time']
+        
+        # Extract the three statistics of interest
+        mean_of_means_data = order_metrics['mean_of_means']
+        variance_of_means_data = order_metrics['variance_of_means']  # Direct from config
+        mean_of_variances_data = order_metrics['mean_of_variances']
+        
+        # Extract values
+        mean_of_means = mean_of_means_data['point_estimate']
+        mean_of_means_ci = mean_of_means_data['confidence_interval']
+        variance_of_means = variance_of_means_data['point_estimate']
+        mean_of_variances = mean_of_variances_data['point_estimate']
+        
+        # Parse design point information
+        load_ratio, interval_type = extract_load_ratio_and_type(design_name)
+        
+        # Store results
+        assignment_time_results.append({
+            'design_name': design_name,
+            'load_ratio': load_ratio,
+            'interval_type': interval_type,
+            'mean_of_means': mean_of_means,
+            'mean_of_means_ci': mean_of_means_ci,
+            'variance_of_means': variance_of_means,
+            'mean_of_variances': mean_of_variances
+        })
+        
+    except KeyError as e:
+        print(f"⚠ Warning: Could not extract assignment time metrics from {design_name}: {e}")
+    except Exception as e:
+        print(f"✗ Error processing {design_name}: {e}")
+
+# Sort and display results table
+assignment_time_results.sort(key=lambda x: (x['load_ratio'], x['interval_type']))
+
+print("🎯 ORDER ASSIGNMENT TIME: STATISTICS OF STATISTICS ANALYSIS")
+print("=" * 100)
+print(f"{'Load Ratio':>10} {'Interval Type':>12} {'Mean of Means':>20} {'Variance of Means':>18} {'Mean of Variances':>18}")
+print("=" * 100)
+
+for result in assignment_time_results:
+    load_ratio = format_metric_value(result['load_ratio'], 1) if result['load_ratio'] else "N/A"
+    interval_type = result['interval_type'][:12]
+    
+    mean_of_means_formatted = format_ci_value(
+        result['mean_of_means'], 
+        result['mean_of_means_ci'], 
+        decimal_places=2
+    )
+    
+    variance_of_means_formatted = format_metric_value(result['variance_of_means'], 2)
+    mean_of_variances_formatted = format_metric_value(result['mean_of_variances'], 2)
+    
+    print(f"{load_ratio:>10} {interval_type:>12} {mean_of_means_formatted:>20} "
+          f"{variance_of_means_formatted:>18} {mean_of_variances_formatted:>18}")
+
+print("=" * 100)
+print(f"✓ Extracted and displayed metrics from {len(assignment_time_results)} design points")
+print("Results stored in 'assignment_time_results' for further analysis")
