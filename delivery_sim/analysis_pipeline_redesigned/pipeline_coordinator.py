@@ -14,7 +14,7 @@ Clean, focused design:
 """
 
 from delivery_sim.utils.logging_system import get_logger
-from delivery_sim.analysis_pipeline.data_preparation import prepare_analysis_data
+from delivery_sim.analysis_pipeline_redesigned.data_preparation import prepare_analysis_data
 from analysis_pipeline_redesigned.aggregation_processor import AggregationProcessor
 
 
