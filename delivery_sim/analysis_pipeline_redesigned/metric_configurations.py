@@ -32,17 +32,17 @@ METRIC_CONFIGURATIONS = {
                 'description': 'Average of assignment time means across replications'
             },
             {
-                'name': 'std_of_means', 
+                'name': 'variance_of_means', 
                 'extract': 'mean', 
-                'compute': 'std',
-                'construct_ci': False,  # Descriptive only - insufficient replications
-                'description': 'Variability of means across replications'
+                'compute': 'variance',
+                'construct_ci': False,  # Descriptive only for testing
+                'description': 'Variance of assignment time means across replications'
             },
             {
                 'name': 'mean_of_variances', 
                 'extract': 'variance', 
                 'compute': 'mean',
-                'construct_ci': True,
+                'construct_ci': False,  # Descriptive only for testing
                 'description': 'Average within-replication variance'
             }
         ],
