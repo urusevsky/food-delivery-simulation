@@ -8,6 +8,10 @@ with systematic validation pairs testing robustness across different absolute ar
 Design Pattern: For each load ratio R:
 - Baseline Interval: (1.0, R) → "Higher intensity" (1.0 orders/min, 1/R drivers/min)
 - 2x Baseline: (2.0, 2R) → "Half intensity" (0.5 orders/min, 1/2R drivers/min)
+
+Refined Hypothesis after experimentation:
+"Operational regime characteristics are determined by the interaction between load ratio and absolute operational intensity,
+with driver capacity serving as the primary system bottleneck."
 """
 # %% Enable Autoreload (run once per session)
 %load_ext autoreload 
