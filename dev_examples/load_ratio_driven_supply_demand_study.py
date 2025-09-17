@@ -387,16 +387,16 @@ for design_name, analysis_result in design_analysis_results.items():
         # Navigate to assignment time metrics
         order_metrics = analysis_result['results']['order_metrics']['order']['assignment_time']
         
-        # Extract the three statistics of interest
+        # Extract the three statistics of interest (updated names)
         mean_of_means_data = order_metrics['mean_of_means']
-        variance_of_means_data = order_metrics['variance_of_means']  # Direct from config
-        mean_of_variances_data = order_metrics['mean_of_variances']
+        std_of_means_data = order_metrics['std_of_means']  # Changed from variance_of_means
+        mean_of_stds_data = order_metrics['mean_of_stds']  # Changed from mean_of_variances
         
         # Extract values
         mean_of_means = mean_of_means_data['point_estimate']
         mean_of_means_ci = mean_of_means_data['confidence_interval']
-        variance_of_means = variance_of_means_data['point_estimate']
-        mean_of_variances = mean_of_variances_data['point_estimate']
+        std_of_means = std_of_means_data['point_estimate']  # Now directly std, no conversion
+        mean_of_stds = mean_of_stds_data['point_estimate']  # Now directly mean of stds
         
         # Parse design point information
         load_ratio, interval_type = extract_load_ratio_and_type(design_name)
@@ -408,12 +408,25 @@ for design_name, analysis_result in design_analysis_results.items():
             'interval_type': interval_type,
             'mean_of_means': mean_of_means,
             'mean_of_means_ci': mean_of_means_ci,
-            'variance_of_means': variance_of_means,
-            'mean_of_variances': mean_of_variances
+            'std_of_means': std_of_means,  # Updated variable name
+            'mean_of_stds': mean_of_stds   # Updated variable name
         })
         
     except KeyError as e:
         print(f"⚠ Warning: Could not extract assignment time metrics from {design_name}: {e}")
+        # Debug: Show actual structure
+        try:
+            if 'order_metrics' in analysis_result['results']:
+                order_metrics_keys = list(analysis_result['results']['order_metrics'].keys())
+                print(f"   Available entity types in order_metrics: {order_metrics_keys}")
+                if 'order' in order_metrics_keys:
+                    metric_keys = list(analysis_result['results']['order_metrics']['order'].keys())
+                    print(f"   Available metrics in 'order': {metric_keys}")
+                    if 'assignment_time' in metric_keys:
+                        stat_keys = list(analysis_result['results']['order_metrics']['order']['assignment_time'].keys())
+                        print(f"   Available statistics in 'assignment_time': {stat_keys}")
+        except:
+            print(f"   Could not inspect structure further")
     except Exception as e:
         print(f"✗ Error processing {design_name}: {e}")
 
@@ -421,9 +434,9 @@ for design_name, analysis_result in design_analysis_results.items():
 assignment_time_results.sort(key=lambda x: (x['load_ratio'], x['interval_type']))
 
 print("🎯 ORDER ASSIGNMENT TIME: STATISTICS OF STATISTICS ANALYSIS")
-print("=" * 100)
-print(f"{'Load Ratio':>10} {'Interval Type':>12} {'Mean of Means':>20} {'Variance of Means':>18} {'Mean of Variances':>18}")
-print("=" * 100)
+print("=" * 95)
+print(f"{'Load Ratio':>10} {'Interval Type':>12} {'Mean of Means':>20} {'Std of Means':>15} {'Mean of Stds':>15}")
+print("=" * 95)
 
 for result in assignment_time_results:
     load_ratio = format_metric_value(result['load_ratio'], 1) if result['load_ratio'] else "N/A"
@@ -435,13 +448,18 @@ for result in assignment_time_results:
         decimal_places=2
     )
     
-    variance_of_means_formatted = format_metric_value(result['variance_of_means'], 2)
-    mean_of_variances_formatted = format_metric_value(result['mean_of_variances'], 2)
+    std_of_means_formatted = format_metric_value(result['std_of_means'], 2)  # Updated
+    mean_of_stds_formatted = format_metric_value(result['mean_of_stds'], 2)  # Updated
     
     print(f"{load_ratio:>10} {interval_type:>12} {mean_of_means_formatted:>20} "
-          f"{variance_of_means_formatted:>18} {mean_of_variances_formatted:>18}")
+          f"{std_of_means_formatted:>15} {mean_of_stds_formatted:>15}")
 
-print("=" * 100)
+print("=" * 95)
 print(f"✓ Extracted and displayed metrics from {len(assignment_time_results)} design points")
 print("Results stored in 'assignment_time_results' for further analysis")
+print("\nColumn Interpretations:")
+print("• Mean of Means: Average assignment time across replications")  
+print("• Std of Means: System consistency between replications (lower = more consistent)")
+print("• Mean of Stds: Average volatility within replications (service predictability)")
+
 # %%

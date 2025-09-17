@@ -32,18 +32,18 @@ METRIC_CONFIGURATIONS = {
                 'description': 'Average of assignment time means across replications'
             },
             {
-                'name': 'variance_of_means', 
+                'name': 'std_of_means', 
                 'extract': 'mean', 
-                'compute': 'variance',
-                'construct_ci': False,  # Descriptive only for testing
-                'description': 'Variance of assignment time means across replications'
+                'compute': 'std',
+                'construct_ci': False,  # Descriptive only for presentation
+                'description': 'Standard deviation of assignment time means across replications (system consistency)'
             },
             {
-                'name': 'mean_of_variances', 
-                'extract': 'variance', 
+                'name': 'mean_of_stds', 
+                'extract': 'std', 
                 'compute': 'mean',
-                'construct_ci': False,  # Descriptive only for testing
-                'description': 'Average within-replication variance'
+                'construct_ci': False,  # Descriptive only for presentation
+                'description': 'Average within-replication standard deviation (average volatility)'
             }
         ],
         'description': 'Individual order performance metrics'
