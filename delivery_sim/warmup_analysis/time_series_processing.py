@@ -17,6 +17,8 @@ def extract_warmup_time_series(study_results, design_points,
     """
     Extract time series data for warmup analysis from study results.
     
+    REFACTORED: study_results values are now direct replication_results lists.
+    
     Simple, direct extraction that:
     1. Gets system snapshots from all replications
     2. Calculates cross-replication averages
@@ -38,11 +40,12 @@ def extract_warmup_time_series(study_results, design_points,
     
     all_time_series = {}
     
-    for design_name, design_results in study_results.items():
+    for design_name, replication_results in study_results.items():
         logger.debug(f"Processing {design_name}...")
         
+        # ✅ REFACTORED: Consistent naming - replication_results throughout codebase
         # Step 1: Extract system snapshots from all replications
-        replication_snapshots = _extract_replication_snapshots(design_results)
+        replication_snapshots = _extract_replication_snapshots(replication_results)
         
         if len(replication_snapshots) < 2:
             logger.warning(f"Skipping {design_name}: only {len(replication_snapshots)} replications")
@@ -64,23 +67,24 @@ def extract_warmup_time_series(study_results, design_points,
     return all_time_series
 
 
-def _extract_replication_snapshots(design_results):
+def _extract_replication_snapshots(replication_results):
     """
     Extract system snapshots from replication results.
     
+    REFACTORED: Consistent parameter naming throughout codebase.
+    
     Args:
-        design_results: Results for one design point from study_results
+        replication_results: Direct replication_results list (no wrapper dictionary)
         
     Returns:
         list: List of snapshot lists, one per replication
-              Format: [[rep1_snapshots], [rep2_snapshots], ...]
     """
     replication_snapshots = []
     
-    for replication_result in design_results['replication_results']:
-        snapshots = replication_result.get('system_snapshots', [])
-        if snapshots:
-            replication_snapshots.append(snapshots)
+    # ✅ REFACTORED: replication_results IS the replication_results list
+    for replication_result in replication_results:
+        if 'system_snapshots' in replication_result:
+            replication_snapshots.append(replication_result['system_snapshots'])
     
     return replication_snapshots
 

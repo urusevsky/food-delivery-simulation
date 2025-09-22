@@ -26,6 +26,8 @@ class ExperimentalRunner:
         """
         Execute experimental study with DesignPoint instances.
         
+        REFACTORED: SimulationRunner.run_experiment() now returns direct replication_results list.
+        
         Args:
             design_points_dict: Dict mapping names to DesignPoint instances
             experiment_config: ExperimentConfig (duration, replications, seed)
@@ -45,14 +47,15 @@ class ExperimentalRunner:
             runner = SimulationRunner(design_point.infrastructure)
             
             # Run this design point
-            design_results = runner.run_experiment(
+            replication_results = runner.run_experiment(
                 operational_config=design_point.operational_config,
                 experiment_config=experiment_config,
                 scoring_config=design_point.scoring_config
             )
             
-            study_results[design_name] = design_results
-            self.logger.info(f"Completed {design_name}: {design_results['num_replications']} replications")
+            # ✅ REFACTORED: Consistent naming - replication_results throughout codebase
+            study_results[design_name] = replication_results
+            self.logger.info(f"Completed {design_name}: {len(replication_results)} replications")
         
         self.logger.info(f"Experimental study completed: {len(design_points_dict)} design points")
         return study_results

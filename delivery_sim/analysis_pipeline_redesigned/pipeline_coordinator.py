@@ -47,9 +47,11 @@ class ExperimentAnalysisPipeline:
                         f"confidence_level={confidence_level}, "
                         f"enabled_metrics={enabled_metric_types}")
     
-    def analyze_experiment(self, simulation_results):
+    def analyze_experiment(self, replication_results):
         """
-        Run complete analysis pipeline on simulation results.
+        Process experiment results and create complete statistical summary.
+        
+        REFACTORED: Parameter directly receives replication_results list.
         
         This is the main entry point that processes all replications and produces
         experiment-level results using configuration-driven processing.
@@ -61,12 +63,12 @@ class ExperimentAnalysisPipeline:
         4. Metadata addition and finalization
         
         Args:
-            simulation_results: Results from simulation_runner.run_experiment()
+            replication_results: Direct replication results list from simulation_runner.run_experiment()
                 
         Returns:
             dict: Complete experiment summary with statistics (and CIs for configured metrics)
         """
-        replication_results = simulation_results['replication_results']
+        # ✅ REFACTORED: Direct parameter usage, no redundant assignment
         num_replications = len(replication_results)
         
         self.logger.info(f"Starting analysis for {num_replications} replications")
@@ -82,7 +84,7 @@ class ExperimentAnalysisPipeline:
         experiment_with_cis = self._construct_confidence_intervals(experiment_statistics, all_replication_summaries)
         
         # Step 4: Add metadata and return
-        return self._finalize_experiment_summary(experiment_with_cis, simulation_results)
+        return self._finalize_experiment_summary(experiment_with_cis, replication_results)
     
     def _process_all_replications(self, replication_results):
         """
@@ -169,20 +171,21 @@ class ExperimentAnalysisPipeline:
             self.confidence_level
         )
     
-    def _finalize_experiment_summary(self, experiment_with_cis, simulation_results):
+    def _finalize_experiment_summary(self, experiment_with_cis, replication_results):
         """
         Add metadata and finalize experiment summary.
+        
+        REFACTORED: replication_results parameter directly receives the list.
+        Metadata that was previously in wrapper dictionary is no longer available.
         
         Returns:
             dict: Complete experiment summary
         """
         experiment_summary = {
-            'num_replications': len(simulation_results['replication_results']),
+            'num_replications': len(replication_results),
             'warmup_period': self.warmup_period,
             'confidence_level': self.confidence_level,
             'processed_metric_types': self.enabled_metric_types,
-            'typical_distance': simulation_results.get('typical_distance'),
-            'config_summary': simulation_results.get('config_summary'),
             'results': experiment_with_cis
         }
         

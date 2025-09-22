@@ -89,7 +89,9 @@ class SimulationRunner:
     
     def run_experiment(self, operational_config, experiment_config, scoring_config=None):
         """
-        Run complete experiment for operational configuration using provided infrastructure.
+        Execute simulation experiment with multiple replications.
+        
+        REFACTORED: Now returns replication_results directly, no wrapper dictionary.
         
         Args:
             operational_config: OperationalConfig with arrival rates, pairing rules, etc.
@@ -97,7 +99,7 @@ class SimulationRunner:
             scoring_config: Optional ScoringConfig for priority scoring (defaults to ScoringConfig())
             
         Returns:
-            dict: Experiment results with replication data and infrastructure info
+            list: Direct replication results list (no wrapper dictionary)
         """
         from delivery_sim.simulation.configuration import ScoringConfig
         
@@ -126,16 +128,9 @@ class SimulationRunner:
             
             self.logger.info(f"Completed replication {replication + 1}")
         
-        # ===== RETURN RESULTS =====
-        experiment_result = {
-            'replication_results': replication_results,
-            'typical_distance': self.typical_distance,  # Only essential infrastructure data
-            'config_summary': f"Op: {operational_config}, Exp: {experiment_config}",
-            'num_replications': len(replication_results)
-        }
-        
+        # ===== RETURN SIMPLIFIED RESULTS =====
         self.logger.info(f"Experiment completed: {len(replication_results)} replications")
-        return experiment_result
+        return replication_results  # ✅ Direct return, no wrapper dictionary
     
     def _create_service_config(self):
         """
