@@ -129,17 +129,6 @@ for load_ratio in target_load_ratios:
 
 print(f"\n✓ Created {len(design_points)} design points systematically")
 
-# Display systematic validation pairs
-print(f"\n📊 Systematic Validation Pairs Overview:")
-for load_ratio in target_load_ratios:
-    baseline_order_rate = 1.0 / 1.0
-    double_baseline_order_rate = 1.0 / 2.0
-    baseline_driver_rate = 1.0 / load_ratio
-    double_baseline_driver_rate = 1.0 / (2.0 * load_ratio)
-    
-    print(f"  Load Ratio {load_ratio:.1f}:")
-    print(f"    • Baseline: {baseline_order_rate:.2f} orders/min, {baseline_driver_rate:.3f} drivers/min")
-    print(f"    • 2x Baseline: {double_baseline_order_rate:.2f} orders/min, {double_baseline_driver_rate:.3f} drivers/min")
 
 print(f"\n🎯 Research Hypothesis:")
 print(f"  • Load ratio determines operational regime characteristics")
