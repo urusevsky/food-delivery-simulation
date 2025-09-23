@@ -21,9 +21,6 @@ class PriorityScorer:
     """
     Main scoring system that evaluates driver-entity assignment opportunities.
     
-    This scorer is designed to be reusable across multiple replications by separating
-    infrastructure-derived parameters (calculated once) from environment-specific
-    components (updated per replication).
     """
     
     def __init__(self, scoring_config, typical_distance, env):
