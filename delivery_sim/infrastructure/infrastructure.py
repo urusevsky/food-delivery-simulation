@@ -63,45 +63,33 @@ class Infrastructure:
         """Generate all infrastructure components deterministically."""
         self.logger.debug("Generating infrastructure components...")
         
-        # Generate restaurants using structural RNG
-        restaurants = self._generate_restaurants()
+        # Generate restaurants directly into repository
+        self._generate_restaurants()
         
-        # Add restaurants to repository
-        for restaurant in restaurants:
-            self.restaurant_repository.add(restaurant)
-        
-        self.logger.info(f"Generated {len(restaurants)} restaurants in "
+        restaurant_count = len(self.restaurant_repository)
+        self.logger.info(f"Generated {restaurant_count} restaurants in "
                         f"{self.structural_config.delivery_area_size}x{self.structural_config.delivery_area_size}km area")
-    
+
     def _generate_restaurants(self):
         """
-        Generate restaurant locations using uniform random distribution.
-        
-        This method implements the methodological decision to use uniform random
-        distribution for restaurant placement to create a spatially neutral
-        simulation environment as outlined in the research methodology.
+        Generate restaurant locations directly into repository.
         
         Returns:
-            list: Generated Restaurant objects with deterministic locations
+            None (restaurants added directly to self.restaurant_repository)
         """
-        restaurants = []
         area_size = self.structural_config.delivery_area_size
         num_restaurants = self.structural_config.num_restaurants
         
         self.logger.debug(f"Generating {num_restaurants} restaurants in {area_size}x{area_size}km area")
         
         for i in range(num_restaurants):
-            # Generate deterministic location using structural RNG
             location = self.structural_rng.rng.uniform(0, area_size, size=2).tolist()
             restaurant_id = f"R{i+1}"
             
             restaurant = Restaurant(restaurant_id=restaurant_id, location=location)
-            restaurants.append(restaurant)
+            self.restaurant_repository.add(restaurant)  # ← Direct addition
             
-            # Log restaurant creation (debug level for infrastructure)
             self.logger.debug(f"Generated restaurant {restaurant_id} at {format_location(location)}")
-        
-        return restaurants
     
     # ===== Public Interface for Analysis and Reuse =====
     
