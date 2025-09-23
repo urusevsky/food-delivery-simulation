@@ -179,7 +179,7 @@ class SimulationRunner:
         self.pair_repository = PairRepository()
         self.delivery_unit_repository = DeliveryUnitRepository()
         
-        # 5. SIMPLIFIED: Create priority scorer directly - no factory function
+        # 5. Create priority scorer
         self.priority_scorer = PriorityScorer(
             scoring_config=self.scoring_config,
             typical_distance=self.typical_distance,  # Direct access to only what we need
