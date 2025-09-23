@@ -311,12 +311,12 @@ print(f"Warmup period: {uniform_warmup_period} minutes")
 print(f"Confidence level: 95%")
 print(f"Focus metric: Order Assignment Time\n")
 
-for i, (design_name, design_results) in enumerate(study_results.items(), 1):
+for i, (design_name, replication_results) in enumerate(study_results.items(), 1):
     print(f"[{i:2d}/{len(study_results)}] Analyzing {design_name}...")
     
     try:
         # Run the new analysis pipeline
-        analysis_result = pipeline.analyze_experiment(design_results)
+        analysis_result = pipeline.analyze_experiment(replication_results)
         design_analysis_results[design_name] = analysis_result
         
         # Quick validation - check if we have the expected structure
