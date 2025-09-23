@@ -22,25 +22,26 @@ class ExperimentalRunner:
         self.logger = get_logger("experimental.runner")
         self.logger.info("ExperimentalRunner initialized")
     
-    def run_experimental_study(self, design_points_dict, experiment_config):
+    def run_experimental_study(self, design_points, experiment_config):
         """
         Execute experimental study with DesignPoint instances.
         
         REFACTORED: SimulationRunner.run_experiment() now returns direct replication_results list.
         
         Args:
-            design_points_dict: Dict mapping names to DesignPoint instances
-            experiment_config: ExperimentConfig (duration, replications, seed)
+            design_points: Dict mapping names to DesignPoint instances
+            experiment_config: ExperimentConfig (duration, replications, seed, collection_interval)
             
         Returns:
             dict: Experimental results organized by design point name
         """
-        self.logger.info(f"Starting experimental study with {len(design_points_dict)} design points")
+        self.logger.info(f"Starting experimental study with {len(design_points)} design points")
         
-        # Execute each design point
+        # Initialize results container
         study_results = {}
         
-        for design_name, design_point in design_points_dict.items():
+        # Execute each design point 
+        for design_name, design_point in design_points.items():
             self.logger.info(f"--- Executing design point: {design_name} ---")
             
             # Create SimulationRunner with this design point's infrastructure
@@ -57,5 +58,5 @@ class ExperimentalRunner:
             study_results[design_name] = replication_results
             self.logger.info(f"Completed {design_name}: {len(replication_results)} replications")
         
-        self.logger.info(f"Experimental study completed: {len(design_points_dict)} design points")
+        self.logger.info(f"Experimental study completed: {len(design_points)} design points")
         return study_results
