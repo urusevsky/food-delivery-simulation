@@ -70,7 +70,7 @@ class SimulationRunner:
         self.operational_config = None
         self.experiment_config = None
         self.scoring_config = None
-        self.flat_config = None
+        self.config = None
         self.env = None
         self.event_dispatcher = None
         self.order_repository = None
@@ -109,7 +109,7 @@ class SimulationRunner:
         self.scoring_config = scoring_config or ScoringConfig()
         
         # Create flat config for service access (only what services actually need)
-        self.flat_config = self._create_flat_config()
+        self.config = self._create_service_config()
         
         self.logger.info(f"Starting experiment with {experiment_config.num_replications} replications")
         
@@ -132,7 +132,7 @@ class SimulationRunner:
         self.logger.info(f"Experiment completed: {len(replication_results)} replications")
         return replication_results  # ✅ Direct return, no wrapper dictionary
     
-    def _create_flat_config(self):
+    def _create_service_config(self):
         """
         Create simple config object that provides flat access to parameters services need.
         
