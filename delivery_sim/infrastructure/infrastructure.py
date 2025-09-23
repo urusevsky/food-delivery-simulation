@@ -66,7 +66,7 @@ class Infrastructure:
         # Generate restaurants directly into repository
         self._generate_restaurants()
         
-        restaurant_count = len(self.restaurant_repository)
+        restaurant_count = self.restaurant_repository.count() 
         self.logger.info(f"Generated {restaurant_count} restaurants in "
                         f"{self.structural_config.delivery_area_size}x{self.structural_config.delivery_area_size}km area")
 
