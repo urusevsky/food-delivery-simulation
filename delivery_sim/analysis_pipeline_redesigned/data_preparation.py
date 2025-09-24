@@ -57,7 +57,7 @@ class AnalyticalPopulations:
         Get all cohort orders that were completed (arrived post-warmup and delivered).
         
         This population serves dual purposes:
-        1. System effectiveness numerator (how many cohort orders were successfully delivered)
+        1. order completion numerator (how many cohort orders were successfully delivered)
         2. Unbiased performance sample (for calculating averages of completed orders)
         
         Since orders are atomic entities, completed cohort orders represent 
