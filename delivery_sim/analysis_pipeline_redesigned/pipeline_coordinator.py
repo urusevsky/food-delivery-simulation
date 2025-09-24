@@ -49,7 +49,7 @@ class ExperimentAnalysisPipeline:
     
     def analyze_experiment(self, replication_results):
         """
-        Process experiment results and create complete statistical summary.
+        Process replication results and create complete statistical summary.
         
         REFACTORED: Parameter directly receives replication_results list.
         
