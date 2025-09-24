@@ -35,10 +35,10 @@ class SystemDataDefinitions:
             'timestamp': timestamp,
             
             # System performance analysis metrics
-            'unassigned_orders_count': self.count_unassigned_orders(),
-            'unassigned_pairs_count': self.count_unassigned_pairs(),
-            'available_drivers_count': self.count_available_drivers(),
-            'delivering_drivers_count': self.count_delivering_drivers(),
+            'unassigned_orders': self.count_unassigned_orders(),
+            'unassigned_pairs': self.count_unassigned_pairs(),
+            'available_drivers': self.count_available_drivers(),
+            'delivering_drivers': self.count_delivering_drivers(),
             
             # Warmup detection and supply-demand dynamics metrics
             'active_drivers': self.count_active_drivers(),
