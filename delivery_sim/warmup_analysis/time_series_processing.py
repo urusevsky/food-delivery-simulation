@@ -150,7 +150,7 @@ def _extract_metric_from_replications(replication_snapshots, metric_name):
     
     for rep_snapshots in replication_snapshots:
         # Extract metric values from this replication's snapshots
-        values = [snapshot.get(metric_name, 0) for snapshot in rep_snapshots]
+        values = [snapshot[metric_name] for snapshot in rep_snapshots]
         metric_arrays.append(values)
     
     # Convert to numpy array for easy averaging
