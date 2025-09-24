@@ -38,7 +38,7 @@ def extract_warmup_time_series(study_results, design_points,
     logger = get_logger("warmup_analysis.time_series_processing")
     logger.info(f"Extracting time series for {len(study_results)} design points")
     
-    all_time_series = {}
+    all_time_series_data = {}  # ✅ Consistent with calling code
     
     for design_name, replication_results in study_results.items():
         logger.debug(f"Processing {design_name}...")
@@ -60,11 +60,11 @@ def extract_warmup_time_series(study_results, design_points,
             moving_average_window
         )
         
-        all_time_series[design_name] = time_series_data
+        all_time_series_data[design_name] = time_series_data
         logger.debug(f"Processed {design_name}: {len(time_series_data)} metrics")
     
     logger.info(f"Time series extraction complete for {len(all_time_series)} design points")
-    return all_time_series
+    return all_time_series_data
 
 
 def _extract_replication_snapshots(replication_results):
