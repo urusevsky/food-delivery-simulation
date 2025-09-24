@@ -99,23 +99,20 @@ class AnalyticalPopulations:
         unbiased_units = []
         
         for unit in all_units:
-            # Must be completed (complete lifecycle requirement)
-            if not unit.completion_time:
-                continue
+            if unit.completion_time is not None:  # positive pattern ← Consistent with other methods
+                entity = unit.delivery_entity
                 
-            entity = unit.delivery_entity
-            
-            if entity.entity_type == EntityType.ORDER:
+                if entity.entity_type == EntityType.ORDER:
                 # Single order: order must have arrived after warmup
-                if entity.arrival_time >= self._warmup_period:
-                    unbiased_units.append(unit)
-                    
-            elif entity.entity_type == EntityType.PAIR:
-                # Paired orders: BOTH orders must have arrived after warmup (strict filtering)
-                if (entity.order1.arrival_time >= self._warmup_period and 
-                    entity.order2.arrival_time >= self._warmup_period):
-                    unbiased_units.append(unit)
-        
+                    if entity.arrival_time >= self._warmup_period:
+                        unbiased_units.append(unit)
+                        
+                elif entity.entity_type == EntityType.PAIR:
+                    # Paired orders: BOTH orders must have arrived after warmup (strict filtering)
+                    if (entity.order1.arrival_time >= self._warmup_period and 
+                        entity.order2.arrival_time >= self._warmup_period):
+                        unbiased_units.append(unit)
+            
         return unbiased_units
     
     def get_cohort_paired_orders(self):
@@ -157,7 +154,7 @@ class AnalysisData:
         # Create all populations upfront for this replication
         self.cohort_orders = populations.get_cohort_orders()
         self.cohort_completed_orders = populations.get_cohort_completed_orders()
-        self.cohort_delivery_units = populations.get_cohort_completed_delivery_units()
+        self.cohort_completed_delivery_units = populations.get_cohort_completed_delivery_units()
         self.cohort_paired_orders = populations.get_cohort_paired_orders()
 
 
