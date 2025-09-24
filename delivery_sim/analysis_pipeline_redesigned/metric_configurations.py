@@ -9,7 +9,7 @@ instead of brittle string parsing.
 
 from delivery_sim.utils.logging_system import get_logger
 
-logger = get_logger("analysis_pipeline_redesigned.configurations")
+logger = get_logger("analysis_pipeline_redesigned.metric_configurations")
 
 # ==============================================================================
 # CORE METRIC CONFIGURATIONS
