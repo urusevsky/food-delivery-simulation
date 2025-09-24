@@ -38,7 +38,7 @@ class SystemDataCollector:
             self.snapshot_repository.add_snapshot(snapshot_data)
             
             self.logger.debug(f"[t={self.env.now:.2f}] Collected snapshot: "
-                            f"available_drivers={snapshot_data['available_drivers_count']}")
+                            f"available_drivers={snapshot_data['available_drivers']}")
             
             # Wait for next collection interval
             yield self.env.timeout(self.collection_interval)
