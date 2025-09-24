@@ -84,12 +84,6 @@ class WelchMethodVisualization:
                 'blue', linewidth=3, 
                 label=f'Welch MA-{unassigned_data["moving_average_window"]}')
         
-        # Final value annotation (helps with regime assessment)
-        final_value = unassigned_data['moving_averages'][-1] if unassigned_data['moving_averages'] else 0
-        ax2.text(0.98, 0.95, f'Final: {final_value:.1f}',
-                transform=ax2.transAxes, verticalalignment='top', horizontalalignment='right',
-                bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.7), fontsize=9)
-        
         ax2.set_ylabel('Unassigned Delivery Entities', fontsize=12)
         ax2.set_xlabel('Simulation Time (minutes)', fontsize=12)
         ax2.set_title('Unassigned Delivery Entities', fontsize=14)
