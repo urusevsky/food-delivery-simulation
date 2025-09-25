@@ -190,9 +190,6 @@ all_time_series_data = extract_warmup_time_series(
     moving_average_window=100  # Larger window for 2000-minute simulation
 )
 
-# Initialize visualization object
-viz = WelchMethodVisualization(figsize=(16, 10))
-
 print(f"✓ Time series processing complete for {len(all_time_series_data)} design points")
 print(f"✓ Each design point has {len(next(iter(all_time_series_data.values())))} metrics")
 print(f"✓ Ready for warmup analysis visualization")
@@ -303,22 +300,12 @@ print(f"Focus metric: Order Assignment Time\n")
 for i, (design_name, replication_results) in enumerate(study_results.items(), 1):
     print(f"[{i:2d}/{len(study_results)}] Analyzing {design_name}...")
     
-    try:
-        # Run the new analysis pipeline
-        analysis_result = pipeline.analyze_experiment(replication_results)
-        design_analysis_results[design_name] = analysis_result
-        
-        # Quick validation - check if we have the expected structure
-        if ('results' in analysis_result and 
-            'order_metrics' in analysis_result['results'] and
-            'order' in analysis_result['results']['order_metrics']):
-            print(f"    ✓ Successfully processed {analysis_result['num_replications']} replications")
-        else:
-            print(f"    ⚠ Warning: Unexpected result structure for {design_name}")
+    # Simple, direct approach - let it fail with full context
+    analysis_result = pipeline.analyze_experiment(replication_results)
+    design_analysis_results[design_name] = analysis_result
     
-    except Exception as e:
-        print(f"    ✗ Error processing {design_name}: {str(e)}")
-        raise  # Re-raise for debugging
+    # Simple success confirmation
+    print(f"    ✓ Processed {analysis_result['num_replications']} replications")
 
 print(f"\n✓ Completed analysis for all {len(design_analysis_results)} design points")
 print("Analysis results stored in 'design_analysis_results'")
@@ -378,7 +365,7 @@ assignment_time_results = []
 for design_name, analysis_result in design_analysis_results.items():
     try:
         # Navigate to assignment time metrics
-        order_metrics = analysis_result['results']['order_metrics']['order']['assignment_time']
+        order_metrics = analysis_result['results']['order_metrics']['assignment_time']  # ✅ Removed 'order' layer
         
         # Extract the three statistics of interest (updated names)
         mean_of_means_data = order_metrics['mean_of_means']
@@ -410,14 +397,11 @@ for design_name, analysis_result in design_analysis_results.items():
         # Debug: Show actual structure
         try:
             if 'order_metrics' in analysis_result['results']:
-                order_metrics_keys = list(analysis_result['results']['order_metrics'].keys())
-                print(f"   Available entity types in order_metrics: {order_metrics_keys}")
-                if 'order' in order_metrics_keys:
-                    metric_keys = list(analysis_result['results']['order_metrics']['order'].keys())
-                    print(f"   Available metrics in 'order': {metric_keys}")
-                    if 'assignment_time' in metric_keys:
-                        stat_keys = list(analysis_result['results']['order_metrics']['order']['assignment_time'].keys())
-                        print(f"   Available statistics in 'assignment_time': {stat_keys}")
+                metric_keys = list(analysis_result['results']['order_metrics'].keys())
+                print(f"   Available metrics in order_metrics: {metric_keys}")  # ✅ Updated message
+                if 'assignment_time' in metric_keys:
+                    stat_keys = list(analysis_result['results']['order_metrics']['assignment_time'].keys())
+                    print(f"   Available statistics in 'assignment_time': {stat_keys}")
         except:
             print(f"   Could not inspect structure further")
     except Exception as e:
