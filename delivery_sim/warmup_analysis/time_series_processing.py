@@ -63,7 +63,7 @@ def extract_warmup_time_series(study_results, design_points,
         all_time_series_data[design_name] = time_series_data
         logger.debug(f"Processed {design_name}: {len(time_series_data)} metrics")
     
-    logger.info(f"Time series extraction complete for {len(all_time_series)} design points")
+    logger.info(f"Time series extraction complete for {len(all_time_series_data)} design points")
     return all_time_series_data
 
 
