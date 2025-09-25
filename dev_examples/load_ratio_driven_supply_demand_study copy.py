@@ -365,7 +365,7 @@ assignment_time_results = []
 for design_name, analysis_result in design_analysis_results.items():
     try:
         # Navigate to assignment time metrics
-        order_metrics = analysis_result['results']['order_metrics']['order']['assignment_time']
+        order_metrics = analysis_result['results']['order_metrics']['assignment_time']  # ✅ Removed 'order' layer
         
         # Extract the three statistics of interest (updated names)
         mean_of_means_data = order_metrics['mean_of_means']
@@ -397,14 +397,11 @@ for design_name, analysis_result in design_analysis_results.items():
         # Debug: Show actual structure
         try:
             if 'order_metrics' in analysis_result['results']:
-                order_metrics_keys = list(analysis_result['results']['order_metrics'].keys())
-                print(f"   Available entity types in order_metrics: {order_metrics_keys}")
-                if 'order' in order_metrics_keys:
-                    metric_keys = list(analysis_result['results']['order_metrics']['order'].keys())
-                    print(f"   Available metrics in 'order': {metric_keys}")
-                    if 'assignment_time' in metric_keys:
-                        stat_keys = list(analysis_result['results']['order_metrics']['order']['assignment_time'].keys())
-                        print(f"   Available statistics in 'assignment_time': {stat_keys}")
+                metric_keys = list(analysis_result['results']['order_metrics'].keys())
+                print(f"   Available metrics in order_metrics: {metric_keys}")  # ✅ Updated message
+                if 'assignment_time' in metric_keys:
+                    stat_keys = list(analysis_result['results']['order_metrics']['assignment_time'].keys())
+                    print(f"   Available statistics in 'assignment_time': {stat_keys}")
         except:
             print(f"   Could not inspect structure further")
     except Exception as e:
