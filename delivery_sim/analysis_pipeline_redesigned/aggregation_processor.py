@@ -63,14 +63,14 @@ class AggregationProcessor:
         else:
             raise ValueError(f"Unknown aggregation pattern: {pattern}")
     
-    def _process_two_level_replication(self, analysis_data, config, metric_type):
+    def _process_two_level_replication(self, analysis_data, config):  # ✅ Removed metric_type
         """Individual entities → Statistics objects (via individual values aggregation)."""
         # Get entities
         entity_data_key = config['entity_data_key']
         entities = getattr(analysis_data, entity_data_key, [])
         
         if not entities:
-            self.logger.warning(f"No entities found for {metric_type}")
+            self.logger.warning(f"No entities found for {entity_data_key}")  # ✅ Use entity_data_key from config
             return {}
         
         # Calculate individual metrics
@@ -78,7 +78,6 @@ class AggregationProcessor:
         individual_metrics = [metric_function(entity) for entity in entities]
         
         # Aggregate individual values to statistics objects
-        # ✅ SIMPLIFIED: Remove entity_type extraction and passing
         return self._aggregate_individual_values(individual_metrics)
     
     def _process_one_level_replication(self, analysis_data, config):
