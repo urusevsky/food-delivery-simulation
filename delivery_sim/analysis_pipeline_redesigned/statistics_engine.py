@@ -110,23 +110,14 @@ class StatisticsEngine:
             'std': float(np.sqrt(variance))
         }
     
-    def extract_statistic_for_experiment_aggregation(self, replication_summaries, entity_type, metric_name, statistic_type):
+    def extract_statistic_for_experiment_aggregation(self, replication_summaries, metric_name, statistic_type):
         """
         Extract a specific statistic across replication summaries for two-level aggregation.
         
-        **PURPOSE**: This method is specifically designed for TWO-LEVEL AGGREGATION PATTERNS.
-        
-        **USE CASE**: Entity metrics that produce statistics objects at replication level
-        (e.g., {'mean': 12.5, 'std': 3.2, 'p95': 18.1}) and need statistics-of-statistics
-        at experiment level (e.g., mean-of-means, std-of-means).
-        
-        **NOT FOR**: One-level system metrics that produce scalar values at replication level
-        (e.g., completion_rate: 0.73) - these use direct aggregation instead.
+        ✅ SIMPLIFIED: Removed entity_type parameter - no longer needed with flat structure.
         
         Args:
-            replication_summaries: List of replication-level summary dictionaries containing
-                                 nested structure: replication[entity_type][metric_name][stat_type]
-            entity_type: Entity type key (e.g., 'orders', 'delivery_units')  
+            replication_summaries: List of replication-level summary dictionaries
             metric_name: Metric name key (e.g., 'assignment_time', 'total_distance')
             statistic_type: Statistic to extract (e.g., 'mean', 'std', 'p95')
             
@@ -134,33 +125,32 @@ class StatisticsEngine:
             List of statistic values across replications for experiment-level CI calculation
             
         Example:
-            # Extract mean assignment times across all replications for experiment-level analysis
+            # Extract mean assignment times across all replications
             means = engine.extract_statistic_for_experiment_aggregation(
-                replication_summaries, 'orders', 'assignment_time', 'mean'
+                replication_summaries, 'assignment_time', 'mean'  # ← No entity_type needed
             )
             # Result: [12.47, 13.12, 11.85] - one mean per replication
-            # These values then get aggregated into experiment-level confidence intervals
         """
         statistic_values = []
         
         for i, rep_summary in enumerate(replication_summaries):
             try:
-                entity_data = rep_summary[entity_type]
-                metric_data = entity_data[metric_name]
+                # ✅ SIMPLIFIED: Direct access to metric, no entity_type navigation
+                metric_data = rep_summary[metric_name]
                 stat_value = metric_data[statistic_type]
                 statistic_values.append(float(stat_value))
             except KeyError as e:
                 self.logger.error(f"Missing data structure in replication {i} summary: {e}")
-                self.logger.error(f"Expected structure: replication[{entity_type}][{metric_name}][{statistic_type}]")
+                self.logger.error(f"Expected structure: replication[{metric_name}][{statistic_type}]")  # ← Updated error message
                 raise
             except (TypeError, ValueError) as e:
                 self.logger.error(f"Invalid data type in replication {i} summary: {e}")
                 raise
         
         if not statistic_values:
-            self.logger.warning(f"No values extracted for {entity_type}.{metric_name}.{statistic_type}")
+            self.logger.warning(f"No values extracted for {metric_name}.{statistic_type}")
         else:
-            self.logger.debug(f"Extracted {len(statistic_values)} values for {entity_type}.{metric_name}.{statistic_type}")
+            self.logger.debug(f"Extracted {len(statistic_values)} values for {metric_name}.{statistic_type}")
         
         return statistic_values
     

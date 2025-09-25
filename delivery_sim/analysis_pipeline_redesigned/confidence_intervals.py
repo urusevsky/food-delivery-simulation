@@ -84,51 +84,47 @@ def _construct_cis_for_two_level(metric_statistics, replication_summaries, metri
     """
     Construct CIs for two-level pattern (statistics-of-statistics).
     
-    Only constructs CIs for statistics that have construct_ci=True in configuration.
-    Automatically determines the correct statistical method based on compute field.
+    ✅ SIMPLIFIED: Updated for flat structure without entity_type nesting.
     """
     
     statistics_engine = StatisticsEngine()
-    ci_configurations = get_ci_configuration(metric_type)  # Only get stats that need CIs
+    ci_configurations = get_ci_configuration(metric_type)
     
     results_with_cis = {}
     
-    for entity_type, entity_metrics in metric_statistics.items():
-        results_with_cis[entity_type] = {}
+    # ✅ SIMPLIFIED: Direct iteration over metrics, no entity_type loop
+    for metric_name, metric_stats in metric_statistics.items():
+        results_with_cis[metric_name] = {}
         
-        for metric_name, metric_stats in entity_metrics.items():
-            results_with_cis[entity_type][metric_name] = {}
+        # Copy all descriptive statistics first
+        for stat_name, stat_value in metric_stats.items():
+            results_with_cis[metric_name][stat_name] = {
+                'point_estimate': stat_value,
+                'confidence_interval': [None, None]  # Default: no CI
+            }
+        
+        # Add CIs only for configured statistics
+        for ci_config in ci_configurations:
+            stat_name = ci_config['name']
             
-            # Copy all descriptive statistics first
-            for stat_name, stat_value in metric_stats.items():
-                results_with_cis[entity_type][metric_name][stat_name] = {
-                    'point_estimate': stat_value,
-                    'confidence_interval': [None, None]  # Default: no CI
-                }
-            
-            # Add CIs only for configured statistics
-            for ci_config in ci_configurations:
-                stat_name = ci_config['name']
+            if stat_name in metric_stats:
+                # ✅ SIMPLIFIED: Re-extract values using updated method signature
+                extracted_values = statistics_engine.extract_statistic_for_experiment_aggregation(
+                    replication_summaries, metric_name, ci_config['extract']  # ← Removed entity_type
+                )
                 
-                if stat_name in metric_stats:
-                    # Re-extract the underlying values that created this statistic
-                    extracted_values = statistics_engine.extract_statistic_for_experiment_aggregation(
-                        replication_summaries, entity_type, metric_name, ci_config['extract']
-                    )
-                    
-                    # Automatically determine CI method from compute field
-                    ci_method = get_ci_method(metric_type, stat_name)
-                    
-                    # Construct CI using automatically determined method
-                    ci_result = _construct_ci_with_method(
-                        extracted_values, confidence_level, ci_config['compute'], ci_method
-                    )
-                    
-                    # Update with CI information
-                    results_with_cis[entity_type][metric_name][stat_name] = ci_result
-                    
-                    logger.debug(f"Constructed {ci_method} CI for {entity_type}.{metric_name}.{stat_name} "
-                               f"(auto-determined from compute='{ci_config['compute']}')")
+                # Automatically determine CI method from compute field
+                ci_method = get_ci_method(metric_type, stat_name)
+                
+                # Construct CI using automatically determined method
+                ci_result = _construct_ci_with_method(
+                    extracted_values, confidence_level, ci_config['compute'], ci_method
+                )
+                
+                # Update with CI information
+                results_with_cis[metric_name][stat_name] = ci_result
+                
+                logger.debug(f"Constructed {ci_method} CI for {metric_name}.{stat_name}")
     
     return results_with_cis
 

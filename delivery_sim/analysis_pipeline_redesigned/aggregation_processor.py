@@ -78,8 +78,8 @@ class AggregationProcessor:
         individual_metrics = [metric_function(entity) for entity in entities]
         
         # Aggregate individual values to statistics objects
-        entity_type = metric_type.replace('_metrics', '')
-        return self._aggregate_individual_values(individual_metrics, entity_type)
+        # ✅ SIMPLIFIED: Remove entity_type extraction and passing
+        return self._aggregate_individual_values(individual_metrics)
     
     def _process_one_level_replication(self, analysis_data, config):
         """Direct calculation (already at replication level)."""
@@ -107,12 +107,12 @@ class AggregationProcessor:
     # AGGREGATION METHODS (CATEGORIZED BY DATA STRUCTURE)
     # ==============================================================================
     
-    def _aggregate_individual_values(self, individual_metrics, entity_type):
+    def _aggregate_individual_values(self, individual_metrics):
         """
         Aggregate individual entity values into statistics objects.
         
         Input: List of individual metric dictionaries from entities
-        Output: Nested statistics structure {entity_type: {metric_name: stats}}
+        Output: Direct statistics structure {metric_name: stats}  # ← Updated comment
         Context: Within replication, across entities
         """
         if not individual_metrics:
@@ -124,12 +124,12 @@ class AggregationProcessor:
         for metric_name in metric_names:
             # Extract values for this metric across all entities
             values = [metrics[metric_name] for metrics in individual_metrics 
-                     if metric_name in metrics and metrics[metric_name] is not None]
+                    if metric_name in metrics and metrics[metric_name] is not None]
             
             if values:
                 results[metric_name] = self.statistics_engine.calculate_statistics(values)
         
-        return {entity_type: results} if results else {}
+        return results  # ✅ SIMPLIFIED: Remove entity_type wrapper
     
     def _aggregate_scalar_values(self, scalar_data):
         """
@@ -155,45 +155,45 @@ class AggregationProcessor:
         Output: Experiment-level statistics-of-statistics
         Context: Across replications, for entity metrics (second order)
         """
-        entity_types = list(replication_results[0].keys())
+        if not replication_results or not replication_results[0]:
+            return {}
+        
+        # ✅ SIMPLIFIED: Direct metric access, no entity_type navigation
+        metric_names = list(replication_results[0].keys())
         results = {}
         
-        for entity_type in entity_types:
-            results[entity_type] = {}
-            metric_names = list(replication_results[0][entity_type].keys())
+        for metric_name in metric_names:
+            results[metric_name] = {}
             
-            for metric_name in metric_names:
-                results[entity_type][metric_name] = {}
+            # Calculate each configured statistics-of-statistics
+            for stat_config in experiment_stats_config:
+                stat_name = stat_config['name']
+                extract_stat = stat_config['extract']
+                compute_stat = stat_config['compute']
                 
-                # Calculate each configured statistics-of-statistics
-                for stat_config in experiment_stats_config:
-                    stat_name = stat_config['name']
-                    extract_stat = stat_config['extract']
-                    compute_stat = stat_config['compute']
-                    
-                    # Extract base statistic values across replications
-                    extracted_values = self.statistics_engine.extract_statistic_for_experiment_aggregation(
-                        replication_results, entity_type, metric_name, extract_stat
-                    )
-                    
-                    if extracted_values:
-                        # Compute target statistic on extracted values
-                        if compute_stat == 'mean':
-                            stats = self.statistics_engine.calculate_basic_statistics(extracted_values)
-                            results[entity_type][metric_name][stat_name] = stats['mean']
-                        elif compute_stat == 'std':
-                            stats = self.statistics_engine.calculate_basic_statistics(extracted_values)
-                            results[entity_type][metric_name][stat_name] = stats['std']
-                        elif compute_stat == 'variance':
-                            stats = self.statistics_engine.calculate_basic_statistics(extracted_values)
-                            results[entity_type][metric_name][stat_name] = stats['variance']
-                        elif compute_stat == 'full_stats':
-                            results[entity_type][metric_name][stat_name] = \
-                                self.statistics_engine.calculate_basic_statistics(extracted_values)
-                        else:
-                            self.logger.warning(f"Unknown compute statistic: {compute_stat}")
+                # ✅ SIMPLIFIED: Extract base statistic values across replications
+                extracted_values = self.statistics_engine.extract_statistic_for_experiment_aggregation(
+                    replication_results, metric_name, extract_stat  # ← Removed entity_type parameter
+                )
+                
+                if extracted_values:
+                    # Compute target statistic on extracted values
+                    if compute_stat == 'mean':
+                        stats = self.statistics_engine.calculate_basic_statistics(extracted_values)
+                        results[metric_name][stat_name] = stats['mean']
+                    elif compute_stat == 'std':
+                        stats = self.statistics_engine.calculate_basic_statistics(extracted_values)
+                        results[metric_name][stat_name] = stats['std']
+                    elif compute_stat == 'variance':
+                        stats = self.statistics_engine.calculate_basic_statistics(extracted_values)
+                        results[metric_name][stat_name] = stats['variance']
+                    elif compute_stat == 'full_stats':
+                        results[metric_name][stat_name] = \
+                            self.statistics_engine.calculate_basic_statistics(extracted_values)
                     else:
-                        self.logger.warning(f"No values for {entity_type}.{metric_name}.{extract_stat}")
+                        self.logger.warning(f"Unknown compute statistic: {compute_stat}")
+                else:
+                    self.logger.warning(f"No values for {metric_name}.{extract_stat}")
         
         return results
     
