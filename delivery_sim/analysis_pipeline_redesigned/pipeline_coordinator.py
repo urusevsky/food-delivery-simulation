@@ -75,13 +75,13 @@ class ExperimentAnalysisPipeline:
         self.logger.info(f"Processing metric types: {self.enabled_metric_types}")
         
         # Step 1: Process replication-level for all metric types
-        all_replication_summaries = self._process_all_replications(replication_results)
+        all_processed_replications = self._process_all_replications(replication_results)  # ✅ Updated
         
         # Step 2: Process experiment-level aggregation (descriptive statistics)
-        experiment_statistics = self._process_experiment_level(all_replication_summaries)
+        experiment_statistics = self._aggregate_all_metric_types(all_processed_replications)  # ✅ Updated method name and variable
         
         # Step 3: Construct confidence intervals (granular control via configuration)
-        experiment_with_cis = self._construct_confidence_intervals(experiment_statistics, all_replication_summaries)
+        experiment_with_cis = self._construct_confidence_intervals(experiment_statistics, all_processed_replications)  # ✅ Updated
         
         # Step 4: Add metadata and return
         return self._finalize_experiment_summary(experiment_with_cis, replication_results)
@@ -91,9 +91,9 @@ class ExperimentAnalysisPipeline:
         Process replication-level analysis for all metric types across all replications.
         
         Returns:
-            dict: metric_type -> list of replication summaries
+            dict: metric_type -> list of processed replications
         """
-        all_replication_summaries = {metric_type: [] for metric_type in self.enabled_metric_types}
+        all_processed_replications = {metric_type: [] for metric_type in self.enabled_metric_types}  # ✅ Updated
         
         for i, replication_result in enumerate(replication_results):
             self.logger.debug(f"Processing replication {i+1}/{len(replication_results)}")
@@ -104,26 +104,25 @@ class ExperimentAnalysisPipeline:
             
             # Process each configured metric type
             for metric_type in self.enabled_metric_types:
-                replication_summary = self.aggregation_processor.process_replication_level(
+                processed_replication = self.aggregation_processor.process_replication_level(  # ✅ Updated
                     analysis_data, metric_type
                 )
                 
-                if replication_summary:
-                    all_replication_summaries[metric_type].append(replication_summary)
+                if processed_replication:  # ✅ Updated
+                    all_processed_replications[metric_type].append(processed_replication)  # ✅ Updated
                     self.logger.debug(f"Processed {metric_type} for replication {i+1}")
                 else:
-                    # In research context, empty results indicate a problem to investigate
                     self.logger.warning(f"Empty results from {metric_type} for replication {i+1} - investigate upstream")
         
         # Log processing summary
-        for metric_type, summaries in all_replication_summaries.items():
-            self.logger.info(f"Collected {len(summaries)} replication summaries for {metric_type}")
+        for metric_type, processed_replications in all_processed_replications.items():  # ✅ Updated
+            self.logger.info(f"Collected {len(processed_replications)} processed replications for {metric_type}")  # ✅ Updated
         
-        return all_replication_summaries
+        return all_processed_replications  # ✅ Updated
     
-    def _process_experiment_level(self, all_replication_summaries):
+    def _aggregate_all_metric_types(self, all_processed_replications):  # ✅ Renamed method
         """
-        Process experiment-level aggregation for all metric types.
+        Aggregate experiment-level statistics for all metric types.
         
         This step produces descriptive statistics at experiment level.
         
@@ -132,13 +131,13 @@ class ExperimentAnalysisPipeline:
         """
         experiment_statistics = {}
         
-        for metric_type, replication_summaries in all_replication_summaries.items():
-            if not replication_summaries:
-                self.logger.warning(f"No replication summaries for {metric_type} - check replication processing")
+        for metric_type, processed_replications in all_processed_replications.items():  # ✅ Updated
+            if not processed_replications:  # ✅ Updated
+                self.logger.warning(f"No processed replications for {metric_type} - check replication processing")
                 continue
             
             experiment_result = self.aggregation_processor.process_experiment_level(
-                replication_summaries, metric_type
+                processed_replications, metric_type  # ✅ Updated
             )
             
             if experiment_result:
@@ -149,16 +148,15 @@ class ExperimentAnalysisPipeline:
         
         return experiment_statistics
     
-    def _construct_confidence_intervals(self, experiment_statistics, all_replication_summaries):
+    def _construct_confidence_intervals(self, experiment_statistics, all_processed_replications):  # ✅ Updated parameter
         """
         Construct confidence intervals based on granular configuration.
-        
         Uses configuration to determine which specific statistics/metrics get CIs
         and which statistical method to use for each one.
         
         Args:
             experiment_statistics: Experiment-level statistics from previous step
-            all_replication_summaries: Original replication data needed for CI construction
+            all_processed_replications: Original processed replication data needed for CI construction  # ✅ Updated
             
         Returns:
             dict: Experiment results with CIs added for configured statistics/metrics
@@ -166,7 +164,7 @@ class ExperimentAnalysisPipeline:
         
         return construct_confidence_intervals_for_experiment(
             experiment_statistics,
-            all_replication_summaries, 
+            all_processed_replications,  # ✅ Updated
             self.enabled_metric_types,
             self.confidence_level
         )

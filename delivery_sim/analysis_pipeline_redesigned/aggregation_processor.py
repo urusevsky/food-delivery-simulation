@@ -51,15 +51,15 @@ class AggregationProcessor:
         else:
             raise ValueError(f"Unknown aggregation pattern: {pattern}")
     
-    def process_experiment_level(self, replication_results, metric_type):
+    def process_experiment_level(self, processed_replications, metric_type):  # ✅ Updated parameter
         """Process metrics at experiment level according to aggregation pattern."""
         config = get_metric_configuration(metric_type)
         pattern = config['aggregation_pattern']
         
         if pattern == 'two_level':
-            return self._process_two_level_experiment(replication_results, metric_type)
+            return self._process_two_level_experiment(processed_replications, metric_type)  # ✅ Updated
         elif pattern == 'one_level':
-            return self._process_one_level_experiment(replication_results)
+            return self._process_one_level_experiment(processed_replications)  # ✅ Updated
         else:
             raise ValueError(f"Unknown aggregation pattern: {pattern}")
     
@@ -85,21 +85,21 @@ class AggregationProcessor:
         metric_function = self._get_metric_function(config)
         return metric_function(analysis_data)
     
-    def _process_two_level_experiment(self, replication_results, metric_type):
+    def _process_two_level_experiment(self, processed_replications, metric_type):  # ✅ Updated parameter
         """Statistics objects → Statistics-of-statistics."""
-        if not replication_results or not replication_results[0]:
+        if not processed_replications or not processed_replications[0]:  # ✅ Updated
             return {}
         
         experiment_stats_config = get_experiment_statistics(metric_type)
-        return self._aggregate_statistics_objects(replication_results, experiment_stats_config)
+        return self._aggregate_statistics_objects(processed_replications, experiment_stats_config)  # ✅ Updated
     
-    def _process_one_level_experiment(self, replication_results):
+    def _process_one_level_experiment(self, processed_replications):  # ✅ Updated parameter
         """Scalar values → Statistics objects (via scalar values aggregation)."""
-        if not replication_results:
+        if not processed_replications:  # ✅ Updated
             return {}
         
         # Extract scalar values for aggregation
-        scalar_data = self._extract_scalar_data(replication_results)
+        scalar_data = self._extract_scalar_data(processed_replications)  # ✅ Updated
         return self._aggregate_scalar_values(scalar_data)
     
     # ==============================================================================
