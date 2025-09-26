@@ -49,49 +49,76 @@ class ExperimentAnalysisPipeline:
     
     def analyze_experiment(self, replication_results):
         """
-        Process replication results and create complete statistical summary.
+        Transform raw simulation data into comprehensive experiment-level statistical summary.
         
-        REFACTORED: Parameter directly receives replication_results list.
+        This is the main pipeline orchestrator that processes all replications through
+        configuration-driven, pattern-aware aggregation to produce experiment-level results.
         
-        This is the main entry point that processes all replications and produces
-        experiment-level results using configuration-driven processing.
+        Processing pipeline:
+        1. Replication-level metric computation (pattern-dependent processing)
+        - Two-level patterns: Raw data → Individual metrics → Statistical summaries  
+        - One-level patterns: Raw data → Direct metric calculations
         
-        Processing flow:
-        1. Replication-level processing (descriptive stats per replication)
-        2. Experiment-level aggregation (descriptive stats across replications) 
-        3. Confidence interval construction (granular control via configuration)
-        4. Metadata addition and finalization
+        2. Experiment-level statistical aggregation (across all replications)
+        - Two-level patterns: Statistics-of-statistics (second-order aggregation)
+        - One-level patterns: Standard statistics from scalar values (first-order aggregation)
+        
+        3. Confidence interval construction (configuration-driven, selective application)
+        
+        4. Metadata enrichment and result finalization
         
         Args:
-            replication_results: Direct replication results list from simulation_runner.run_experiment()
-                
+            replication_results: List of raw simulation outputs from simulation_runner.run_experiment()
+                            Each element contains repositories, events, and simulation state
+                    
         Returns:
-            dict: Complete experiment summary with statistics (and CIs for configured metrics)
+            dict: Complete experiment summary containing:
+                - Descriptive statistics for all enabled metric types
+                - Confidence intervals for configured metrics/statistics  
+                - Pipeline metadata (num_replications, warmup_period, etc.)
         """
-        # ✅ REFACTORED: Direct parameter usage, no redundant assignment
         num_replications = len(replication_results)
         
         self.logger.info(f"Starting analysis for {num_replications} replications")
         self.logger.info(f"Processing metric types: {self.enabled_metric_types}")
         
-        # Step 1: Process replication-level for all metric types
-        all_processed_replications = self._compute_replication_level_metrics(replication_results)  # ✅ Updated
+        # Step 1: Transform raw simulation data into replication-level metrics
+        # Output varies by pattern: statistics objects (two-level) or direct values (one-level)
+        replication_level_metrics = self._compute_replication_level_metrics(replication_results)
         
-        # Step 2: Process experiment-level aggregation (descriptive statistics)
-        experiment_statistics = self._compute_experiment_level_statistics(all_processed_replications)  # ✅ Updated method name and variable
+        # Step 2: Aggregate replication-level metrics into experiment-level statistics
+        # Two-level: statistics-of-statistics, One-level: standard statistical aggregation
+        experiment_statistics = self._compute_experiment_level_statistics(replication_level_metrics)
         
-        # Step 3: Construct confidence intervals (granular control via configuration)
-        experiment_with_cis = self._construct_confidence_intervals(experiment_statistics, all_processed_replications)  # ✅ Updated
+        # Step 3: Construct confidence intervals using configuration-driven selection
+        experiment_with_cis = self._construct_confidence_intervals(experiment_statistics, replication_level_metrics)
         
-        # Step 4: Add metadata and return
+        # Step 4: Enrich with metadata and finalize experiment summary
         return self._finalize_experiment_summary(experiment_with_cis, replication_results)
     
     def _compute_replication_level_metrics(self, replication_results):
         """
-        Process replication-level analysis for all metric types across all replications.
+        Transform raw simulation data into replication-level metrics for all enabled metric types.
         
+        This method applies warmup period filtering and computes metrics according to each
+        metric type's aggregation pattern:
+        
+        Two-level patterns (e.g., entity-based metrics):
+        - Raw data → Individual entity metrics → Statistical summaries (mean, std, etc.)
+        - Output: Statistics objects representing entity distributions within each replication
+        
+        One-level patterns (e.g., system-wide metrics):  
+        - Raw data → Direct metric calculation
+        - Output: Scalar values or simple data structures
+        
+        Args:
+            replication_results: List of raw simulation outputs (repositories, events, etc.)
+            
         Returns:
-            dict: metric_type -> list of processed replications
+            dict: {metric_type: [replication_metrics, ...]}
+                Where replication_metrics varies by pattern:
+                - Two-level: Statistics objects (with mean, std, count, etc.)
+                - One-level: Scalar values or simple structures
         """
         all_processed_replications = {metric_type: [] for metric_type in self.enabled_metric_types}  # ✅ Updated
         
@@ -122,13 +149,29 @@ class ExperimentAnalysisPipeline:
     
     def _compute_experiment_level_statistics(self, all_processed_replications):  # ✅ Renamed method
         """
-        Aggregate experiment-level statistics for all metric types.
+        Aggregate replication-level metrics into experiment-level statistical summaries.
         
-        This step produces descriptive statistics at experiment level.
+        This method computes descriptive statistics across replications, with different
+        approaches based on aggregation pattern:
         
+        Two-level patterns:
+        - Input: Statistics objects from each replication
+        - Process: Statistics-of-statistics (second-order aggregation)
+        - Output: Mean-of-means, std-of-means, mean-of-stds, etc.
+        
+        One-level patterns:
+        - Input: Scalar values from each replication  
+        - Process: Standard statistical aggregation (first-order)
+        - Output: Mean, std, min, max across replications
+        
+        Args:
+            all_processed_replications: Output from _compute_replication_level_metrics()
+            
         Returns:
-            dict: Experiment-level statistics (without confidence intervals)
-        """
+            dict: {metric_type: experiment_statistics}
+                Where experiment_statistics contains descriptive statistics
+                summarizing behavior across all replications (no confidence intervals yet)
+    """
         experiment_statistics = {}
         
         for metric_type, processed_replications in all_processed_replications.items():  # ✅ Updated
