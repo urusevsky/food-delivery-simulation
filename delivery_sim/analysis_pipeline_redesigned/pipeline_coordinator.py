@@ -75,10 +75,10 @@ class ExperimentAnalysisPipeline:
         self.logger.info(f"Processing metric types: {self.enabled_metric_types}")
         
         # Step 1: Process replication-level for all metric types
-        all_processed_replications = self._process_all_replications(replication_results)  # ✅ Updated
+        all_processed_replications = self._compute_replication_level_metrics(replication_results)  # ✅ Updated
         
         # Step 2: Process experiment-level aggregation (descriptive statistics)
-        experiment_statistics = self._aggregate_all_metric_types(all_processed_replications)  # ✅ Updated method name and variable
+        experiment_statistics = self._compute_experiment_level_statistics(all_processed_replications)  # ✅ Updated method name and variable
         
         # Step 3: Construct confidence intervals (granular control via configuration)
         experiment_with_cis = self._construct_confidence_intervals(experiment_statistics, all_processed_replications)  # ✅ Updated
@@ -86,7 +86,7 @@ class ExperimentAnalysisPipeline:
         # Step 4: Add metadata and return
         return self._finalize_experiment_summary(experiment_with_cis, replication_results)
     
-    def _process_all_replications(self, replication_results):
+    def _compute_replication_level_metrics(self, replication_results):
         """
         Process replication-level analysis for all metric types across all replications.
         
@@ -120,7 +120,7 @@ class ExperimentAnalysisPipeline:
         
         return all_processed_replications  # ✅ Updated
     
-    def _aggregate_all_metric_types(self, all_processed_replications):  # ✅ Renamed method
+    def _compute_experiment_level_statistics(self, all_processed_replications):  # ✅ Renamed method
         """
         Aggregate experiment-level statistics for all metric types.
         
