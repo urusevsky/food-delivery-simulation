@@ -45,7 +45,7 @@ class AggregationProcessor:
         pattern = config['aggregation_pattern']
         
         if pattern == 'two_level':
-            return self._process_two_level_replication(analysis_data, config, metric_type)
+            return self._process_two_level_replication(analysis_data, config)
         elif pattern == 'one_level':
             return self._process_one_level_replication(analysis_data, config)
         else:
