@@ -25,7 +25,7 @@ from delivery_sim.analysis_pipeline_redesigned.statistics_engine import Statisti
 logger = get_logger("analysis_pipeline_redesigned.confidence_intervals")
 
 
-def construct_confidence_intervals_for_experiment(experiment_statistics, replication_results, metric_types, confidence_level=0.95):
+def construct_confidence_intervals_for_experiment(experiment_statistics, replication_level_metrics, metric_types, confidence_level=0.95):
     """
     Construct confidence intervals for experiment-level statistics.
     
@@ -34,7 +34,7 @@ def construct_confidence_intervals_for_experiment(experiment_statistics, replica
     
     Args:
         experiment_statistics: Results from aggregation processor (descriptive stats)
-        replication_results: Original replication results (needed for raw values)
+        replication_level_metrics: Processed replication-level metrics (needed for CI construction)  # ← Updated
         metric_types: List of metric types to process CIs for
         confidence_level: Confidence level for CI construction
         
@@ -53,7 +53,7 @@ def construct_confidence_intervals_for_experiment(experiment_statistics, replica
         logger.debug(f"Processing CIs for {metric_type}")
         results_with_cis[metric_type] = _construct_cis_for_metric_type(
             experiment_statistics[metric_type],
-            replication_results[metric_type],
+            replication_level_metrics[metric_type],
             metric_type,
             confidence_level
         )
@@ -62,7 +62,7 @@ def construct_confidence_intervals_for_experiment(experiment_statistics, replica
     return results_with_cis
 
 
-def _construct_cis_for_metric_type(metric_statistics, replication_summaries, metric_type, confidence_level):
+def _construct_cis_for_metric_type(metric_statistics, replication_level_metrics, metric_type, confidence_level):
     """
     Construct CIs for a specific metric type.
     
@@ -73,14 +73,14 @@ def _construct_cis_for_metric_type(metric_statistics, replication_summaries, met
     pattern = get_aggregation_pattern(metric_type)
     
     if pattern == 'two_level':
-        return _construct_cis_for_two_level(metric_statistics, replication_summaries, metric_type, confidence_level)
+        return _construct_cis_for_two_level(metric_statistics, replication_level_metrics, metric_type, confidence_level)
     elif pattern == 'one_level':
-        return _construct_cis_for_one_level(metric_statistics, replication_summaries, confidence_level)
+        return _construct_cis_for_one_level(metric_statistics, replication_level_metrics, confidence_level)
     else:
         raise ValueError(f"Unknown aggregation pattern: {pattern}")
 
 
-def _construct_cis_for_two_level(metric_statistics, replication_summaries, metric_type, confidence_level):
+def _construct_cis_for_two_level(metric_statistics, replication_level_metrics, metric_type, confidence_level):
     """
     Construct CIs for two-level pattern (statistics-of-statistics).
     
@@ -110,7 +110,7 @@ def _construct_cis_for_two_level(metric_statistics, replication_summaries, metri
             if stat_name in metric_stats:
                 # ✅ SIMPLIFIED: Re-extract values using updated method signature
                 extracted_values = statistics_engine.extract_statistic_for_experiment_aggregation(
-                    replication_summaries, metric_name, ci_config['extract']  # ← Removed entity_type
+                    replication_level_metrics, metric_name, ci_config['extract']  # ← Removed entity_type
                 )
                 
                 # Automatically determine CI method from compute field
@@ -129,7 +129,7 @@ def _construct_cis_for_two_level(metric_statistics, replication_summaries, metri
     return results_with_cis
 
 
-def _construct_cis_for_one_level(metric_statistics, replication_summaries, metric_type, confidence_level):
+def _construct_cis_for_one_level(metric_statistics, replication_level_metrics, metric_type, confidence_level):
     """
     Construct CIs for one-level pattern (system metrics).
     
@@ -141,14 +141,14 @@ def _construct_cis_for_one_level(metric_statistics, replication_summaries, metri
     results_with_cis = {}
     
     # Extract metric names from first replication
-    if not replication_summaries:
+    if not replication_level_metrics:
         return results_with_cis
     
-    metric_names = list(replication_summaries[0].keys())
+    metric_names = list(replication_level_metrics[0].keys())
     
     # Start with all metrics as descriptive only
     for metric_name in metric_names:
-        scalar_values = [rep_result[metric_name] for rep_result in replication_summaries 
+        scalar_values = [rep_result[metric_name] for rep_result in replication_level_metrics 
                         if metric_name in rep_result]
         point_estimate = np.mean(scalar_values) if scalar_values else None
         
@@ -163,7 +163,7 @@ def _construct_cis_for_one_level(metric_statistics, replication_summaries, metri
         
         if metric_name in metric_names:
             # Re-extract scalar values across replications
-            scalar_values = [rep_result[metric_name] for rep_result in replication_summaries 
+            scalar_values = [rep_result[metric_name] for rep_result in replication_level_metrics 
                             if metric_name in rep_result]
             
             # System metrics always use t-distribution (estimating mean)

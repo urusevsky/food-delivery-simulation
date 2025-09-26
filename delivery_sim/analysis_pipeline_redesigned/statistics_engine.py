@@ -110,14 +110,14 @@ class StatisticsEngine:
             'std': float(np.sqrt(variance))
         }
     
-    def extract_statistic_for_experiment_aggregation(self, replication_summaries, metric_name, statistic_type):
+    def extract_statistic_for_experiment_aggregation(self, replication_level_metrics, metric_name, statistic_type):
         """
         Extract a specific statistic across replication summaries for two-level aggregation.
         
         ✅ SIMPLIFIED: Removed entity_type parameter - no longer needed with flat structure.
         
         Args:
-            replication_summaries: List of replication-level summary dictionaries
+            replication_level_metrics: List of replication-level dictionaries
             metric_name: Metric name key (e.g., 'assignment_time', 'total_distance')
             statistic_type: Statistic to extract (e.g., 'mean', 'std', 'p95')
             
@@ -127,13 +127,13 @@ class StatisticsEngine:
         Example:
             # Extract mean assignment times across all replications
             means = engine.extract_statistic_for_experiment_aggregation(
-                replication_summaries, 'assignment_time', 'mean'  # ← No entity_type needed
+                replication_level_metrics, 'assignment_time', 'mean'  # ← No entity_type needed
             )
             # Result: [12.47, 13.12, 11.85] - one mean per replication
         """
         statistic_values = []
         
-        for i, rep_summary in enumerate(replication_summaries):
+        for i, rep_summary in enumerate(replication_level_metrics):
             try:
                 # ✅ SIMPLIFIED: Direct access to metric, no entity_type navigation
                 metric_data = rep_summary[metric_name]
