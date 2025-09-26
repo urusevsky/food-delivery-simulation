@@ -66,8 +66,8 @@ def _construct_cis_for_metric_type(metric_statistics, replication_level_metrics,
     """
     Construct CIs for a specific metric type.
     
-    Handles both two-level and one-level patterns by re-extracting the
-    underlying values that were used to compute the statistics.
+    Handles both two-level and one-level patterns by extracting the 
+    underlying values needed for confidence interval construction.
     """
     
     pattern = get_aggregation_pattern(metric_type)
@@ -108,7 +108,7 @@ def _construct_cis_for_two_level(metric_statistics, replication_level_metrics, m
             stat_name = ci_config['name']
             
             if stat_name in metric_stats:
-                # ✅ SIMPLIFIED: Re-extract values using updated method signature
+                # Extract statistic values across replications for CI construction
                 extracted_values = statistics_engine.extract_statistic_for_experiment_aggregation(
                     replication_level_metrics, metric_name, ci_config['extract']  # ← Removed entity_type
                 )
@@ -162,7 +162,7 @@ def _construct_cis_for_one_level(metric_statistics, replication_level_metrics, m
         metric_name = ci_config['metric_name']
         
         if metric_name in metric_names:
-            # Re-extract scalar values across replications
+            # Extract scalar values across replications for CI construction
             scalar_values = [rep_result[metric_name] for rep_result in replication_level_metrics 
                             if metric_name in rep_result]
             
