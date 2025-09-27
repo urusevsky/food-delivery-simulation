@@ -19,10 +19,7 @@ One-level pattern:
 import importlib
 from delivery_sim.utils.logging_system import get_logger
 from delivery_sim.analysis_pipeline_redesigned.statistics_engine import StatisticsEngine
-from delivery_sim.analysis_pipeline_redesigned.metric_configurations import (
-    get_metric_configuration,
-    get_experiment_statistics
-)
+
 
 
 class AggregationProcessor:
@@ -39,10 +36,18 @@ class AggregationProcessor:
     # PROCESSING METHODS (ORCHESTRATION)
     # ==============================================================================
     
-    def process_replication_level(self, analysis_data, metric_type):
-        """Process metrics at replication level according to aggregation pattern."""
-        config = get_metric_configuration(metric_type)
-        pattern = config['aggregation_pattern']
+    def process_replication_level(self, analysis_data, config):  # 🎯 CHANGED: metric_type → config
+        """
+        Process metrics at replication level according to aggregation pattern.
+        
+        Args:
+            analysis_data: Prepared analysis data from data_preparation module  
+            config: Metric configuration dictionary (from get_metric_configuration)  # 🎯 UPDATED
+            
+        Returns:
+            dict: Replication-level metrics (format depends on aggregation pattern)
+        """
+        pattern = config['aggregation_pattern']  # 🎯 CHANGED: Direct access instead of get_metric_configuration()
         
         if pattern == 'two_level':
             return self._process_two_level_replication(analysis_data, config)
@@ -51,15 +56,23 @@ class AggregationProcessor:
         else:
             raise ValueError(f"Unknown aggregation pattern: {pattern}")
     
-    def process_experiment_level(self, processed_replications, metric_type):  # ✅ Updated parameter
-        """Process metrics at experiment level according to aggregation pattern."""
-        config = get_metric_configuration(metric_type)
-        pattern = config['aggregation_pattern']
+    def process_experiment_level(self, processed_replications, config):  # 🎯 CHANGED: metric_type → config
+        """
+        Process metrics at experiment level according to aggregation pattern.
+        
+        Args:
+            processed_replications: List of replication-level metric results
+            config: Metric configuration dictionary (from get_metric_configuration)  # 🎯 UPDATED
+            
+        Returns:
+            dict: Experiment-level aggregated statistics
+        """
+        pattern = config['aggregation_pattern']  # 🎯 CHANGED: Direct access instead of get_metric_configuration()
         
         if pattern == 'two_level':
-            return self._process_two_level_experiment(processed_replications, metric_type)  # ✅ Updated
+            return self._process_two_level_experiment(processed_replications, config)  # 🎯 CHANGED: Pass config
         elif pattern == 'one_level':
-            return self._process_one_level_experiment(processed_replications)  # ✅ Updated
+            return self._process_one_level_experiment(processed_replications)
         else:
             raise ValueError(f"Unknown aggregation pattern: {pattern}")
     
@@ -85,13 +98,22 @@ class AggregationProcessor:
         metric_function = self._get_metric_function(config)
         return metric_function(analysis_data)
     
-    def _process_two_level_experiment(self, processed_replications, metric_type):  # ✅ Updated parameter
-        """Statistics objects → Statistics-of-statistics."""
-        if not processed_replications or not processed_replications[0]:  # ✅ Updated
+    def _process_two_level_experiment(self, processed_replications, config):  # 🎯 CHANGED: metric_type → config
+        """
+        Statistics objects → Statistics-of-statistics.
+        
+        Args:
+            processed_replications: List of replication results with statistics objects
+            config: Metric configuration dictionary containing experiment_stats  # 🎯 UPDATED
+            
+        Returns:
+            dict: Experiment-level statistics-of-statistics
+        """
+        if not processed_replications or not processed_replications[0]:
             return {}
         
-        experiment_stats_config = get_experiment_statistics(metric_type)
-        return self._aggregate_statistics_objects(processed_replications, experiment_stats_config)  # ✅ Updated
+        experiment_stats_config = config.get('experiment_stats', [])  # 🎯 CHANGED: Direct access instead of get_experiment_statistics()
+        return self._aggregate_statistics_objects(processed_replications, experiment_stats_config)
     
     def _process_one_level_experiment(self, processed_replications):  # ✅ Updated parameter
         """Scalar values → Statistics objects (via scalar values aggregation)."""
