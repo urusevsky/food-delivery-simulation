@@ -164,7 +164,7 @@ class AggregationProcessor:
         
         for metric_name, values in scalar_data.items():
             if values:
-                results[metric_name] = self.statistics_engine.calculate_basic_statistics(values)
+                results[metric_name] = self.statistics_engine.calculate_statistics(values, include_percentiles=False)
         
         return results
     
@@ -200,17 +200,17 @@ class AggregationProcessor:
                 if extracted_values:
                     # Compute target statistic on extracted values
                     if compute_stat == 'mean':
-                        stats = self.statistics_engine.calculate_basic_statistics(extracted_values)
+                        stats = self.statistics_engine.calculate_statistics(extracted_values, include_percentiles=False)
                         results[metric_name][stat_name] = stats['mean']
                     elif compute_stat == 'std':
-                        stats = self.statistics_engine.calculate_basic_statistics(extracted_values)
+                        stats = self.statistics_engine.calculate_statistics(extracted_values, include_percentiles=False)
                         results[metric_name][stat_name] = stats['std']
                     elif compute_stat == 'variance':
-                        stats = self.statistics_engine.calculate_basic_statistics(extracted_values)
+                        stats = self.statistics_engine.calculate_statistics(extracted_values, include_percentiles=False)
                         results[metric_name][stat_name] = stats['variance']
                     elif compute_stat == 'full_stats':
                         results[metric_name][stat_name] = \
-                            self.statistics_engine.calculate_basic_statistics(extracted_values)
+                            self.statistics_engine.calculate_statistics(extracted_values, include_percentiles=False)
                     else:
                         self.logger.warning(f"Unknown compute statistic: {compute_stat}")
                 else:
