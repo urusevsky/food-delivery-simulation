@@ -94,7 +94,7 @@ METRIC_CONFIGURATIONS = {
 }
 
 # ==============================================================================
-# CONFIGURATION ACCESS FUNCTIONS
+# CORE CONFIGURATION ACCESS
 # ==============================================================================
 
 def get_metric_configuration(metric_type):
@@ -105,132 +105,6 @@ def get_metric_configuration(metric_type):
         raise KeyError(f"Metric type '{metric_type}' not found in configurations")
     
     return METRIC_CONFIGURATIONS[metric_type]
-
-
-def get_aggregation_pattern(metric_type):
-    """Get the aggregation pattern for a metric type."""
-    config = get_metric_configuration(metric_type)
-    return config['aggregation_pattern']
-
-
-def get_metric_function_info(metric_type):
-    """Get the module and function information for a metric type."""
-    config = get_metric_configuration(metric_type)
-    return config['metric_module'], config['metric_function']
-
-
-def get_entity_data_key(metric_type):
-    """Get the AnalysisData attribute key for entity data."""
-    config = get_metric_configuration(metric_type)
-    return config['entity_data_key']
-
-
-def get_experiment_statistics(metric_type):
-    """
-    Get the experiment statistics configuration for a metric type.
-    
-    Returns:
-        list: List of experiment statistics configurations for aggregation processor
-    """
-    config = get_metric_configuration(metric_type)
-    
-    if config['aggregation_pattern'] == 'one_level':
-        raise ValueError(f"Experiment statistics not applicable for one-level pattern: {metric_type}")
-    
-    return config.get('experiment_stats', [])
-
-
-def get_ci_configuration(metric_type):
-    """
-    Get confidence interval configuration for a metric type.
-    
-    Returns:
-        list: CI configuration for each statistic/metric that should have CIs constructed
-    """
-    config = get_metric_configuration(metric_type)
-    pattern = config['aggregation_pattern']
-    
-    if pattern == 'two_level':
-        # Extract CI config from experiment_stats
-        ci_configs = []
-        for stat_config in config.get('experiment_stats', []):
-            if stat_config.get('construct_ci', False):
-                ci_configs.append(stat_config)
-        return ci_configs
-    
-    elif pattern == 'one_level':
-        # Get CI config from ci_config field
-        return config.get('ci_config', [])
-    
-    else:
-        raise ValueError(f"Unknown aggregation pattern: {pattern}")
-
-
-def get_statistics_requiring_ci(metric_type):
-    """
-    Get list of statistics that require CI construction for a metric type.
-    
-    Returns:
-        list: Names of statistics that need CIs
-    """
-    ci_configs = get_ci_configuration(metric_type)
-    
-    pattern = get_aggregation_pattern(metric_type)
-    
-    if pattern == 'two_level':
-        return [config['name'] for config in ci_configs]
-    elif pattern == 'one_level':
-        return [config['metric_name'] for config in ci_configs]
-    else:
-        return []
-
-
-def get_ci_method(metric_type, statistic_name):
-    """
-    Automatically determine the CI construction method based on compute field.
-    
-    Args:
-        metric_type: Metric type key
-        statistic_name: Name of the statistic (or metric name for one-level)
-        
-    Returns:
-        str: CI method ('t_distribution', 'chi_square') based on what's being estimated
-    """
-    ci_configs = get_ci_configuration(metric_type)
-    pattern = get_aggregation_pattern(metric_type)
-    
-    if pattern == 'two_level':
-        # Find by statistic name and determine method from compute field
-        for config in ci_configs:
-            if config['name'] == statistic_name:
-                compute_type = config.get('compute')
-                return _determine_ci_method_from_compute(compute_type)
-    
-    elif pattern == 'one_level':
-        # For system metrics, we're always estimating the mean
-        return 't_distribution'
-    
-    return 't_distribution'  # Default fallback
-
-
-def _determine_ci_method_from_compute(compute_type):
-    """
-    Automatically determine CI method based on what statistic we're computing.
-    
-    Args:
-        compute_type: The 'compute' field value ('mean', 'std', 'variance')
-        
-    Returns:
-        str: Appropriate CI method
-    """
-    if compute_type == 'mean':
-        return 't_distribution'  # Estimating mean -> use t-distribution
-    elif compute_type in ['std', 'variance']:
-        return 'chi_square'      # Estimating variance/std -> use chi-square
-    else:
-        logger.warning(f"Unknown compute type: {compute_type}, defaulting to t-distribution")
-        return 't_distribution'
-
 
 def list_available_metric_types():
     """Get list of all configured metric types."""
