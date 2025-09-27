@@ -15,17 +15,12 @@ Design philosophy:
 import numpy as np
 from scipy import stats
 from delivery_sim.utils.logging_system import get_logger
-from delivery_sim.analysis_pipeline_redesigned.metric_configurations import (
-    get_aggregation_pattern, 
-    get_ci_configuration, 
-    get_ci_method
-)
 from delivery_sim.analysis_pipeline_redesigned.statistics_engine import StatisticsEngine
 
 logger = get_logger("analysis_pipeline_redesigned.confidence_intervals")
 
 
-def construct_confidence_intervals_for_experiment(experiment_statistics, replication_level_metrics, metric_types, confidence_level=0.95):
+def construct_confidence_intervals_for_experiment(experiment_statistics, replication_level_metrics, metric_configs, confidence_level=0.95):  # 🎯 CHANGED: metric_types → metric_configs
     """
     Construct confidence intervals for experiment-level statistics.
     
@@ -34,8 +29,8 @@ def construct_confidence_intervals_for_experiment(experiment_statistics, replica
     
     Args:
         experiment_statistics: Results from aggregation processor (descriptive stats)
-        replication_level_metrics: Processed replication-level metrics (needed for CI construction)  # ← Updated
-        metric_types: List of metric types to process CIs for
+        replication_level_metrics: Processed replication-level metrics (needed for CI construction)
+        metric_configs: Dict of {metric_type: config} - passed from pipeline coordinator  # 🎯 CHANGED: Updated parameter documentation
         confidence_level: Confidence level for CI construction
         
     Returns:
@@ -45,50 +40,53 @@ def construct_confidence_intervals_for_experiment(experiment_statistics, replica
     
     results_with_cis = {}
     
-    for metric_type in metric_types:
+    for metric_type, config in metric_configs.items():  # 🎯 CHANGED: Iterate over metric_configs.items() instead of metric_types
         if metric_type not in experiment_statistics:
             logger.warning(f"No experiment statistics found for {metric_type}")
             continue
             
         logger.debug(f"Processing CIs for {metric_type}")
-        results_with_cis[metric_type] = _construct_cis_for_metric_type(
-            experiment_statistics[metric_type],
-            replication_level_metrics[metric_type],
-            metric_type,
-            confidence_level
-        )
+        
+        pattern = config['aggregation_pattern']  # 🎯 CHANGED: Direct access instead of get_aggregation_pattern()
+        
+        if pattern == 'two_level':
+            results_with_cis[metric_type] = _construct_cis_for_two_level(
+                experiment_statistics[metric_type],
+                replication_level_metrics[metric_type],
+                config,  # 🎯 CHANGED: Pass config instead of metric_type
+                confidence_level
+            )
+        elif pattern == 'one_level':
+            results_with_cis[metric_type] = _construct_cis_for_one_level(
+                experiment_statistics[metric_type],
+                replication_level_metrics[metric_type],
+                config,  # 🎯 CHANGED: Pass config instead of metric_type
+                confidence_level
+            )
+        else:
+            raise ValueError(f"Unknown aggregation pattern: {pattern}")
     
     logger.info("Confidence interval construction completed")
     return results_with_cis
 
-
-def _construct_cis_for_metric_type(metric_statistics, replication_level_metrics, metric_type, confidence_level):
-    """
-    Construct CIs for a specific metric type.
-    
-    Handles both two-level and one-level patterns by extracting the 
-    underlying values needed for confidence interval construction.
-    """
-    
-    pattern = get_aggregation_pattern(metric_type)
-    
-    if pattern == 'two_level':
-        return _construct_cis_for_two_level(metric_statistics, replication_level_metrics, metric_type, confidence_level)
-    elif pattern == 'one_level':
-        return _construct_cis_for_one_level(metric_statistics, replication_level_metrics, confidence_level)
-    else:
-        raise ValueError(f"Unknown aggregation pattern: {pattern}")
-
-
-def _construct_cis_for_two_level(metric_statistics, replication_level_metrics, metric_type, confidence_level):
+def _construct_cis_for_two_level(metric_statistics, replication_level_metrics, config, confidence_level):  # 🎯 CHANGED: metric_type → config
     """
     Construct CIs for two-level pattern (statistics-of-statistics).
     
-    ✅ SIMPLIFIED: Updated for flat structure without entity_type nesting.
+    Args:
+        metric_statistics: Experiment-level statistics for the metric type
+        replication_level_metrics: List of replication-level metric results  
+        config: Metric configuration dictionary containing experiment_stats  # 🎯 UPDATED
+        confidence_level: Confidence level for CI construction
+        
+    Returns:
+        dict: Statistics with confidence intervals added
     """
     
     statistics_engine = StatisticsEngine()
-    ci_configurations = get_ci_configuration(metric_type)
+    ci_configurations = config.get('experiment_stats', [])  # 🎯 CHANGED: Direct access instead of get_ci_configuration()
+    # Filter for only those with construct_ci=True
+    ci_configurations = [stat for stat in ci_configurations if stat.get('construct_ci', False)]  # 🎯 NEW: Filter here
     
     results_with_cis = {}
     
@@ -110,11 +108,11 @@ def _construct_cis_for_two_level(metric_statistics, replication_level_metrics, m
             if stat_name in metric_stats:
                 # Extract statistic values across replications for CI construction
                 extracted_values = statistics_engine.extract_statistic_for_experiment_aggregation(
-                    replication_level_metrics, metric_name, ci_config['extract']  # ← Removed entity_type
+                    replication_level_metrics, metric_name, ci_config['extract']
                 )
                 
                 # Automatically determine CI method from compute field
-                ci_method = get_ci_method(metric_type, stat_name)
+                ci_method = _determine_ci_method_from_compute(ci_config.get('compute'))  # 🎯 CHANGED: Direct call instead of get_ci_method()
                 
                 # Construct CI using automatically determined method
                 ci_result = _construct_ci_with_method(
@@ -129,15 +127,21 @@ def _construct_cis_for_two_level(metric_statistics, replication_level_metrics, m
     return results_with_cis
 
 
-def _construct_cis_for_one_level(metric_statistics, replication_level_metrics, metric_type, confidence_level):
+def _construct_cis_for_one_level(metric_statistics, replication_level_metrics, config, confidence_level):  # 🎯 CHANGED: metric_type → config
     """
     Construct CIs for one-level pattern (system metrics).
     
-    Only constructs CIs for metrics that have construct_ci=True in configuration.
-    Automatically uses t-distribution since we're always estimating means fo system metrics.
+    Args:
+        metric_statistics: Experiment-level statistics for the metric type
+        replication_level_metrics: List of replication-level metric results
+        config: Metric configuration dictionary containing ci_config  # 🎯 UPDATED
+        confidence_level: Confidence level for CI construction
+        
+    Returns:
+        dict: Statistics with confidence intervals added
     """
 
-    ci_configurations = get_ci_configuration(metric_type)
+    ci_configurations = config.get('ci_config', [])  # 🎯 CHANGED: Direct access instead of get_ci_configuration()
     results_with_cis = {}
     
     # Extract metric names from first replication
@@ -161,7 +165,7 @@ def _construct_cis_for_one_level(metric_statistics, replication_level_metrics, m
     for ci_config in ci_configurations:
         metric_name = ci_config['metric_name']
         
-        if metric_name in metric_names:
+        if metric_name in metric_names and ci_config.get('construct_ci', False):  # 🎯 ADDED: Check construct_ci flag
             # Extract scalar values across replications for CI construction
             scalar_values = [rep_result[metric_name] for rep_result in replication_level_metrics 
                             if metric_name in rep_result]
@@ -175,7 +179,23 @@ def _construct_cis_for_one_level(metric_statistics, replication_level_metrics, m
     
     return results_with_cis
 
-
+def _determine_ci_method_from_compute(compute_type):
+    """
+    Automatically determine CI method based on what statistic we're computing.
+    
+    Args:
+        compute_type: Type of statistic ('mean', 'std', 'variance')
+        
+    Returns:
+        str: CI method ('t_distribution', 'chi_square')
+    """
+    if compute_type == 'mean':
+        return 't_distribution'
+    elif compute_type in ['std', 'variance']:
+        return 'chi_square'
+    else:
+        return 't_distribution'  # Default fallback
+    
 def _construct_ci_with_method(values, confidence_level, target_statistic, ci_method):
     """
     Construct CI using specified statistical method.
