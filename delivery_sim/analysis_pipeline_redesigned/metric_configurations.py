@@ -234,45 +234,6 @@ def validate_configurations():
     return True
 
 
-# ==============================================================================
-# CONFIGURATION SUMMARY
-# ==============================================================================
-
-def print_configuration_summary():
-    """Print a summary of all configured metric types."""
-    print("Metric Configuration Summary")
-    print("=" * 50)
-    
-    two_level = list_metric_types_by_pattern('two_level')
-    one_level = list_metric_types_by_pattern('one_level')
-    
-    print(f"\nTwo-Level Pattern ({len(two_level)} types):")
-    for metric_type in two_level:
-        config = get_metric_configuration(metric_type)
-        print(f"  {metric_type}: {config['metric_function']}")
-        for stat in config['experiment_stats']:
-            ci_status = "CI" if stat.get('construct_ci', False) else "descriptive only"
-            if stat.get('construct_ci', False):
-                ci_method = _determine_ci_method_from_compute(stat.get('compute'))
-                print(f"    → {stat['name']}: {stat['compute']} of {stat['extract']} ({ci_status} - {ci_method})")
-            else:
-                print(f"    → {stat['name']}: {stat['compute']} of {stat['extract']} ({ci_status})")
-    
-    print(f"\nOne-Level Pattern ({len(one_level)} types):")
-    for metric_type in one_level:
-        config = get_metric_configuration(metric_type)
-        print(f"  {metric_type}: {config['metric_function']}")
-        if 'ci_config' in config:
-            for ci_config in config['ci_config']:
-                ci_status = "CI (t-distribution)" if ci_config.get('construct_ci', False) else "descriptive only"
-                print(f"    → {ci_config['metric_name']}: {ci_status}")
-    
-    print(f"\nTotal: {len(METRIC_CONFIGURATIONS)} configured metric types")
-    print("\nCI Methods automatically determined:")
-    print("  - compute='mean' → t-distribution")
-    print("  - compute='std' or 'variance' → chi-square")
-    print("  - system metrics → t-distribution (always estimating mean)")
-
 
 
 # Run validation on import to catch configuration errors early
