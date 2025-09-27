@@ -17,7 +17,7 @@ from delivery_sim.utils.logging_system import get_logger
 from delivery_sim.analysis_pipeline_redesigned.data_preparation import prepare_analysis_data
 from delivery_sim.analysis_pipeline_redesigned.aggregation_processor import AggregationProcessor
 from delivery_sim.analysis_pipeline_redesigned.confidence_intervals import construct_confidence_intervals_for_experiment
-
+from delivery_sim.analysis_pipeline_redesigned.metric_configurations import get_metric_configuration
 
 class ExperimentAnalysisPipeline:
     """
@@ -82,21 +82,33 @@ class ExperimentAnalysisPipeline:
         self.logger.info(f"Starting analysis for {num_replications} replications")
         self.logger.info(f"Processing metric types: {self.enabled_metric_types}")
         
+        # 🎯 NEW: Create metric configs once at entry point
+        metric_configs = {
+            metric_type: get_metric_configuration(metric_type) 
+            for metric_type in self.enabled_metric_types
+        }
+        
         # Step 1: Transform raw simulation data into replication-level metrics
         # Output varies by pattern: statistics objects (two-level) or direct values (one-level)
-        replication_level_metrics = self._compute_replication_level_metrics(replication_results)
+        replication_level_metrics = self._compute_replication_level_metrics(
+            replication_results, metric_configs  # 🎯 NEW: Pass metric_configs
+        )
         
         # Step 2: Aggregate replication-level metrics into experiment-level statistics
         # Two-level: statistics-of-statistics, One-level: standard statistical aggregation
-        experiment_statistics = self._compute_experiment_level_statistics(replication_level_metrics)
+        experiment_statistics = self._compute_experiment_level_statistics(
+            replication_level_metrics, metric_configs  # 🎯 NEW: Pass metric_configs
+        )
         
         # Step 3: Construct confidence intervals using configuration-driven selection
-        experiment_with_cis = self._construct_confidence_intervals(experiment_statistics, replication_level_metrics)
+        experiment_with_cis = self._construct_confidence_intervals(
+            experiment_statistics, replication_level_metrics, metric_configs  # 🎯 NEW: Pass metric_configs
+        )
         
         # Step 4: Enrich with metadata and finalize experiment summary
         return self._finalize_experiment_summary(experiment_with_cis, replication_results)
     
-    def _compute_replication_level_metrics(self, replication_results):
+    def _compute_replication_level_metrics(self, replication_results, metric_configs):  # 🎯 NEW: Add metric_configs parameter
         """
         Transform raw simulation data into replication-level metrics for all enabled metric types.
         
@@ -113,6 +125,7 @@ class ExperimentAnalysisPipeline:
         
         Args:
             replication_results: List of raw simulation outputs (repositories, events, etc.)
+            metric_configs: Dict of {metric_type: config} - created once at entry point  # 🎯 NEW: Document new parameter
             
         Returns:
             dict: {metric_type: [replication_metrics, ...]}
@@ -120,7 +133,7 @@ class ExperimentAnalysisPipeline:
                 - Two-level: Statistics objects (with mean, std, count, etc.)
                 - One-level: Scalar values or simple structures
         """
-        all_processed_replications = {metric_type: [] for metric_type in self.enabled_metric_types}  # ✅ Updated
+        all_processed_replications = {metric_type: [] for metric_type in metric_configs.keys()}  # 🎯 CHANGED: Use metric_configs.keys()
         
         for i, replication_result in enumerate(replication_results):
             self.logger.debug(f"Processing replication {i+1}/{len(replication_results)}")
@@ -130,24 +143,24 @@ class ExperimentAnalysisPipeline:
             analysis_data = prepare_analysis_data(repositories, self.warmup_period)
             
             # Process each configured metric type
-            for metric_type in self.enabled_metric_types:
-                processed_replication = self.aggregation_processor.process_replication_level(  # ✅ Updated
-                    analysis_data, metric_type
+            for metric_type, config in metric_configs.items():  # 🎯 CHANGED: Iterate over metric_configs.items()
+                processed_replication = self.aggregation_processor.process_replication_level(
+                    analysis_data, config  # 🎯 CHANGED: Pass config instead of metric_type
                 )
                 
-                if processed_replication:  # ✅ Updated
-                    all_processed_replications[metric_type].append(processed_replication)  # ✅ Updated
+                if processed_replication:
+                    all_processed_replications[metric_type].append(processed_replication)
                     self.logger.debug(f"Processed {metric_type} for replication {i+1}")
                 else:
                     self.logger.warning(f"Empty results from {metric_type} for replication {i+1} - investigate upstream")
         
         # Log processing summary
-        for metric_type, processed_replications in all_processed_replications.items():  # ✅ Updated
-            self.logger.info(f"Collected {len(processed_replications)} processed replications for {metric_type}")  # ✅ Updated
+        for metric_type, processed_replications in all_processed_replications.items():
+            self.logger.info(f"Collected {len(processed_replications)} processed replications for {metric_type}")
         
-        return all_processed_replications  # ✅ Updated
+        return all_processed_replications
     
-    def _compute_experiment_level_statistics(self, all_processed_replications):  # ✅ Renamed method
+    def _compute_experiment_level_statistics(self, all_processed_replications, metric_configs):  # 🎯 NEW: Add metric_configs parameter
         """
         Aggregate replication-level metrics into experiment-level statistical summaries.
         
@@ -166,21 +179,24 @@ class ExperimentAnalysisPipeline:
         
         Args:
             all_processed_replications: Output from _compute_replication_level_metrics()
+            metric_configs: Dict of {metric_type: config} - passed from entry point  # 🎯 NEW: Document new parameter
             
         Returns:
             dict: {metric_type: experiment_statistics}
                 Where experiment_statistics contains descriptive statistics
                 summarizing behavior across all replications (no confidence intervals yet)
-    """
+        """
         experiment_statistics = {}
         
-        for metric_type, processed_replications in all_processed_replications.items():  # ✅ Updated
-            if not processed_replications:  # ✅ Updated
+        for metric_type, config in metric_configs.items():  # 🎯 CHANGED: Iterate over metric_configs.items()
+            processed_replications = all_processed_replications.get(metric_type, [])  # 🎯 CHANGED: Use .get() for safety
+            
+            if not processed_replications:
                 self.logger.warning(f"No processed replications for {metric_type} - check replication processing")
                 continue
             
             experiment_result = self.aggregation_processor.process_experiment_level(
-                processed_replications, metric_type  # ✅ Updated
+                processed_replications, config  # 🎯 CHANGED: Pass config instead of metric_type
             )
             
             if experiment_result:
@@ -191,7 +207,7 @@ class ExperimentAnalysisPipeline:
         
         return experiment_statistics
     
-    def _construct_confidence_intervals(self, experiment_statistics, all_processed_replications):  # ✅ Updated parameter
+    def _construct_confidence_intervals(self, experiment_statistics, all_processed_replications, metric_configs):  # 🎯 NEW: Add metric_configs parameter
         """
         Construct confidence intervals based on granular configuration.
         Uses configuration to determine which specific statistics/metrics get CIs
@@ -199,7 +215,8 @@ class ExperimentAnalysisPipeline:
         
         Args:
             experiment_statistics: Experiment-level statistics from previous step
-            all_processed_replications: Original processed replication data needed for CI construction  # ✅ Updated
+            all_processed_replications: Original processed replication data needed for CI construction
+            metric_configs: Dict of {metric_type: config} - passed from entry point  # 🎯 NEW: Document new parameter
             
         Returns:
             dict: Experiment results with CIs added for configured statistics/metrics
@@ -207,8 +224,8 @@ class ExperimentAnalysisPipeline:
         
         return construct_confidence_intervals_for_experiment(
             experiment_statistics,
-            all_processed_replications,  # ✅ Updated
-            self.enabled_metric_types,
+            all_processed_replications,
+            metric_configs,  # 🎯 CHANGED: Pass metric_configs instead of self.enabled_metric_types
             self.confidence_level
         )
     
