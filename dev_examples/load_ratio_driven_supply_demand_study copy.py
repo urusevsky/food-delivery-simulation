@@ -280,7 +280,7 @@ print("STEP 10: EXPERIMENTAL ANALYSIS USING NEW REDESIGNED PIPELINE")
 print(f"{'='*80}\n")
 
 # Import the new redesigned pipeline
-from delivery_sim.analysis_pipeline_redesigned.pipeline_coordinator import ExperimentAnalysisPipeline
+from delivery_sim.analysis_pipeline.pipeline_coordinator import ExperimentAnalysisPipeline
 
 # Initialize pipeline focused on order metrics only
 pipeline = ExperimentAnalysisPipeline(
