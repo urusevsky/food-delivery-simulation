@@ -47,7 +47,7 @@ class ExperimentAnalysisPipeline:
                         f"confidence_level={confidence_level}, "
                         f"enabled_metrics={enabled_metric_types}")
     
-    def analyze_experiment(self, replication_results):
+    def analyze_experiment(self, raw_replication_outputs):
         """
         Transform raw simulation data into comprehensive experiment-level summary.
         
@@ -57,8 +57,14 @@ class ExperimentAnalysisPipeline:
         Phase 2: Experiment-level aggregation
         Phase 3: Confidence interval construction
         Phase 4: Metadata enrichment and finalization
+        
+        Args:
+            raw_replication_outputs: List of raw simulation outputs (one per replication)
+            
+        Returns:
+            dict: Complete experiment summary with statistics and confidence intervals
         """
-        num_replications = len(replication_results)
+        num_replications = len(raw_replication_outputs)
         self.logger.info(f"Starting analysis for {num_replications} replications")
         
         # Prepare metric configurations once
@@ -68,27 +74,31 @@ class ExperimentAnalysisPipeline:
         }
         
         # Phase 0: Prepare analysis data (warmup filtering)
-        prepared_analysis_data = self._phase0_prepare_analysis_data(replication_results)
+        prepared_analysis_data = self._phase0_prepare_analysis_data(
+            raw_replication_outputs
+        )
         
         # Phase 1: Process each replication
-        replication_level_metrics = self._phase1_process_replications(
+        replication_metrics_by_type = self._phase1_process_replications(
             prepared_analysis_data, metric_configs
         )
         
         # Phase 2: Aggregate across replications
-        experiment_statistics = self._phase2_aggregate_experiment(
-            replication_level_metrics, metric_configs
+        experiment_statistics_by_type = self._phase2_aggregate_experiment(
+            replication_metrics_by_type, metric_configs
         )
         
         # Phase 3: Construct confidence intervals
-        experiment_with_cis = self._phase3_construct_confidence_intervals(
-            experiment_statistics, replication_level_metrics, metric_configs
+        experiment_results_with_cis = self._phase3_construct_confidence_intervals(
+            experiment_statistics_by_type, replication_metrics_by_type, metric_configs
         )
         
         # Phase 4: Finalize with metadata
-        return self._phase4_finalize_results(experiment_with_cis, replication_results)
+        return self._phase4_finalize_results(
+            experiment_results_with_cis, raw_replication_outputs
+        )
     
-    def _phase0_prepare_analysis_data(self, replication_results):
+    def _phase0_prepare_analysis_data(self, raw_replication_outputs):
         """
         Phase 0: Prepare analysis data by filtering warmup period.
         
@@ -98,131 +108,147 @@ class ExperimentAnalysisPipeline:
         - Creating analytical populations
         
         Args:
-            replication_results: List of raw simulation outputs
+            raw_replication_outputs: List of raw simulation outputs
             
         Returns:
             list: Analysis data objects (one per replication) ready for metric processing
         """
         self.logger.info("Phase 0: Preparing analysis data (warmup filtering)")
         
-        prepared_data = []
+        prepared_analysis_data = []
         
-        for i, replication_result in enumerate(replication_results):
+        for i, replication_result in enumerate(raw_replication_outputs):
             repositories = replication_result['repositories']
             analysis_data = prepare_analysis_data(repositories, self.warmup_period)
-            prepared_data.append(analysis_data)
+            prepared_analysis_data.append(analysis_data)
             
             self.logger.debug(
-                f"Prepared analysis data for replication {i+1}/{len(replication_results)}"
+                f"Prepared analysis data for replication {i+1}/{len(raw_replication_outputs)}"
             )
         
-        self.logger.info(f"Phase 0 complete: Prepared {len(prepared_data)} replications")
-        return prepared_data
+        self.logger.info(f"Phase 0 complete: Prepared {len(prepared_analysis_data)} replications")
+        return prepared_analysis_data
         
     def _phase1_process_replications(self, prepared_analysis_data, metric_configs):
         """
         Phase 1: Transform analysis data into replication-level metrics.
         
-        For each prepared analysis data:
-        - Process according to metric pattern
-        - Two-level: Calculate individual metrics → Aggregate to statistics
-        - One-level: Calculate directly (no aggregation at replication level)
-        
         Args:
-            prepared_analysis_data: List of analysis data objects from Phase 0
+            prepared_analysis_data: List of warmup-filtered analysis data
             metric_configs: Dict of metric configurations
             
         Returns:
-            dict: {metric_type: [replication_metrics, ...]}
+            dict: {metric_type: [rep1_metrics, rep2_metrics, ...]}
         """
         self.logger.info("Phase 1: Processing replication-level metrics")
         
-        all_processed = {metric_type: [] for metric_type in metric_configs.keys()}
+        replication_metrics_by_type = {
+            metric_type: [] for metric_type in metric_configs.keys()
+        }
         
         for i, analysis_data in enumerate(prepared_analysis_data):
-            self.logger.debug(
-                f"Processing replication {i+1}/{len(prepared_analysis_data)}"
-            )
+            self.logger.debug(f"Processing replication {i+1}/{len(prepared_analysis_data)}")
             
-            # Process each metric type
             for metric_type, config in metric_configs.items():
-                processed = self.replication_processor.process_replication(
+                processed_metrics = self.replication_processor.process_replication(
                     analysis_data, config
                 )
                 
-                if processed:
-                    all_processed[metric_type].append(processed)
+                if processed_metrics:
+                    replication_metrics_by_type[metric_type].append(processed_metrics)
                     self.logger.debug(f"Processed {metric_type} for replication {i+1}")
                 else:
-                    self.logger.warning(
-                        f"Empty results for {metric_type} in replication {i+1}"
-                    )
+                    self.logger.warning(f"Empty results for {metric_type} in replication {i+1}")
         
         # Log phase summary
-        for metric_type, processed_reps in all_processed.items():
+        for metric_type, metrics_list in replication_metrics_by_type.items():
             self.logger.info(
-                f"Phase 1 complete: {len(processed_reps)} replications for {metric_type}"
+                f"Phase 1 complete: {len(metrics_list)} replications for {metric_type}"
             )
         
-        return all_processed
+        return replication_metrics_by_type
     
-    def _phase2_aggregate_experiment(self, replication_level_metrics, metric_configs):
+    def _phase2_aggregate_experiment(self, replication_metrics_by_type, metric_configs):
         """
         Phase 2: Aggregate replication-level metrics into experiment-level statistics.
+        
+        Args:
+            replication_metrics_by_type: Dict of {metric_type: [rep1, rep2, ...]}
+            metric_configs: Dict of metric configurations
+            
+        Returns:
+            dict: {metric_type: experiment_statistics}
         """
         self.logger.info("Phase 2: Aggregating across replications")
         
-        experiment_statistics = {}
+        experiment_statistics_by_type = {}
         
         for metric_type, config in metric_configs.items():
-            replication_results = replication_level_metrics.get(metric_type, [])
+            # Extract metrics for ONE metric type
+            metrics_across_replications = replication_metrics_by_type.get(metric_type, [])
             
-            if not replication_results:
-                self.logger.warning(f"No replication results for {metric_type}")
+            if not metrics_across_replications:
+                self.logger.warning(f"No metrics for {metric_type}")
                 continue
             
+            # Aggregate this metric type
             experiment_stats = self.experiment_aggregator.aggregate_experiment(
-                replication_results, config
+                metrics_across_replications, config
             )
             
             if experiment_stats:
-                experiment_statistics[metric_type] = experiment_stats
+                experiment_statistics_by_type[metric_type] = experiment_stats
                 self.logger.debug(f"Aggregated {metric_type}")
             else:
                 self.logger.warning(f"No experiment statistics for {metric_type}")
         
-        self.logger.info(f"Phase 2 complete: {len(experiment_statistics)} metric types")
-        return experiment_statistics
+        self.logger.info(f"Phase 2 complete: {len(experiment_statistics_by_type)} metric types")
+        return experiment_statistics_by_type
     
-    def _phase3_construct_confidence_intervals(self, experiment_statistics, 
-                                              replication_level_metrics, metric_configs):
+    def _phase3_construct_confidence_intervals(self, experiment_statistics_by_type, 
+                                            replication_metrics_by_type, metric_configs):
         """
         Phase 3: Add statistical inference (confidence intervals).
+        
+        Args:
+            experiment_statistics_by_type: Dict of {metric_type: statistics}
+            replication_metrics_by_type: Dict of {metric_type: [rep1, rep2, ...]}
+            metric_configs: Dict of metric configurations
+            
+        Returns:
+            dict: {metric_type: statistics_with_cis}
         """
         self.logger.info("Phase 3: Constructing confidence intervals")
         
-        experiment_with_cis = construct_confidence_intervals(
-            experiment_statistics,
-            replication_level_metrics,
+        experiment_results_with_cis = construct_confidence_intervals(
+            experiment_statistics_by_type,
+            replication_metrics_by_type,
             metric_configs,
             self.confidence_level
         )
         
         self.logger.info("Phase 3 complete: Confidence intervals added")
-        return experiment_with_cis
+        return experiment_results_with_cis
     
-    def _phase4_finalize_results(self, experiment_with_cis, replication_results):
+    def _phase4_finalize_results(self, experiment_results_with_cis, raw_replication_outputs):
         """
         Phase 4: Add metadata and finalize experiment summary.
+        
+        Args:
+            experiment_results_with_cis: Dict of {metric_type: statistics_with_cis}
+            raw_replication_outputs: Original raw simulation outputs (for metadata)
+            
+        Returns:
+            dict: Complete experiment summary
         """
         self.logger.info("Phase 4: Finalizing experiment summary")
         
         experiment_summary = {
-            'num_replications': len(replication_results),
+            'num_replications': len(raw_replication_outputs),
             'warmup_period': self.warmup_period,
             'confidence_level': self.confidence_level,
             'processed_metric_types': self.enabled_metric_types,
-            'results': experiment_with_cis
+            'results': experiment_results_with_cis
         }
         
         self.logger.info("Analysis pipeline completed successfully")
