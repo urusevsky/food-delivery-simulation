@@ -25,37 +25,52 @@ class ExperimentAggregator:
         self.statistics_engine = StatisticsEngine()
         self.extraction_engine = ExtractionEngine()
     
-    def aggregate_experiment(self, replication_level_metrics, config):
+    def aggregate_experiment(self, metrics_across_replications, config):
         """
         Aggregate across all replications according to metric configuration.
         
         Args:
-            replication_level_metrics: List of replication-level metric results
+            metrics_across_replications: List of metric results, one per replication
+                                         (for a SINGLE metric type)
             config: Metric configuration dictionary
             
         Returns:
             dict: Experiment-level aggregated statistics
         """
+        # Guard clause and common setup
+        if not metrics_across_replications:
+            return {}
+        
+        # Extract metric names once at router level
+        metric_names = list(metrics_across_replications[0].keys())
+        
+        # Route to pattern-specific aggregation
         pattern = config['aggregation_pattern']
         
         if pattern == 'two_level':
-            return self._aggregate_two_level_experiment(replication_level_metrics, config)
+            return self._aggregate_two_level_experiment(
+                metrics_across_replications, metric_names, config
+            )
         elif pattern == 'one_level':
-            return self._aggregate_one_level_experiment(replication_level_metrics)
+            return self._aggregate_one_level_experiment(
+                metrics_across_replications, metric_names
+            )
         else:
             raise ValueError(f"Unknown aggregation pattern: {pattern}")
     
-    def _aggregate_two_level_experiment(self, replication_level_metrics, config):
+    def _aggregate_two_level_experiment(self, metrics_across_replications, 
+                                       metric_names, config):
         """
         Two-level pattern: Statistics → Statistics-of-statistics.
         
         Second aggregation happens here (across replications).
-        """
-        if not replication_level_metrics or not replication_level_metrics[0]:
-            return {}
         
+        Args:
+            metrics_across_replications: List of replication-level metric dicts
+            metric_names: List of metric names to process
+            config: Metric configuration
+        """
         experiment_stats_config = config.get('experiment_stats', [])
-        metric_names = list(replication_level_metrics[0].keys())
         results = {}
         
         for metric_name in metric_names:
@@ -69,7 +84,7 @@ class ExperimentAggregator:
                 
                 # Extract base statistic values across replications
                 extracted_values = self.extraction_engine.extract_for_two_level_pattern(
-                    replication_level_metrics, metric_name, extract_stat
+                    metrics_across_replications, metric_name, extract_stat
                 )
                 
                 if extracted_values:
@@ -101,26 +116,25 @@ class ExperimentAggregator:
         
         return results
     
-    def _aggregate_one_level_experiment(self, replication_level_metrics):
-        """
-        One-level pattern: Scalars → Statistics.
-        
-        First and only aggregation happens here (across replications).
-        """
-        if not replication_level_metrics:
-            return {}
-        
-        # Extract all scalar values
-        scalar_data = self.extraction_engine.extract_for_one_level_pattern(
-            replication_level_metrics
-        )
-        
-        # Aggregate each metric
-        results = {}
-        for metric_name, values in scalar_data.items():
-            if values:
-                results[metric_name] = self.statistics_engine.calculate_statistics(
-                    values, include_percentiles=False
+    def _aggregate_one_level_experiment(self, metrics_across_replications, metric_names):
+            """
+            One-level pattern: Scalars → Statistics.
+            
+            First and only aggregation happens here (across replications).
+            
+            Args:
+                metrics_across_replications: List of scalar dicts, one per replication
+                metric_names: List of metric names to process
+            """
+            results = {}
+            
+            for metric_name in metric_names:
+                values = self.extraction_engine.extract_for_one_level_pattern(
+                    metrics_across_replications, metric_name
                 )
-        
-        return results
+                if values:
+                    results[metric_name] = self.statistics_engine.calculate_statistics(
+                        values, include_percentiles=False
+                    )
+            
+            return results

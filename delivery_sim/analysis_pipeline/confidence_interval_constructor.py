@@ -14,14 +14,15 @@ from delivery_sim.analysis_pipeline.extraction_engine import ExtractionEngine
 logger = get_logger("analysis_pipeline.confidence_interval_constructor")
 
 
-def construct_confidence_intervals(experiment_statistics, replication_level_metrics, 
+def construct_confidence_intervals(experiment_statistics_by_type, 
+                                   replication_metrics_by_type, 
                                    metric_configs, confidence_level=0.95):
     """
     Construct confidence intervals for experiment-level statistics.
     
     Args:
-        experiment_statistics: Results from experiment aggregation (descriptive stats)
-        replication_level_metrics: Replication-level metrics (needed for CI construction)
+        experiment_statistics_by_type: Dict of {metric_type: statistics}
+        replication_metrics_by_type: Dict of {metric_type: [rep1, rep2, ...]}
         metric_configs: Dict of {metric_type: config}
         confidence_level: Confidence level for intervals (default: 0.95)
         
@@ -34,7 +35,7 @@ def construct_confidence_intervals(experiment_statistics, replication_level_metr
     extraction_engine = ExtractionEngine()
     
     for metric_type, config in metric_configs.items():
-        if metric_type not in experiment_statistics:
+        if metric_type not in experiment_statistics_by_type:
             logger.warning(f"No experiment statistics found for {metric_type}")
             continue
             
@@ -44,16 +45,16 @@ def construct_confidence_intervals(experiment_statistics, replication_level_metr
         
         if pattern == 'two_level':
             results_with_cis[metric_type] = _construct_cis_for_two_level(
-                experiment_statistics[metric_type],
-                replication_level_metrics[metric_type],
+                experiment_statistics_by_type[metric_type],
+                replication_metrics_by_type[metric_type],
                 config,
                 confidence_level,
                 extraction_engine
             )
         elif pattern == 'one_level':
             results_with_cis[metric_type] = _construct_cis_for_one_level(
-                experiment_statistics[metric_type],
-                replication_level_metrics[metric_type],
+                experiment_statistics_by_type[metric_type],
+                replication_metrics_by_type[metric_type],
                 config,
                 confidence_level,
                 extraction_engine
@@ -63,9 +64,18 @@ def construct_confidence_intervals(experiment_statistics, replication_level_metr
     return results_with_cis
 
 
-def _construct_cis_for_two_level(metric_statistics, replication_level_metrics, 
+def _construct_cis_for_two_level(metric_statistics, metrics_across_replications, 
                                  config, confidence_level, extraction_engine):
-    """Construct CIs for two-level pattern (statistics-of-statistics)."""
+    """
+    Construct CIs for two-level pattern (statistics-of-statistics).
+    
+    Args:
+        metric_statistics: Experiment-level descriptive statistics
+        metrics_across_replications: List of replication-level metrics for ONE metric type
+        config: Metric configuration
+        confidence_level: CI confidence level
+        extraction_engine: Engine for extracting values
+    """
     ci_configurations = [
         stat for stat in config.get('experiment_stats', []) 
         if stat.get('construct_ci', False)
@@ -90,7 +100,7 @@ def _construct_cis_for_two_level(metric_statistics, replication_level_metrics,
             if stat_name in metric_stats:
                 # Extract values across replications using extraction engine
                 extracted_values = extraction_engine.extract_for_two_level_pattern(
-                    replication_level_metrics, metric_name, ci_config['extract']
+                    metrics_across_replications, metric_name, ci_config['extract']
                 )
                 
                 # Construct CI
@@ -104,21 +114,30 @@ def _construct_cis_for_two_level(metric_statistics, replication_level_metrics,
     return results_with_cis
 
 
-def _construct_cis_for_one_level(metric_statistics, replication_level_metrics, 
+def _construct_cis_for_one_level(metric_statistics, metrics_across_replications, 
                                  config, confidence_level, extraction_engine):
-    """Construct CIs for one-level pattern (system metrics)."""
+    """
+    Construct CIs for one-level pattern (system metrics).
+    
+    Args:
+        metric_statistics: Experiment-level descriptive statistics  
+        metrics_across_replications: List of scalar dicts, one per replication
+        config: Metric configuration
+        confidence_level: CI confidence level
+        extraction_engine: Engine for extracting values
+    """
     ci_configurations = config.get('ci_config', [])
     results_with_cis = {}
     
-    if not replication_level_metrics:
+    if not metrics_across_replications:
         return results_with_cis
     
-    metric_names = list(replication_level_metrics[0].keys())
+    metric_names = list(metrics_across_replications[0].keys())
     
     # Initialize all metrics with descriptive-only structure
     for metric_name in metric_names:
-        scalar_values = extraction_engine.extract_scalar_values_for_metric(
-            replication_level_metrics, metric_name
+        scalar_values = extraction_engine.extract_for_one_level_pattern(
+            metrics_across_replications, metric_name
         )
         point_estimate = np.mean(scalar_values) if scalar_values else None
         
@@ -132,8 +151,8 @@ def _construct_cis_for_one_level(metric_statistics, replication_level_metrics,
         metric_name = ci_config['metric_name']
         
         if metric_name in metric_names and ci_config.get('construct_ci', False):
-            scalar_values = extraction_engine.extract_scalar_values_for_metric(
-                replication_level_metrics, metric_name
+            scalar_values = extraction_engine.extract_for_one_level_pattern(
+                metrics_across_replications, metric_name
             )
             
             # System metrics always estimate means → use t-distribution
