@@ -95,7 +95,9 @@ class ExperimentAnalysisPipeline:
         
         # Phase 4: Finalize with metadata
         return self._phase4_finalize_results(
-            experiment_results_with_cis, raw_replication_outputs
+            num_replications,  # Just pass the count
+            experiment_statistics_by_type,
+            experiment_results_with_cis
         )
     
     def _phase0_prepare_analysis_data(self, raw_replication_outputs):
@@ -248,13 +250,15 @@ class ExperimentAnalysisPipeline:
         self.logger.info("Phase 3 complete: Confidence intervals added")
         return experiment_results_with_cis
     
-    def _phase4_finalize_results(self, experiment_results_with_cis, raw_replication_outputs):
+    def _phase4_finalize_results(self, num_replications, experiment_statistics_by_type,
+                                experiment_results_with_cis):
         """
         Phase 4: Add metadata and finalize experiment summary.
         
         Args:
+            num_replications: Number of replications analyzed
+            experiment_statistics_by_type: Dict of {metric_type: statistics}
             experiment_results_with_cis: Dict of {metric_type: statistics_with_cis}
-            raw_replication_outputs: Original raw simulation outputs (for metadata)
             
         Returns:
             dict: Complete experiment summary
@@ -262,11 +266,12 @@ class ExperimentAnalysisPipeline:
         self.logger.info("Phase 4: Finalizing experiment summary")
         
         experiment_summary = {
-            'num_replications': len(raw_replication_outputs),
+            'num_replications': num_replications,
             'warmup_period': self.warmup_period,
             'confidence_level': self.confidence_level,
             'processed_metric_types': self.enabled_metric_types,
-            'results': experiment_results_with_cis
+            'experiment_statistics': experiment_statistics_by_type,
+            'statistics_with_cis': experiment_results_with_cis
         }
         
         self.logger.info("Analysis pipeline completed successfully")
