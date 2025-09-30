@@ -63,5 +63,4 @@ class ExtractionEngine:
         return [
             rep_metrics[metric_name] 
             for rep_metrics in metrics_across_replications 
-            if metric_name in rep_metrics
         ]
