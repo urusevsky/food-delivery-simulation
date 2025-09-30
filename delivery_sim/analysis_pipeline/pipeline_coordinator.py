@@ -220,12 +220,30 @@ class ExperimentAnalysisPipeline:
         """
         self.logger.info("Phase 3: Constructing confidence intervals")
         
-        experiment_results_with_cis = construct_confidence_intervals(
-            experiment_statistics_by_type,
-            replication_metrics_by_type,
-            metric_configs,
-            self.confidence_level
-        )
+        experiment_results_with_cis = {}
+        
+        # Loop at coordinator level (consistent with Phase 2)
+        for metric_type, config in metric_configs.items():
+            if metric_type not in experiment_statistics_by_type:
+                self.logger.warning(f"No experiment statistics for {metric_type}")
+                continue
+            
+            self.logger.debug(f"Processing CIs for {metric_type}")
+            
+            # Extract data for ONE metric type
+            metric_statistics = experiment_statistics_by_type[metric_type]
+            metrics_across_replications = replication_metrics_by_type[metric_type]
+            
+            # Construct CIs for this metric type (router handles pattern dispatch)
+            results_with_cis = construct_confidence_intervals(
+                metric_statistics,
+                metrics_across_replications,
+                config,
+                self.confidence_level
+            )
+            
+            experiment_results_with_cis[metric_type] = results_with_cis
+            self.logger.debug(f"Constructed CIs for {metric_type}")
         
         self.logger.info("Phase 3 complete: Confidence intervals added")
         return experiment_results_with_cis

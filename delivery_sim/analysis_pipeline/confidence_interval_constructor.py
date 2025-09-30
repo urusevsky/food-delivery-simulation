@@ -14,68 +14,49 @@ from delivery_sim.analysis_pipeline.extraction_engine import ExtractionEngine
 logger = get_logger("analysis_pipeline.confidence_interval_constructor")
 
 
-def construct_confidence_intervals(experiment_statistics_by_type, 
-                                   replication_metrics_by_type, 
-                                   metric_configs, confidence_level=0.95):
+def construct_confidence_intervals(metric_statistics, metrics_across_replications, 
+                                   config, confidence_level):
     """
-    Construct confidence intervals for experiment-level statistics.
+    Router: Construct confidence intervals according to aggregation pattern.
     
     Args:
-        experiment_statistics_by_type: Dict of {metric_type: statistics}
-        replication_metrics_by_type: Dict of {metric_type: [rep1, rep2, ...]}
-        metric_configs: Dict of {metric_type: config}
-        confidence_level: Confidence level for intervals (default: 0.95)
+        metric_statistics: Experiment-level descriptive statistics (for ONE metric type)
+        metrics_across_replications: List of replication-level data (for ONE metric type)
+        config: Metric configuration dictionary
+        confidence_level: CI confidence level
         
     Returns:
-        dict: Experiment statistics with confidence intervals added
+        dict: Statistics with confidence intervals for this metric type
     """
-    logger.info(f"Constructing {confidence_level*100}% confidence intervals")
+    pattern = config['aggregation_pattern']
     
-    results_with_cis = {}
-    extraction_engine = ExtractionEngine()
-    
-    for metric_type, config in metric_configs.items():
-        if metric_type not in experiment_statistics_by_type:
-            logger.warning(f"No experiment statistics found for {metric_type}")
-            continue
-            
-        logger.debug(f"Processing CIs for {metric_type}")
-        
-        pattern = config['aggregation_pattern']
-        
-        if pattern == 'two_level':
-            results_with_cis[metric_type] = _construct_cis_for_two_level(
-                experiment_statistics_by_type[metric_type],
-                replication_metrics_by_type[metric_type],
-                config,
-                confidence_level,
-                extraction_engine
-            )
-        elif pattern == 'one_level':
-            results_with_cis[metric_type] = _construct_cis_for_one_level(
-                experiment_statistics_by_type[metric_type],
-                replication_metrics_by_type[metric_type],
-                config,
-                confidence_level,
-                extraction_engine
-            )
-    
-    logger.info("Confidence interval construction completed")
-    return results_with_cis
+    if pattern == 'two_level':
+        return _construct_cis_for_two_level(
+            metric_statistics, metrics_across_replications, config, confidence_level
+        )
+    elif pattern == 'one_level':
+        return _construct_cis_for_one_level(
+            metric_statistics, metrics_across_replications, config, confidence_level
+        )
+    else:
+        raise ValueError(f"Unknown aggregation pattern: {pattern}")
 
 
 def _construct_cis_for_two_level(metric_statistics, metrics_across_replications, 
-                                 config, confidence_level, extraction_engine):
+                                 config, confidence_level):
     """
     Construct CIs for two-level pattern (statistics-of-statistics).
     
     Args:
-        metric_statistics: Experiment-level descriptive statistics
-        metrics_across_replications: List of replication-level metrics for ONE metric type
+        metric_statistics: Experiment-level descriptive statistics (for ONE metric type)
+        metrics_across_replications: List of replication-level metrics (for ONE metric type)
         config: Metric configuration
         confidence_level: CI confidence level
-        extraction_engine: Engine for extracting values
+        
+    Returns:
+        dict: Statistics with confidence intervals for this metric type
     """
+    extraction_engine = ExtractionEngine()
     ci_configurations = [
         stat for stat in config.get('experiment_stats', []) 
         if stat.get('construct_ci', False)
@@ -96,16 +77,18 @@ def _construct_cis_for_two_level(metric_statistics, metrics_across_replications,
         # Add CIs for configured statistics
         for ci_config in ci_configurations:
             stat_name = ci_config['name']
+            statistic_type = ci_config['extract']      # NEW: Explicit variable
+            target_statistic = ci_config['compute']    # NEW: Explicit variable
             
             if stat_name in metric_stats:
-                # Extract values across replications using extraction engine
+                # Extract values across replications
                 extracted_values = extraction_engine.extract_for_two_level_pattern(
-                    metrics_across_replications, metric_name, ci_config['extract']
+                    metrics_across_replications, metric_name, statistic_type
                 )
                 
                 # Construct CI
                 ci_result = _construct_confidence_interval(
-                    extracted_values, confidence_level, ci_config['compute']
+                    extracted_values, confidence_level, target_statistic
                 )
                 
                 results_with_cis[metric_name][stat_name] = ci_result
@@ -115,50 +98,47 @@ def _construct_cis_for_two_level(metric_statistics, metrics_across_replications,
 
 
 def _construct_cis_for_one_level(metric_statistics, metrics_across_replications, 
-                                 config, confidence_level, extraction_engine):
+                                 config, confidence_level):
     """
     Construct CIs for one-level pattern (system metrics).
     
     Args:
-        metric_statistics: Experiment-level descriptive statistics  
-        metrics_across_replications: List of scalar dicts, one per replication
+        metric_statistics: Experiment-level descriptive statistics (for ONE metric type)
+        metrics_across_replications: List of scalar dicts (for ONE metric type)
         config: Metric configuration
         confidence_level: CI confidence level
-        extraction_engine: Engine for extracting values
+        
+    Returns:
+        dict: Statistics with confidence intervals for this metric type
     """
+    extraction_engine = ExtractionEngine()
     ci_configurations = config.get('ci_config', [])
     results_with_cis = {}
     
-    if not metrics_across_replications:
-        return results_with_cis
-    
-    metric_names = list(metrics_across_replications[0].keys())
-    
-    # Initialize all metrics with descriptive-only structure
-    for metric_name in metric_names:
-        scalar_values = extraction_engine.extract_for_one_level_pattern(
-            metrics_across_replications, metric_name
-        )
-        point_estimate = np.mean(scalar_values) if scalar_values else None
-        
+    # Initialize all metrics with descriptive statistics (no CI)
+    for metric_name, metric_stats in metric_statistics.items():
         results_with_cis[metric_name] = {
-            'point_estimate': point_estimate,
+            'point_estimate': metric_stats['mean'],
             'confidence_interval': [None, None]
         }
     
-    # Add CIs for configured metrics
+    # Add CIs ONLY for configured metrics
     for ci_config in ci_configurations:
         metric_name = ci_config['metric_name']
+        target_statistic = ci_config.get('target_statistic', 'mean')
         
-        if metric_name in metric_names and ci_config.get('construct_ci', False):
+        if metric_name in metric_statistics and ci_config.get('construct_ci', False):
+            # Extract values only when we need to construct CI
             scalar_values = extraction_engine.extract_for_one_level_pattern(
                 metrics_across_replications, metric_name
             )
             
-            # System metrics always estimate means → use t-distribution
-            ci_result = _construct_confidence_interval(scalar_values, confidence_level, 'mean')
+            # Construct CI for the specified target statistic
+            ci_result = _construct_confidence_interval(
+                scalar_values, confidence_level, target_statistic
+            )
             results_with_cis[metric_name] = ci_result
-            logger.debug(f"Constructed CI for {metric_name} (system metric)")
+            logger.debug(f"Constructed {target_statistic} CI for {metric_name}")
     
     return results_with_cis
 
@@ -168,6 +148,14 @@ def _construct_confidence_interval(values, confidence_level, target_statistic):
     Unified confidence interval construction.
     
     Handles t-distribution (for means) and chi-square (for variance/std).
+    
+    Args:
+        values: List of numeric values
+        confidence_level: Confidence level (e.g., 0.95)
+        target_statistic: 'mean', 'std', or 'variance'
+        
+    Returns:
+        dict: CI result with point_estimate, confidence_interval, etc.
     """
     valid_values = [v for v in values if v is not None]
     

@@ -76,18 +76,20 @@ METRIC_CONFIGURATIONS = {
         'aggregation_pattern': 'one_level',
         'metric_module': 'delivery_sim.metrics.system.entity_derived_metrics', 
         'metric_function': 'calculate_all_entity_derived_system_metrics',
-        'entity_data_key': None,  # Function takes full AnalysisData object
+        'entity_data_key': None,
         'ci_config': [
             {
                 'metric_name': 'completion_rate',
+                'target_statistic': 'mean',  # NEW: specify what to estimate
                 'construct_ci': True,
-                'description': 'System completion rate with CI'
+                'description': 'Mean completion rate with CI'
             },
             {
                 'metric_name': 'pairing_rate', 
+                'target_statistic': 'mean',  # NEW: can choose mean/std/variance
                 'construct_ci': True,
-                'description': 'System pairing rate with CI'
-            }
+                'description': 'Mean pairing rate with CI'
+            },
         ],
         'description': 'System-wide performance metrics'
     }
