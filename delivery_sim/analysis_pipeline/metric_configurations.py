@@ -79,14 +79,14 @@ METRIC_CONFIGURATIONS = {
         'entity_data_key': None,
         'ci_config': [
             {
-                'metric_name': 'completion_rate',
-                'target_statistic': 'mean',  # NEW: specify what to estimate
+                'metric_name': 'system_completion_rate',  # ✅ Changed from 'completion_rate'
+                'target_statistic': 'mean',
                 'construct_ci': True,
                 'description': 'Mean completion rate with CI'
             },
             {
-                'metric_name': 'pairing_rate', 
-                'target_statistic': 'mean',  # NEW: can choose mean/std/variance
+                'metric_name': 'system_pairing_rate',  # ✅ Changed from 'pairing_rate'
+                'target_statistic': 'mean',
                 'construct_ci': True,
                 'description': 'Mean pairing rate with CI'
             },

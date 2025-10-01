@@ -379,7 +379,7 @@ for design_name, analysis_result in design_analysis_results.items():
         mean_of_stds = mean_of_stds_data['point_estimate']
         
         # Extract completion rate (one-level pattern - direct metric with CI)
-        completion_rate_data = system_metrics_ci['completion_rate']
+        completion_rate_data = system_metrics_ci['system_completion_rate']
         completion_rate = completion_rate_data['point_estimate']
         completion_rate_ci = completion_rate_data['confidence_interval']
         
@@ -454,5 +454,4 @@ print("• Mean of Means: Average assignment time across replications")
 print("• Std of Means: System consistency between replications (lower = more consistent)")
 print("• Mean of Stds: Average volatility within replications (service predictability)")
 print("• Completion Rate: Proportion of orders successfully completed (with 95% CI)")
-
 # %%
