@@ -100,18 +100,19 @@ class ExperimentAnalysisPipeline:
             experiment_results_with_cis
         )
     
-    def _phase0_prepare_analysis_data(self, raw_replication_outputs):
+    def _phase0_prepare_analysis_data(self, raw_replication_results):
         """
         Phase 0: Prepare analysis data by filtering warmup period.
         
-        Transforms raw simulation outputs into analysis-ready data by:
+        Transforms raw simulation results into analysis-ready data by:
         - Extracting repositories from each replication
         - Applying warmup period filtering
         - Creating analytical populations
         
         Args:
-            raw_replication_outputs: List of raw simulation outputs
-            
+            raw_replication_results: List of raw simulation results (one per replication)
+                Each result is a dict with 'repositories' key containing entity repositories
+                
         Returns:
             list: Analysis data objects (one per replication) ready for metric processing
         """
@@ -119,13 +120,13 @@ class ExperimentAnalysisPipeline:
         
         prepared_analysis_data = []
         
-        for i, replication_result in enumerate(raw_replication_outputs):
-            repositories = replication_result['repositories']
+        for i, raw_replication_result in enumerate(raw_replication_results):
+            repositories = raw_replication_result['repositories']
             analysis_data = prepare_analysis_data(repositories, self.warmup_period)
             prepared_analysis_data.append(analysis_data)
             
             self.logger.debug(
-                f"Prepared analysis data for replication {i+1}/{len(raw_replication_outputs)}"
+                f"Prepared analysis data for replication {i+1}/{len(raw_replication_results)}"
             )
         
         self.logger.info(f"Phase 0 complete: Prepared {len(prepared_analysis_data)} replications")
