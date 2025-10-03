@@ -280,12 +280,12 @@ print("STEP 10: EXPERIMENTAL ANALYSIS USING NEW REDESIGNED PIPELINE")
 print(f"{'='*80}\n")
 
 # Import the new redesigned pipeline
-from delivery_sim.analysis_pipeline_redesigned.pipeline_coordinator import ExperimentAnalysisPipeline
+from delivery_sim.analysis_pipeline.pipeline_coordinator import ExperimentAnalysisPipeline
 
-# Initialize pipeline focused on order metrics only
+# Initialize pipeline with both order metrics and system metrics
 pipeline = ExperimentAnalysisPipeline(
     warmup_period=uniform_warmup_period,  # 500 minutes from Step 9
-    enabled_metric_types=['order_metrics'],  # Focus on order metrics only
+    enabled_metric_types=['order_metrics', 'system_metrics'],  # Include both metric types
     confidence_level=0.95
 )
 
@@ -295,7 +295,7 @@ design_analysis_results = {}
 print(f"Processing {len(study_results)} design points through redesigned analysis pipeline...")
 print(f"Warmup period: {uniform_warmup_period} minutes")
 print(f"Confidence level: 95%")
-print(f"Focus metric: Order Assignment Time\n")
+print(f"Metrics: Order Assignment Time + Completion Rate\n")
 
 for i, (design_name, replication_results) in enumerate(study_results.items(), 1):
     print(f"[{i:2d}/{len(study_results)}] Analyzing {design_name}...")
@@ -312,11 +312,11 @@ print("Analysis results stored in 'design_analysis_results'")
 
 # %%
 # ==================================================================================
-# STEP 11: EXTRACT AND PRESENT FOCUSED ORDER ASSIGNMENT TIME METRICS
+# STEP 11: EXTRACT AND PRESENT KEY METRICS WITH CONFIDENCE INTERVALS
 # ==================================================================================
 
 print(f"\n{'='*80}")
-print("STEP 11: ORDER ASSIGNMENT TIME STATISTICS EXTRACTION AND PRESENTATION")
+print("STEP 11: KEY PERFORMANCE METRICS EXTRACTION AND PRESENTATION")
 print(f"{'='*80}\n")
 
 import re
@@ -360,83 +360,98 @@ def format_ci_value(point_estimate, ci_bounds, decimal_places=2):
         return f"{point_estimate:.{decimal_places}f}"
 
 # Extract metrics from analysis results
-assignment_time_results = []
+results_table = []
 
 for design_name, analysis_result in design_analysis_results.items():
     try:
-        # Navigate to assignment time metrics
-        order_metrics = analysis_result['results']['order_metrics']['assignment_time']  # ✅ Removed 'order' layer
+        # NEW STRUCTURE: Access via 'statistics_with_cis' for CI data
+        order_metrics_ci = analysis_result['statistics_with_cis']['order_metrics']['assignment_time']
+        system_metrics_ci = analysis_result['statistics_with_cis']['system_metrics']
         
-        # Extract the three statistics of interest (updated names)
-        mean_of_means_data = order_metrics['mean_of_means']
-        std_of_means_data = order_metrics['std_of_means']  # Changed from variance_of_means
-        mean_of_stds_data = order_metrics['mean_of_stds']  # Changed from mean_of_variances
+        # Extract assignment time metrics (two-level pattern - statistics of statistics)
+        mean_of_means_data = order_metrics_ci['mean_of_means']
+        std_of_means_data = order_metrics_ci['std_of_means']
+        mean_of_stds_data = order_metrics_ci['mean_of_stds']
         
-        # Extract values
         mean_of_means = mean_of_means_data['point_estimate']
         mean_of_means_ci = mean_of_means_data['confidence_interval']
-        std_of_means = std_of_means_data['point_estimate']  # Now directly std, no conversion
-        mean_of_stds = mean_of_stds_data['point_estimate']  # Now directly mean of stds
+        std_of_means = std_of_means_data['point_estimate']
+        mean_of_stds = mean_of_stds_data['point_estimate']
+        
+        # Extract completion rate (one-level pattern - direct metric with CI)
+        completion_rate_data = system_metrics_ci['system_completion_rate']
+        completion_rate = completion_rate_data['point_estimate']
+        completion_rate_ci = completion_rate_data['confidence_interval']
         
         # Parse design point information
         load_ratio, interval_type = extract_load_ratio_and_type(design_name)
         
         # Store results
-        assignment_time_results.append({
+        results_table.append({
             'design_name': design_name,
             'load_ratio': load_ratio,
             'interval_type': interval_type,
+            # Assignment time metrics
             'mean_of_means': mean_of_means,
             'mean_of_means_ci': mean_of_means_ci,
-            'std_of_means': std_of_means,  # Updated variable name
-            'mean_of_stds': mean_of_stds   # Updated variable name
+            'std_of_means': std_of_means,
+            'mean_of_stds': mean_of_stds,
+            # Completion rate
+            'completion_rate': completion_rate,
+            'completion_rate_ci': completion_rate_ci
         })
         
     except KeyError as e:
-        print(f"⚠ Warning: Could not extract assignment time metrics from {design_name}: {e}")
+        print(f"⚠ Warning: Could not extract metrics from {design_name}: {e}")
         # Debug: Show actual structure
         try:
-            if 'order_metrics' in analysis_result['results']:
-                metric_keys = list(analysis_result['results']['order_metrics'].keys())
-                print(f"   Available metrics in order_metrics: {metric_keys}")  # ✅ Updated message
-                if 'assignment_time' in metric_keys:
-                    stat_keys = list(analysis_result['results']['order_metrics']['assignment_time'].keys())
-                    print(f"   Available statistics in 'assignment_time': {stat_keys}")
+            print(f"   Available top-level keys: {list(analysis_result.keys())}")
+            if 'statistics_with_cis' in analysis_result:
+                print(f"   Available metric types: {list(analysis_result['statistics_with_cis'].keys())}")
         except:
             print(f"   Could not inspect structure further")
     except Exception as e:
         print(f"✗ Error processing {design_name}: {e}")
 
 # Sort and display results table
-assignment_time_results.sort(key=lambda x: (x['load_ratio'], x['interval_type']))
+results_table.sort(key=lambda x: (x['load_ratio'], x['interval_type']))
 
-print("🎯 ORDER ASSIGNMENT TIME: STATISTICS OF STATISTICS ANALYSIS")
-print("=" * 95)
-print(f"{'Load Ratio':>10} {'Interval Type':>12} {'Mean of Means':>20} {'Std of Means':>15} {'Mean of Stds':>15}")
-print("=" * 95)
+print("🎯 KEY PERFORMANCE METRICS: ASSIGNMENT TIME & COMPLETION RATE")
+print("=" * 120)
+print(f"{'Load':>5} {'Interval':>12} {'Mean of Means':>20} {'Std of':>10} {'Mean of':>10} {'Completion Rate':>25}")
+print(f"{'Ratio':>5} {'Type':>12} {'(Assignment Time)':>20} {'Means':>10} {'Stds':>10} {'(with 95% CI)':>25}")
+print("=" * 120)
 
-for result in assignment_time_results:
+for result in results_table:
     load_ratio = format_metric_value(result['load_ratio'], 1) if result['load_ratio'] else "N/A"
     interval_type = result['interval_type'][:12]
     
+    # Assignment time metrics
     mean_of_means_formatted = format_ci_value(
         result['mean_of_means'], 
         result['mean_of_means_ci'], 
         decimal_places=2
     )
+    std_of_means_formatted = format_metric_value(result['std_of_means'], 2)
+    mean_of_stds_formatted = format_metric_value(result['mean_of_stds'], 2)
     
-    std_of_means_formatted = format_metric_value(result['std_of_means'], 2)  # Updated
-    mean_of_stds_formatted = format_metric_value(result['mean_of_stds'], 2)  # Updated
+    # Completion rate with CI
+    completion_rate_formatted = format_ci_value(
+        result['completion_rate'],
+        result['completion_rate_ci'],
+        decimal_places=3
+    )
     
-    print(f"{load_ratio:>10} {interval_type:>12} {mean_of_means_formatted:>20} "
-          f"{std_of_means_formatted:>15} {mean_of_stds_formatted:>15}")
+    print(f"{load_ratio:>5} {interval_type:>12} {mean_of_means_formatted:>20} "
+          f"{std_of_means_formatted:>10} {mean_of_stds_formatted:>10} "
+          f"{completion_rate_formatted:>25}")
 
-print("=" * 95)
-print(f"✓ Extracted and displayed metrics from {len(assignment_time_results)} design points")
-print("Results stored in 'assignment_time_results' for further analysis")
+print("=" * 120)
+print(f"✓ Extracted and displayed metrics from {len(results_table)} design points")
+print("Results stored in 'results_table' for further analysis")
 print("\nColumn Interpretations:")
 print("• Mean of Means: Average assignment time across replications")  
 print("• Std of Means: System consistency between replications (lower = more consistent)")
 print("• Mean of Stds: Average volatility within replications (service predictability)")
-
+print("• Completion Rate: Proportion of orders successfully completed (with 95% CI)")
 # %%
