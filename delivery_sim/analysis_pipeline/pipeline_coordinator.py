@@ -152,9 +152,9 @@ class ExperimentAnalysisPipeline:
         for i, analysis_data in enumerate(prepared_analysis_data):
             self.logger.debug(f"Processing replication {i+1}/{len(prepared_analysis_data)}")
             
-            for metric_type, config in metric_configs.items():
+            for metric_type, metric_config in metric_configs.items():
                 processed_metrics = self.replication_processor.process_replication(
-                    analysis_data, config
+                    analysis_data, metric_config
                 )
                 
                 if processed_metrics:
@@ -186,7 +186,7 @@ class ExperimentAnalysisPipeline:
         
         experiment_statistics_by_type = {}
         
-        for metric_type, config in metric_configs.items():
+        for metric_type, metric_config in metric_configs.items():
             # Extract metrics for ONE metric type
             metrics_across_replications = replication_metrics_by_type.get(metric_type, [])
             
@@ -196,7 +196,7 @@ class ExperimentAnalysisPipeline:
             
             # Aggregate this metric type
             experiment_stats = self.experiment_aggregator.aggregate_experiment(
-                metrics_across_replications, config
+                metrics_across_replications, metric_config
             )
             
             if experiment_stats:
@@ -226,7 +226,7 @@ class ExperimentAnalysisPipeline:
         experiment_results_with_cis = {}
         
         # Loop at coordinator level (consistent with Phase 2)
-        for metric_type, config in metric_configs.items():
+        for metric_type, metric_config in metric_configs.items():
             if metric_type not in experiment_statistics_by_type:
                 self.logger.warning(f"No experiment statistics for {metric_type}")
                 continue
@@ -241,7 +241,7 @@ class ExperimentAnalysisPipeline:
             results_with_cis = construct_confidence_intervals(
                 metric_statistics,
                 metrics_across_replications,
-                config,
+                metric_config,
                 self.confidence_level
             )
             

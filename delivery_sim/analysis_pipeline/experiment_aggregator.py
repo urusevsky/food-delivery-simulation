@@ -25,14 +25,14 @@ class ExperimentAggregator:
         self.statistics_engine = StatisticsEngine()
         self.extraction_engine = ExtractionEngine()
     
-    def aggregate_experiment(self, metrics_across_replications, config):
+    def aggregate_experiment(self, metrics_across_replications, metric_config):
         """
         Aggregate across all replications according to metric configuration.
         
         Args:
             metrics_across_replications: List of metric results, one per replication
                                          (for a SINGLE metric type)
-            config: Metric configuration dictionary
+            metric_config: Metric configuration dictionary
             
         Returns:
             dict: Experiment-level aggregated statistics
@@ -45,11 +45,11 @@ class ExperimentAggregator:
         metric_names = list(metrics_across_replications[0].keys())
         
         # Route to pattern-specific aggregation
-        pattern = config['aggregation_pattern']
+        pattern = metric_config['aggregation_pattern']
         
         if pattern == 'two_level':
             return self._aggregate_two_level_experiment(
-                metrics_across_replications, metric_names, config
+                metrics_across_replications, metric_names, metric_config
             )
         elif pattern == 'one_level':
             return self._aggregate_one_level_experiment(
@@ -59,7 +59,7 @@ class ExperimentAggregator:
             raise ValueError(f"Unknown aggregation pattern: {pattern}")
     
     def _aggregate_two_level_experiment(self, metrics_across_replications, 
-                                       metric_names, config):
+                                       metric_names, metric_config):
         """
         Two-level pattern: Statistics → Statistics-of-statistics.
         
@@ -68,9 +68,9 @@ class ExperimentAggregator:
         Args:
             metrics_across_replications: List of replication-level metric dicts
             metric_names: List of metric names to process
-            config: Metric configuration
+            metric_config): Metric configuration
         """
-        experiment_stats_config = config.get('experiment_stats', [])
+        experiment_stats_config = metric_config.get('experiment_stats', [])
         results = {}
         
         for metric_name in metric_names:

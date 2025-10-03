@@ -25,34 +25,34 @@ class ReplicationProcessor:
         self.statistics_engine = StatisticsEngine()
         self._metric_function_cache = {}
     
-    def process_replication(self, analysis_data, config):
+    def process_replication(self, analysis_data, metric_config):
         """
         Process single replication according to metric configuration.
         
         Args:
             analysis_data: Prepared analysis data from data_preparation module
-            config: Metric configuration dictionary
+            metric_config: Metric configuration dictionary for a specific metric type
             
         Returns:
             dict: Replication-level metrics (format depends on pattern)
         """
-        pattern = config['aggregation_pattern']
+        pattern = metric_config['aggregation_pattern']
         
         if pattern == 'two_level':
-            return self._process_two_level_replication(analysis_data, config)
+            return self._process_two_level_replication(analysis_data, metric_config)
         elif pattern == 'one_level':
-            return self._process_one_level_replication(analysis_data, config)
+            return self._process_one_level_replication(analysis_data, metric_config)
         else:
             raise ValueError(f"Unknown aggregation pattern: {pattern}")
     
-    def _process_two_level_replication(self, analysis_data, config):
+    def _process_two_level_replication(self, analysis_data, metric_config):
         """
         Two-level pattern: Individual entities → Statistics objects.
         
         First aggregation happens here (within replication).
         """
         # Get entities from analysis data
-        entity_data_key = config['entity_data_key']
+        entity_data_key = metric_config['entity_data_key']
         entities = getattr(analysis_data, entity_data_key, [])
         
         if not entities:
@@ -60,19 +60,19 @@ class ReplicationProcessor:
             return {}
         
         # Calculate individual metrics for each entity
-        metric_function = self._get_metric_function(config)
+        metric_function = self._get_metric_function(metric_config)
         individual_metrics = [metric_function(entity) for entity in entities]
         
         # Aggregate individual values to statistics objects (first aggregation)
         return self._aggregate_individual_values(individual_metrics)
     
-    def _process_one_level_replication(self, analysis_data, config):
+    def _process_one_level_replication(self, analysis_data, metric_config):
         """
         One-level pattern: Direct calculation (already replication-level).
         
         No aggregation at this phase - just calculation.
         """
-        metric_function = self._get_metric_function(config)
+        metric_function = self._get_metric_function(metric_config)
         return metric_function(analysis_data)
     
     def _aggregate_individual_values(self, individual_metrics):
@@ -100,10 +100,10 @@ class ReplicationProcessor:
         
         return results
     
-    def _get_metric_function(self, config):
+    def _get_metric_function(self, metric_config):
         """Import and cache metric calculation function."""
-        module_path = config['metric_module']
-        function_name = config['metric_function']
+        module_path = metric_config['metric_module']
+        function_name = metric_config['metric_function']
         cache_key = f"{module_path}.{function_name}"
         
         if cache_key not in self._metric_function_cache:

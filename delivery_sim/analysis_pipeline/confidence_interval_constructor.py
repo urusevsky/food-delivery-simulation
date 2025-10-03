@@ -15,42 +15,42 @@ logger = get_logger("analysis_pipeline.confidence_interval_constructor")
 
 
 def construct_confidence_intervals(metric_statistics, metrics_across_replications, 
-                                   config, confidence_level):
+                                   metric_config, confidence_level):
     """
     Router: Construct confidence intervals according to aggregation pattern.
     
     Args:
         metric_statistics: Experiment-level descriptive statistics (for ONE metric type)
         metrics_across_replications: List of replication-level data (for ONE metric type)
-        config: Metric configuration dictionary
+        metric_config: Metric configuration dictionary
         confidence_level: CI confidence level
         
     Returns:
         dict: Statistics with confidence intervals for this metric type
     """
-    pattern = config['aggregation_pattern']
+    pattern = metric_config['aggregation_pattern']
     
     if pattern == 'two_level':
         return _construct_cis_for_two_level(
-            metric_statistics, metrics_across_replications, config, confidence_level
+            metric_statistics, metrics_across_replications, metric_config, confidence_level
         )
     elif pattern == 'one_level':
         return _construct_cis_for_one_level(
-            metric_statistics, metrics_across_replications, config, confidence_level
+            metric_statistics, metrics_across_replications, metric_config, confidence_level
         )
     else:
         raise ValueError(f"Unknown aggregation pattern: {pattern}")
 
 
 def _construct_cis_for_two_level(metric_statistics, metrics_across_replications, 
-                                 config, confidence_level):
+                                 metric_config, confidence_level):
     """
     Construct CIs for two-level pattern (statistics-of-statistics).
     
     Args:
         metric_statistics: Experiment-level descriptive statistics (for ONE metric type)
         metrics_across_replications: List of replication-level metrics (for ONE metric type)
-        config: Metric configuration
+        metric_config: Metric configuration
         confidence_level: CI confidence level
         
     Returns:
@@ -58,7 +58,7 @@ def _construct_cis_for_two_level(metric_statistics, metrics_across_replications,
     """
     extraction_engine = ExtractionEngine()
     ci_configurations = [
-        stat for stat in config.get('experiment_stats', []) 
+        stat for stat in metric_config.get('experiment_stats', []) 
         if stat.get('construct_ci', False)
     ]
     
@@ -98,21 +98,21 @@ def _construct_cis_for_two_level(metric_statistics, metrics_across_replications,
 
 
 def _construct_cis_for_one_level(metric_statistics, metrics_across_replications, 
-                                 config, confidence_level):
+                                 metric_config, confidence_level):
     """
     Construct CIs for one-level pattern (system metrics).
     
     Args:
         metric_statistics: Experiment-level descriptive statistics (for ONE metric type)
         metrics_across_replications: List of scalar dicts (for ONE metric type)
-        config: Metric configuration
+        metric_config: Metric configuration
         confidence_level: CI confidence level
         
     Returns:
         dict: Statistics with confidence intervals for this metric type
     """
     extraction_engine = ExtractionEngine()
-    ci_configurations = config.get('ci_config', [])
+    ci_configurations = metric_config.get('ci_config', [])
     results_with_cis = {}
     
     # Initialize all metrics with descriptive statistics (no CI)
