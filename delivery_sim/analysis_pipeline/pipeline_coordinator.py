@@ -47,7 +47,7 @@ class ExperimentAnalysisPipeline:
                         f"confidence_level={confidence_level}, "
                         f"enabled_metrics={enabled_metric_types}")
     
-    def analyze_experiment(self, raw_replication_outputs):
+    def analyze_experiment(self, raw_replication_results):
         """
         Transform raw simulation data into comprehensive experiment-level summary.
         
@@ -59,12 +59,12 @@ class ExperimentAnalysisPipeline:
         Phase 4: Metadata enrichment and finalization
         
         Args:
-            raw_replication_outputs: List of raw simulation outputs (one per replication)
+            raw_replication_results: List of raw simulation results (one per replication)
             
         Returns:
             dict: Complete experiment summary with statistics and confidence intervals
         """
-        num_replications = len(raw_replication_outputs)
+        num_replications = len(raw_replication_results)
         self.logger.info(f"Starting analysis for {num_replications} replications")
         
         # Prepare metric configurations once
@@ -75,7 +75,7 @@ class ExperimentAnalysisPipeline:
         
         # Phase 0: Prepare analysis data (warmup filtering)
         prepared_analysis_data = self._phase0_prepare_analysis_data(
-            raw_replication_outputs
+            raw_replication_results
         )
         
         # Phase 1: Process each replication
