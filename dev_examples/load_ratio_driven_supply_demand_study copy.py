@@ -297,11 +297,11 @@ print(f"Warmup period: {uniform_warmup_period} minutes")
 print(f"Confidence level: 95%")
 print(f"Metrics: Order Assignment Time + Completion Rate\n")
 
-for i, (design_name, replication_results) in enumerate(study_results.items(), 1):
+for i, (design_name, raw_replication_results) in enumerate(study_results.items(), 1):
     print(f"[{i:2d}/{len(study_results)}] Analyzing {design_name}...")
     
     # Simple, direct approach - let it fail with full context
-    analysis_result = pipeline.analyze_experiment(replication_results)
+    analysis_result = pipeline.analyze_experiment(raw_replication_results)
     design_analysis_results[design_name] = analysis_result
     
     # Simple success confirmation
