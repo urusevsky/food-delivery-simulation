@@ -26,7 +26,7 @@ from delivery_sim.simulation.configuration import (
 )
 from delivery_sim.infrastructure.infrastructure import Infrastructure
 from delivery_sim.infrastructure.infrastructure_analyzer import InfrastructureAnalyzer
-from delivery_sim.simulation.simulation_runner_redesigned import SimulationRunner
+from delivery_sim.simulation.simulation_runner import SimulationRunner
 from delivery_sim.utils.logging_system import configure_logging
 
 print("✓ Redesigned SimulationRunner imports successful")

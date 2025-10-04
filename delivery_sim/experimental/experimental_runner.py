@@ -6,7 +6,7 @@ Clean, simple runner that takes a dict of DesignPoint instances and executes the
 No feature creep - just execution orchestration.
 """
 
-from delivery_sim.simulation.simulation_runner_redesigned import SimulationRunner
+from delivery_sim.simulation.simulation_runner import SimulationRunner
 from delivery_sim.utils.logging_system import get_logger
 
 
