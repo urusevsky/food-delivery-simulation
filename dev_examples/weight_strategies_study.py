@@ -18,6 +18,7 @@ This reveals:
 3. Trade-offs between distance efficiency, throughput optimization, and fairness considerations
 4. Context-sensitive priority scoring strategies for different operational regimes
 """
+
 # %% Enable Autoreload (ALWAYS put this at the top of research scripts)
 %load_ext autoreload
 %autoreload 2
@@ -40,7 +41,7 @@ from delivery_sim.experimental.experimental_runner import ExperimentalRunner
 from delivery_sim.utils.logging_system import configure_logging
 
 print("="*80)
-print("WEIGHT STRATEGY OPTIMIZATION STUDY: PRIORITY SCORING CONFIGURATIONS")
+print("WEIGHT STRATEGY OPTIMIZATION STUDY: MULTI-OBJECTIVE PRIORITY SCORING")
 print("="*80)
 print("Research Focus: Weight Strategy × Load Ratio × Absolute Scale Interaction Effects")
 
@@ -62,139 +63,140 @@ print("\n" + "="*50)
 print("INFRASTRUCTURE SETUP")
 print("="*50)
 
-# Same infrastructure as previous studies for consistency
 structural_config = StructuralConfig(
     delivery_area_size=10,
     num_restaurants=10,
     driver_speed=0.5
 )
 
-master_seed = 42
-infrastructure = Infrastructure(structural_config, master_seed)
+infrastructure = Infrastructure(structural_config, master_seed=42)
+print(f"✓ Infrastructure created: {structural_config.delivery_area_size}km × {structural_config.delivery_area_size}km")
+print(f"✓ Restaurants: {structural_config.num_restaurants}")
+print(f"✓ Driver speed: {structural_config.driver_speed} km/min")
+
 analyzer = InfrastructureAnalyzer(infrastructure)
-analysis_results = analyzer.analyze_complete_infrastructure()
+analysis = analyzer.analyze_complete_infrastructure()
+print(f"✓ Infrastructure analyzed: typical_distance = {analysis['typical_distance']:.2f}km")
 
-print(f"✓ Infrastructure: {infrastructure}")
-print(f"✓ Typical distance: {analysis_results['typical_distance']:.3f}km")
-print(f"✓ Consistent with previous load ratio and exploratory studies")
+# %% Step 4: Weight Strategy Design Points
+print("\n" + "="*50)
+print("WEIGHT STRATEGY DESIGN POINTS")
+print("="*50)
 
-# %% Step 4: Define experimental design points
-print("🔧 DEFINING EXPERIMENTAL DESIGN POINTS...")
-
-# Fixed pairing thresholds (moderate configuration to isolate weight effects)
+# Fixed pairing configuration (moderate) to isolate weight strategy effects
 FIXED_PAIRING_CONFIG = {
-    'restaurants_proximity_threshold': 4.0,  # km
-    'customers_proximity_threshold': 3.0     # km
+    'pairing_enabled': True,
+    'restaurants_proximity_threshold': 4.0,
+    'customers_proximity_threshold': 3.0
 }
 
-# PRIMARY EXPERIMENTAL FACTOR: Weight Strategy Configurations
+print(f"Fixed Pairing Configuration (to isolate weight effects):")
+print(f"  • Restaurants threshold: {FIXED_PAIRING_CONFIG['restaurants_proximity_threshold']}km")
+print(f"  • Customers threshold: {FIXED_PAIRING_CONFIG['customers_proximity_threshold']}km")
+
+# Weight strategy configurations for multi-objective optimization
 weight_strategy_configurations = {
-    'distance_focused': {
-        'weight_distance': 0.7,
-        'weight_throughput': 0.2, 
-        'weight_fairness': 0.1
-    },
-    'throughput_focused': {
-        'weight_distance': 0.2,
-        'weight_throughput': 0.7,
-        'weight_fairness': 0.1
-    },
-    'fairness_focused': {
-        'weight_distance': 0.2,
-        'weight_throughput': 0.2,
-        'weight_fairness': 0.6
-    },
-    'balanced': {
-        'weight_distance': 0.33,
-        'weight_throughput': 0.33,
-        'weight_fairness': 0.34
-    },
-    'efficiency_only': {
-        'weight_distance': 0.5,
-        'weight_throughput': 0.5,
-        'weight_fairness': 0.0
-    }
+    'distance_focused': ScoringConfig(
+        weight_distance=0.7,
+        weight_throughput=0.2, 
+        weight_fairness=0.1
+    ),
+    'throughput_focused': ScoringConfig(
+        weight_distance=0.2,
+        weight_throughput=0.7,
+        weight_fairness=0.1
+    ),
+    'fairness_focused': ScoringConfig(
+        weight_distance=0.2,
+        weight_throughput=0.2,
+        weight_fairness=0.6
+    ),
+    'balanced': ScoringConfig(
+        weight_distance=0.33,
+        weight_throughput=0.33,
+        weight_fairness=0.34
+    ),
+    'efficiency_only': ScoringConfig(
+        weight_distance=0.5,
+        weight_throughput=0.5,
+        weight_fairness=0.0
+    )
 }
 
+print(f"\nWeight Strategy Configurations:")
+for strategy_name, scoring_config in weight_strategy_configurations.items():
+    print(f"  • {strategy_name.replace('_', ' ').title()}: "
+          f"distance={scoring_config.weight_distance:.2f}, "
+          f"throughput={scoring_config.weight_throughput:.2f}, "
+          f"fairness={scoring_config.weight_fairness:.2f}")
+
+# Base operational parameters
 base_params = {
-    'mean_service_duration': 100,     # Match threshold study
-    'service_duration_std_dev': 60,   # Match threshold study  
-    'min_service_duration': 30,      # Match threshold study
-    'max_service_duration': 200,     # Match threshold study
+    'mean_service_duration': 100,
+    'service_duration_std_dev': 60,
+    'min_service_duration': 30,
+    'max_service_duration': 200,
 }
 
-# Load ratios to test (efficient subset for multi-objective analysis)
-target_load_ratios = [3.0, 5.0, 7.0]  # Optimal, Efficient, Stressed regimes
+# Target load ratios (optimal, efficient, stressed regimes)
+target_load_ratios = [3.0, 5.0, 7.0]
 
-# Create design points
+print(f"\nCreating weight strategy design points...")
+print(f"Pattern: Weight Strategy × Load Ratio × Validation Pairs")
+print(f"Total combinations: {len(weight_strategy_configurations)} strategies × {len(target_load_ratios)} ratios × 2 validation = {len(weight_strategy_configurations) * len(target_load_ratios) * 2}")
+
 design_points = {}
-design_point_counter = 1
 
-for weight_strategy_name, weight_config in weight_strategy_configurations.items():
+for strategy_name, scoring_config in weight_strategy_configurations.items():
+    
     for load_ratio in target_load_ratios:
-        for interval_type in ['baseline', '2x_baseline']:
-            
-            # Create operational config with fixed pairing thresholds
-            operational_config = OperationalConfig(
-                # Interval configuration (same as before)
-                mean_order_inter_arrival_time=1.0 if interval_type == 'baseline' else 2.0,
-                mean_driver_inter_arrival_time=load_ratio if interval_type == 'baseline' else 2.0 * load_ratio,
-                
-                # FIXED pairing configuration (moderate thresholds)
-                pairing_enabled=True,
-                restaurants_proximity_threshold=FIXED_PAIRING_CONFIG['restaurants_proximity_threshold'],
-                customers_proximity_threshold=FIXED_PAIRING_CONFIG['customers_proximity_threshold'],
-                
-                **base_params  # Use consistent service parameters
-            )
-            
-            # Create scoring config with experimental weight strategy
-            scoring_config = ScoringConfig(
-                # Weight configuration (PRIMARY EXPERIMENTAL FACTOR)
-                weight_distance=weight_config['weight_distance'],
-                weight_throughput=weight_config['weight_throughput'], 
-                weight_fairness=weight_config['weight_fairness'],
-                
-                # Fixed scoring parameters
-                max_distance_ratio_multiplier=2.0,
-                max_acceptable_delay=30.0,
-                max_orders_per_trip=2,
-                typical_distance_samples=1000
-            )
-            
-            # Create design point
-            design_point_name = f"{weight_strategy_name}_LR{load_ratio}_{interval_type}"
-            design_points[design_point_name] = DesignPoint(
-                infrastructure=infrastructure,  # Reuse same infrastructure
-                operational_config=operational_config,
-                scoring_config=scoring_config,
-                name=design_point_name
-            )
-            
-            print(f"  {design_point_counter:2d}. {design_point_name}")
-            design_point_counter += 1
+        
+        # === Baseline Design Point ===
+        baseline_name = f"weight_{strategy_name}_load_ratio_{load_ratio:.1f}_baseline"
+        design_points[baseline_name] = DesignPoint(
+            infrastructure=infrastructure,
+            operational_config=OperationalConfig(
+                mean_order_inter_arrival_time=1.0,
+                mean_driver_inter_arrival_time=load_ratio,
+                **base_params,
+                **FIXED_PAIRING_CONFIG
+            ),
+            scoring_config=scoring_config,
+            name=baseline_name
+        )
+        
+        # === 2x Baseline Design Point ===
+        double_baseline_name = f"weight_{strategy_name}_load_ratio_{load_ratio:.1f}_2x_baseline"
+        design_points[double_baseline_name] = DesignPoint(
+            infrastructure=infrastructure,
+            operational_config=OperationalConfig(
+                mean_order_inter_arrival_time=2.0,
+                mean_driver_inter_arrival_time=2.0 * load_ratio,
+                **base_params,
+                **FIXED_PAIRING_CONFIG
+            ),
+            scoring_config=scoring_config,
+            name=double_baseline_name
+        )
+    
+    print(f"  ✓ {strategy_name.replace('_', ' ').title()}: {len(target_load_ratios)} load ratios × 2 validation = {len(target_load_ratios) * 2} points")
 
-print(f"\n📊 EXPERIMENTAL DESIGN SUMMARY:")
-print(f"   Weight Strategies: {len(weight_strategy_configurations)} configurations")
-print(f"   Load Ratios: {len(target_load_ratios)} ratios {target_load_ratios}")
-print(f"   Validation Pairs: 2 per load ratio (baseline + 2x baseline)")
-print(f"   Total Design Points: {len(design_points)}")
-print(f"   Pairing Thresholds: FIXED at moderate ({FIXED_PAIRING_CONFIG})")
-print(f"   Primary Factor: WEIGHT STRATEGY CONFIGURATIONS")
+print(f"\n✓ Created {len(design_points)} weight strategy design points")
+print(f"✓ Design enables analysis of: Weight Strategy × Load Ratio × Scale interactions")
 
-# %% Step 5: Experiment Configuration (Consistent with Previous Studies)
+# %% Step 5: Experiment Configuration
 print("\n" + "="*50)
 print("EXPERIMENT CONFIGURATION")
 print("="*50)
 
 experiment_config = ExperimentConfig(
-    simulation_duration=2000,  # Consistent with previous studies
-    num_replications=5,        # Consistent with previous studies
+    simulation_duration=2000,
+    num_replications=5,
     master_seed=42
 )
 
-print(f"✓ Duration: {experiment_config.simulation_duration} minutes (consistent)")
-print(f"✓ Replications: {experiment_config.num_replications} (consistent)")
+print(f"✓ Duration: {experiment_config.simulation_duration} minutes")
+print(f"✓ Replications: {experiment_config.num_replications}")
 print(f"✓ Total simulation runs: {len(design_points)} × {experiment_config.num_replications} = {len(design_points) * experiment_config.num_replications}")
 
 # %% Step 6: Execute Weight Strategy Study
@@ -205,8 +207,8 @@ print("="*50)
 runner = ExperimentalRunner()
 print("✓ ExperimentalRunner initialized")
 
-print(f"\nExecuting weight strategy study with validation pairs...")
-print("Focus: How do different priority scoring weights affect performance across load ratios and scales?")
+print(f"\nExecuting weight strategy study...")
+print("Focus: How do priority scoring weight configurations affect performance?")
 study_results = runner.run_experimental_study(design_points, experiment_config)
 
 print(f"\n✅ WEIGHT STRATEGY STUDY COMPLETE!")
@@ -218,237 +220,231 @@ print("\n" + "="*50)
 print("WARMUP PERIOD (FROM PREVIOUS STUDY)")
 print("="*50)
 
-# Use verified warmup from previous load ratio study
-uniform_warmup_period = 500  # Verified by visual inspection in previous study
+uniform_warmup_period = 500
 
 print(f"✓ Using verified warmup period: {uniform_warmup_period} minutes")
 print(f"✓ Based on visual inspection from load_ratio_driven_supply_demand_study.py")
 print(f"✓ Streamlined approach - no warmup detection needed")
 
-# %% Step 8: Weight Strategy Performance Metrics Analysis
-print("\n" + "="*50)
-print("WEIGHT STRATEGY PERFORMANCE METRICS WITH SERVICE RELIABILITY")
-print("="*50)
+# %%
+# ==================================================================================
+# STEP 8: EXPERIMENTAL ANALYSIS USING ANALYSIS PIPELINE
+# ==================================================================================
 
-from delivery_sim.analysis_pipeline.pipeline_coordinator import analyze_single_configuration
+print(f"\n{'='*80}")
+print("STEP 8: EXPERIMENTAL ANALYSIS USING ANALYSIS PIPELINE")
+print(f"{'='*80}\n")
 
-print(f"Calculating weight strategy metrics including within-replication variability...")
-print(f"Focus: How priority scoring weight configurations affect performance across load ratios and scales")
+from delivery_sim.analysis_pipeline.pipeline_coordinator import ExperimentAnalysisPipeline
 
-metrics_results = {}
+# Initialize pipeline
+pipeline = ExperimentAnalysisPipeline(
+    warmup_period=uniform_warmup_period,
+    enabled_metric_types=['order_metrics', 'system_metrics'],
+    confidence_level=0.95
+)
 
-for design_name, design_results in study_results.items():
-    print(f"  Processing {design_name}...")
+# Process each design point
+design_analysis_results = {}
+
+print(f"Processing {len(study_results)} design points through analysis pipeline...")
+print(f"Warmup period: {uniform_warmup_period} minutes")
+print(f"Confidence level: 95%")
+print(f"Metrics: Assignment Time + Pairing Rate + Completion Rate\n")
+
+for i, (design_name, raw_replication_results) in enumerate(study_results.items(), 1):
+    print(f"[{i:2d}/{len(study_results)}] Analyzing {design_name}...")
     
-    try:
-        analysis_result = analyze_single_configuration(
-            simulation_results=design_results,
-            warmup_period=uniform_warmup_period,
-            confidence_level=0.95
-        )
-        
-        metrics_results[design_name] = {
-            'analysis': analysis_result,
-            'status': 'success'
-        }
-        print(f"    ✓ Success")
-        
-    except Exception as e:
-        print(f"    ✗ Error: {str(e)}")
-        metrics_results[design_name] = {
-            'analysis': None,
-            'status': 'error',
-            'error': str(e)
-        }
-
-print(f"\n✓ Weight strategy metrics calculation complete")
-
-# %% Step 9: Weight Strategy Evidence Table with Multi-Objective Performance Analysis
-print("\n" + "="*50)
-print("WEIGHT STRATEGY OPTIMIZATION HYPOTHESIS VALIDATION: EVIDENCE TABLE")
-print("="*50)
-
-import pandas as pd
-
-print("Creating weight strategy evidence table with multi-objective performance analysis...")
-
-# Extract performance metrics including within-replication std
-table_data = []
-
-for design_name, result in metrics_results.items():
-    if result['status'] != 'success':
-        continue
+    analysis_result = pipeline.analyze_experiment(raw_replication_results)
+    design_analysis_results[design_name] = analysis_result
     
-    analysis = result['analysis']
+    print(f"    ✓ Processed {analysis_result['num_replications']} replications")
+
+print(f"\n✓ Completed analysis for all {len(design_analysis_results)} design points")
+print("Analysis results stored in 'design_analysis_results'")
+
+# %%
+# ==================================================================================
+# STEP 9: EXTRACT AND PRESENT WEIGHT STRATEGY METRICS
+# ==================================================================================
+
+print(f"\n{'='*80}")
+print("STEP 9: WEIGHT STRATEGY OPTIMIZATION METRICS EXTRACTION")
+print(f"{'='*80}\n")
+
+import re
+
+def extract_weight_strategy_info(design_name):
+    """Extract weight strategy, load ratio, and interval type from design name."""
+    # Pattern: weight_distance_focused_load_ratio_3.0_baseline
+    # Pattern: weight_efficiency_only_load_ratio_5.0_2x_baseline
     
-    try:
-        # Debug: Print the actual design name being parsed  
-        print(f"Parsing design name: {design_name}")
+    pattern = r"weight_(\w+)_load_ratio_(\d+\.?\d*)_(.*)"
+    match = re.match(pattern, design_name)
+    
+    if match:
+        strategy_name = match.group(1)
+        load_ratio = float(match.group(2))
+        interval_suffix = match.group(3)
         
-        # Parse weight strategy, load ratio, and interval type from design name
-        # Expected format: {weight_strategy}_LR{load_ratio}_{interval_type}
-        if '_LR' in design_name:
-            parts = design_name.split('_LR')
-            weight_strategy = parts[0]  # distance_focused, throughput_focused, etc.
-            
-            remainder = parts[1]  # e.g., "3.0_baseline" or "3.0_2x_baseline"
-            
-            # More robust interval type detection
-            if remainder.endswith('_2x_baseline'):
-                load_ratio_str = remainder.replace('_2x_baseline', '')
-                interval_type = "2x Baseline"
-            elif remainder.endswith('_baseline'):
-                load_ratio_str = remainder.replace('_baseline', '')
-                interval_type = "Baseline"
-            else:
-                print(f"⚠️ Cannot parse interval type from: {remainder}")
-                continue
-                
-            try:
-                load_ratio = float(load_ratio_str)
-            except ValueError:
-                print(f"⚠️ Cannot parse load ratio from: {load_ratio_str}")
-                continue
-                
+        # Format strategy display name
+        strategy_display = strategy_name.replace('_', ' ').title()
+        
+        # Format interval type
+        if interval_suffix == "baseline":
+            interval_type = "Baseline"
+        elif interval_suffix == "2x_baseline":
+            interval_type = "2x Baseline"
         else:
-            print(f"⚠️ Design name format unexpected: {design_name}")
-            continue
+            interval_type = interval_suffix.replace("_", " ").title()
         
-        # Extract assignment time metrics
-        entity_metrics = analysis.get('entity_metrics', {})
-        orders_metrics = entity_metrics.get('orders', {})
-        assignment_time_data = orders_metrics.get('assignment_time', {})
+        return strategy_name, strategy_display, load_ratio, interval_type
+    else:
+        return None, None, None, None
+
+def format_metric_value(value, decimal_places=2):
+    """Format metric value for display."""
+    if value is None:
+        return "N/A"
+    return f"{value:.{decimal_places}f}"
+
+def format_ci_value(point_estimate, ci_bounds, decimal_places=2):
+    """Format value with confidence interval."""
+    if point_estimate is None:
+        return "N/A"
+    
+    if ci_bounds and ci_bounds[0] is not None and ci_bounds[1] is not None:
+        lower, upper = ci_bounds
+        margin = (upper - lower) / 2
+        return f"{point_estimate:.{decimal_places}f} ± {margin:.{decimal_places}f}"
+    else:
+        return f"{point_estimate:.{decimal_places}f}"
+
+# Extract metrics from analysis results
+results_table = []
+
+for design_name, analysis_result in design_analysis_results.items():
+    try:
+        # Access metrics via statistics_with_cis
+        order_metrics_ci = analysis_result['statistics_with_cis']['order_metrics']['assignment_time']
+        system_metrics_ci = analysis_result['statistics_with_cis']['system_metrics']
         
-        # Mean assignment time
-        assignment_time_mean = None
-        assignment_time_mean_ci = None
-        if assignment_time_data and 'mean' in assignment_time_data:
-            assignment_time_mean = assignment_time_data['mean'].get('point_estimate')
-            assignment_time_ci = assignment_time_data['mean'].get('confidence_interval', [None, None])
-            if assignment_time_mean and assignment_time_ci[0] is not None:
-                ci_width = (assignment_time_ci[1] - assignment_time_ci[0]) / 2
-                assignment_time_mean_ci = f"{assignment_time_mean:.1f}±{ci_width:.1f}"
-            else:
-                assignment_time_mean_ci = f"{assignment_time_mean:.1f}" if assignment_time_mean else "N/A"
+        # Extract assignment time metrics (two-level pattern)
+        mean_of_means_data = order_metrics_ci['mean_of_means']
+        std_of_means_data = order_metrics_ci['std_of_means']
+        mean_of_stds_data = order_metrics_ci['mean_of_stds']
         
-        # Within-replication standard deviation (SERVICE RELIABILITY)
-        assignment_time_std_mean = None
-        assignment_time_std_ci = None
-        if assignment_time_data and 'std' in assignment_time_data:
-            assignment_time_std_mean = assignment_time_data['std'].get('point_estimate')
-            assignment_time_std_ci_raw = assignment_time_data['std'].get('confidence_interval', [None, None])
-            if assignment_time_std_mean and assignment_time_std_ci_raw[0] is not None:
-                std_ci_width = (assignment_time_std_ci_raw[1] - assignment_time_std_ci_raw[0]) / 2
-                assignment_time_std_ci = f"{assignment_time_std_mean:.1f}±{std_ci_width:.1f}"
-            else:
-                assignment_time_std_ci = f"{assignment_time_std_mean:.1f}" if assignment_time_std_mean else "N/A"
+        mean_of_means = mean_of_means_data['point_estimate']
+        mean_of_means_ci = mean_of_means_data['confidence_interval']
+        std_of_means = std_of_means_data['point_estimate']
+        mean_of_stds = mean_of_stds_data['point_estimate']
         
-        # Extract completion rate
-        system_metrics = analysis.get('system_metrics', {})
-        completion_rate_data = system_metrics.get('system_completion_rate', {})
-        completion_rate = completion_rate_data.get('point_estimate') if completion_rate_data else None
-        completion_formatted = f"{completion_rate:.1%}" if completion_rate else "N/A"
+        # Extract system metrics (one-level pattern)
+        completion_rate_data = system_metrics_ci['system_completion_rate']
+        pairing_rate_data = system_metrics_ci['system_pairing_rate']
         
-        # Extract pairing effectiveness
-        pairing_effectiveness_data = system_metrics.get('pairing_effectiveness', {})
-        pairing_effectiveness = pairing_effectiveness_data.get('point_estimate') if pairing_effectiveness_data else None
-        pairing_formatted = f"{pairing_effectiveness:.1%}" if pairing_effectiveness else "0.0%"
+        completion_rate = completion_rate_data['point_estimate']
+        completion_rate_ci = completion_rate_data['confidence_interval']
+        pairing_rate = pairing_rate_data['point_estimate']
+        pairing_rate_ci = pairing_rate_data['confidence_interval']
         
-        table_data.append({
-            'Weight Strategy': weight_strategy.replace('_', ' ').title(),
-            'Load Ratio': f"{load_ratio:.1f}",
-            'Interval Type': interval_type,
-            'Pairing Effectiveness': pairing_formatted,
-            'Mean Assignment Time': assignment_time_mean_ci,
-            'Service Reliability (Std)': assignment_time_std_ci,
-            'Completion Rate': completion_formatted,
-            'Weight Strategy Value': weight_strategy,
-            'Load Ratio Value': load_ratio,
-            'Assignment Time Value': assignment_time_mean if assignment_time_mean else 999,
-            'Service Reliability Value': assignment_time_std_mean if assignment_time_std_mean else 0,
-            'Pairing Effectiveness Value': pairing_effectiveness if pairing_effectiveness else 0.0
+        # Parse design point information
+        strategy_name, strategy_display, load_ratio, interval_type = extract_weight_strategy_info(design_name)
+        
+        # Store results
+        results_table.append({
+            'design_name': design_name,
+            'strategy_name': strategy_name,
+            'strategy_display': strategy_display,
+            'load_ratio': load_ratio,
+            'interval_type': interval_type,
+            'mean_of_means': mean_of_means,
+            'mean_of_means_ci': mean_of_means_ci,
+            'std_of_means': std_of_means,
+            'mean_of_stds': mean_of_stds,
+            'pairing_rate': pairing_rate,
+            'pairing_rate_ci': pairing_rate_ci,
+            'completion_rate': completion_rate,
+            'completion_rate_ci': completion_rate_ci
         })
         
-    except Exception as e:
-        print(f"  ⚠️  Error extracting metrics for {design_name}: {str(e)}")
+    except KeyError as e:
+        print(f"⚠ Warning: Could not extract metrics from {design_name}: {e}")
 
-# Create and display weight strategy evidence table
-if table_data:
-    df = pd.DataFrame(table_data)
-    
-    # Define custom order for weight strategies (matching your 5 strategies)
-    weight_order = {
-        'distance_focused': 0, 
-        'throughput_focused': 1, 
-        'fairness_focused': 2, 
-        'balanced': 3, 
-        'efficiency_only': 4
-    }
-    df['Weight Strategy Sort Order'] = df['Weight Strategy Value'].map(weight_order)
-    
-    # Sort with custom weight strategy order
-    df_display = df.sort_values(['Load Ratio Value', 'Weight Strategy Sort Order', 'Interval Type'])[
-        ['Weight Strategy', 'Load Ratio', 'Interval Type', 'Pairing Effectiveness', 'Mean Assignment Time', 'Service Reliability (Std)', 'Completion Rate']
-    ]
-    
-    print("\n🎯 WEIGHT STRATEGY OPTIMIZATION EVIDENCE TABLE")
-    print("="*140)
-    print(df_display.to_string(index=False))
-    
-    print(f"\n📊 WEIGHT STRATEGY ANALYSIS:")
-    print(f"Research Questions:")
-    print(f"1. How do different priority scoring weights affect system performance across regimes?")
-    print(f"2. Are optimal weight strategies consistent across different load ratios?")
-    print(f"3. Do validation pairs show robust weight strategy performance patterns?")
-    print(f"4. Which multi-objective trade-offs provide optimal system performance?")
-    
-    # Enhanced analysis by load ratio and weight strategy
-    print(f"\n🔬 Load Ratio × Weight Strategy Analysis:")
-    
-    for load_ratio in sorted(df['Load Ratio Value'].unique()):
-        print(f"\n  Load Ratio {load_ratio:.1f}:")
-        
-        load_ratio_subset = df[df['Load Ratio Value'] == load_ratio]
-        
-        # Find optimal weight strategy for this load ratio (baseline only for clarity)
-        baseline_subset = load_ratio_subset[load_ratio_subset['Interval Type'] == 'Baseline']
-        
-        if len(baseline_subset) > 0:
-            # Sort by assignment time (lower is better)
-            optimal_baseline = baseline_subset.loc[baseline_subset['Assignment Time Value'].idxmin()]
-            
-            print(f"    Optimal Strategy (Baseline): {optimal_baseline['Weight Strategy']}")
-            print(f"      • Assignment Time: {optimal_baseline['Assignment Time Value']:.1f}min")
-            print(f"      • Pairing Effectiveness: {optimal_baseline['Pairing Effectiveness Value']:.1%}")
-            print(f"      • Completion Rate: {optimal_baseline['Completion Rate']}")
-            
-            # Show all strategies for comparison
-            print(f"    All Strategies (Baseline):")
-            for _, row in baseline_subset.sort_values('Assignment Time Value').iterrows():
-                print(f"      • {row['Weight Strategy']}: {row['Assignment Time Value']:.1f}min "
-                      f"(Effectiveness: {row['Pairing Effectiveness Value']:.1%})")
-    
-    print(f"\n📋 KEY WEIGHT STRATEGY INSIGHTS:")
-    print(f"• Which weight strategies perform optimally across different load ratios?")
-    print(f"• Are distance-focused strategies better in high-stress regimes?")
-    print(f"• Do throughput-focused strategies provide capacity benefits?")
-    print(f"• How does fairness consideration affect overall system performance?")
-    print(f"• Are balanced strategies consistently competitive across regimes?")
-    
-    print(f"\n✅ WEIGHT STRATEGY ANALYSIS COMPLETE!")
-    print(f"✓ Weight strategy configurations tested across load ratios")
-    print(f"✓ Validation pairs analyzed for robustness")
-    print(f"✓ Weight strategy × regime interaction effects revealed")
-    print(f"✓ Multi-objective optimization insights for priority scoring")
+# Sort and display results table
+# Define strategy order for sorting
+strategy_order = {
+    'distance_focused': 0, 
+    'throughput_focused': 1, 
+    'fairness_focused': 2, 
+    'balanced': 3, 
+    'efficiency_only': 4
+}
+results_table.sort(key=lambda x: (x['load_ratio'], strategy_order.get(x['strategy_name'], 99), x['interval_type']))
 
-else:
-    print("⚠️  No valid data available for weight strategy table")
+print("🎯 WEIGHT STRATEGY OPTIMIZATION: MULTI-OBJECTIVE TRADE-OFF ANALYSIS")
+print("=" * 160)
+print(f"{'Weight':>18} {'Load':>5} {'Interval':>12} {'Pairing':>12} {'Mean of Means':>20} {'Std of':>10} {'Mean of':>10} {'Completion Rate':>25}")
+print(f"{'Strategy':>18} {'Ratio':>5} {'Type':>12} {'Rate':>12} {'(Assignment Time)':>20} {'Means':>10} {'Stds':>10} {'(with 95% CI)':>25}")
+print("=" * 160)
 
-print(f"\n" + "="*80)
-print("WEIGHT STRATEGY OPTIMIZATION STUDY COMPLETE")
-print("="*80)
-print("✓ Research Questions: Weight Strategy × Load Ratio × Absolute Scale interactions")
-print("✓ Method: Multiple weight configs + Validation pairs + Fixed moderate pairing thresholds")
-print("✓ Evidence: Multi-objective trade-offs + Context-dependent optimization strategies")
-print("✓ Next: Dynamic weight adjustment algorithms based on optimal strategies")
-# %%
+for result in results_table:
+    strategy_display = result['strategy_display'][:18] if result['strategy_display'] else "N/A"
+    load_ratio = format_metric_value(result['load_ratio'], 1) if result['load_ratio'] else "N/A"
+    interval_type = result['interval_type'][:12] if result['interval_type'] else "N/A"
+    
+    # Pairing rate (percentage with CI)
+    if result['pairing_rate'] is not None:
+        pairing_pct = result['pairing_rate'] * 100
+        if result['pairing_rate_ci'] and result['pairing_rate_ci'][0] is not None:
+            ci_lower = result['pairing_rate_ci'][0] * 100
+            ci_upper = result['pairing_rate_ci'][1] * 100
+            margin = (ci_upper - ci_lower) / 2
+            pairing_rate_formatted = f"{pairing_pct:.1f}% ± {margin:.1f}"
+        else:
+            pairing_rate_formatted = f"{pairing_pct:.1f}%"
+    else:
+        pairing_rate_formatted = "N/A"
+    
+    # Assignment time metrics
+    mean_of_means_formatted = format_ci_value(
+        result['mean_of_means'], 
+        result['mean_of_means_ci'], 
+        decimal_places=2
+    )
+    std_of_means_formatted = format_metric_value(result['std_of_means'], 2)
+    mean_of_stds_formatted = format_metric_value(result['mean_of_stds'], 2)
+    
+    # Completion rate (percentage with CI)
+    if result['completion_rate'] is not None:
+        comp_pct = result['completion_rate'] * 100
+        if result['completion_rate_ci'] and result['completion_rate_ci'][0] is not None:
+            ci_lower = result['completion_rate_ci'][0] * 100
+            ci_upper = result['completion_rate_ci'][1] * 100
+            margin = (ci_upper - ci_lower) / 2
+            completion_rate_formatted = f"{comp_pct:.1f}% ± {margin:.1f}"
+        else:
+            completion_rate_formatted = f"{comp_pct:.1f}%"
+    else:
+        completion_rate_formatted = "N/A"
+    
+    print(f"{strategy_display:>18} {load_ratio:>5} {interval_type:>12} {pairing_rate_formatted:>12} "
+          f"{mean_of_means_formatted:>20} {std_of_means_formatted:>10} {mean_of_stds_formatted:>10} "
+          f"{completion_rate_formatted:>25}")
+
+print("=" * 160)
+print(f"✓ Extracted and displayed metrics from {len(results_table)} design points")
+print("Results stored in 'results_table' for further analysis")
+print("\nColumn Interpretations:")
+print("• Weight Strategy: Multi-objective optimization approach for priority scoring")
+print("• Pairing Rate: Percentage of cohort orders that were paired (with 95% CI)")
+print("• Mean of Means: Average assignment time across replications (with 95% CI)")
+print("• Std of Means: System consistency between replications (lower = more consistent)")
+print("• Mean of Stds: Average within-replication volatility (service predictability)")
+print("• Completion Rate: Proportion of orders successfully completed (with 95% CI)")
+print("\nResearch Questions:")
+print("1. How do weight strategies affect performance across different load ratios?")
+print("2. Are distance-focused strategies better in high-stress regimes?")
+print("3. Do throughput-focused strategies provide capacity benefits?")
+print("4. How does fairness consideration affect overall system performance?")
+print("5. Are balanced strategies consistently competitive across regimes?")
