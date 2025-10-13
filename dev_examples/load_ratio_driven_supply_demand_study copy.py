@@ -57,7 +57,7 @@ print("INFRASTRUCTURE SETUP")
 print("="*50)
 
 structural_config = StructuralConfig(
-    delivery_area_size=10,
+    delivery_area_size=5,
     num_restaurants=10,
     driver_speed=0.5
 )
@@ -413,7 +413,7 @@ for design_name, analysis_result in design_analysis_results.items():
     except Exception as e:
         print(f"✗ Error processing {design_name}: {e}")
 
-# Sort and display results table
+# Sort and display results table (Original ordering: by load ratio, then interval type)
 results_table.sort(key=lambda x: (x['load_ratio'], x['interval_type']))
 
 print("🎯 KEY PERFORMANCE METRICS: ASSIGNMENT TIME & COMPLETION RATE")
@@ -454,4 +454,56 @@ print("• Mean of Means: Average assignment time across replications")
 print("• Std of Means: System consistency between replications (lower = more consistent)")
 print("• Mean of Stds: Average volatility within replications (service predictability)")
 print("• Completion Rate: Proportion of orders successfully completed (with 95% CI)")
+
+# ==================================================================================
+# ALTERNATIVE TABLE: GROUPED BY INTERVAL TYPE
+# ==================================================================================
+
+print(f"\n\n{'='*80}")
+print("ALTERNATIVE VIEW: GROUPED BY INTERVAL TYPE")
+print(f"{'='*80}\n")
+
+# Sort by interval type first, then load ratio
+results_table_by_interval = sorted(results_table, key=lambda x: (x['interval_type'], x['load_ratio']))
+
+print("🎯 KEY PERFORMANCE METRICS: GROUPED BY INTERVAL TYPE")
+print("=" * 120)
+print(f"{'Load':>5} {'Interval':>12} {'Mean of Means':>20} {'Std of':>10} {'Mean of':>10} {'Completion Rate':>25}")
+print(f"{'Ratio':>5} {'Type':>12} {'(Assignment Time)':>20} {'Means':>10} {'Stds':>10} {'(with 95% CI)':>25}")
+print("=" * 120)
+
+current_interval_type = None
+for result in results_table_by_interval:
+    # Add separator when interval type changes
+    if current_interval_type is not None and result['interval_type'] != current_interval_type:
+        print("-" * 120)
+    current_interval_type = result['interval_type']
+    
+    load_ratio = format_metric_value(result['load_ratio'], 1) if result['load_ratio'] else "N/A"
+    interval_type = result['interval_type'][:12]
+    
+    # Assignment time metrics
+    mean_of_means_formatted = format_ci_value(
+        result['mean_of_means'], 
+        result['mean_of_means_ci'], 
+        decimal_places=2
+    )
+    std_of_means_formatted = format_metric_value(result['std_of_means'], 2)
+    mean_of_stds_formatted = format_metric_value(result['mean_of_stds'], 2)
+    
+    # Completion rate with CI
+    completion_rate_formatted = format_ci_value(
+        result['completion_rate'],
+        result['completion_rate_ci'],
+        decimal_places=3
+    )
+    
+    print(f"{load_ratio:>5} {interval_type:>12} {mean_of_means_formatted:>20} "
+          f"{std_of_means_formatted:>10} {mean_of_stds_formatted:>10} "
+          f"{completion_rate_formatted:>25}")
+
+print("=" * 120)
+print("✓ Alternative view facilitates within-interval-type pattern observation")
+print("✓ Separator lines indicate transition between different interval types")
 # %%
+

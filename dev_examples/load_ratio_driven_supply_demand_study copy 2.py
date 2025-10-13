@@ -143,7 +143,7 @@ print("EXPERIMENT CONFIGURATION")
 print("="*50)
 
 experiment_config = ExperimentConfig(
-    simulation_duration=2000,  # Extended duration for regime pattern analysis
+    simulation_duration=2500,  # Extended duration for regime pattern analysis
     num_replications=5,        # Multiple replications for statistical robustness
     master_seed=42,
     collection_interval=1.0
