@@ -9,7 +9,7 @@ analytical consistency.
 
 Key Design Principles:
 - Self-contained: Owns all physical environment components
-- Deterministic: Same structural_config + master_seed = identical infrastructure  
+- Deterministic: Same structural_config + structural_seed = identical infrastructure  
 - Reusable: Can be shared across multiple operational configurations
 - Analysis-ready: Provides access for comprehensive infrastructure analysis
 """
@@ -37,7 +37,7 @@ class Infrastructure:
         
         Args:
             structural_config: StructuralConfig defining area size, restaurant count, etc.
-            master_seed: Master seed for deterministic infrastructure generation
+            structural_seed: structural seed for deterministic infrastructure generation
         """
         self.logger = get_logger("infrastructure.core")
         
@@ -183,7 +183,7 @@ class Infrastructure:
             'area_size': self.structural_config.delivery_area_size,
             'num_restaurants': self.structural_config.num_restaurants,
             'driver_speed': self.structural_config.driver_speed,
-            'master_seed': self.master_seed
+            'structural_seed': self.structural_seed
         }
     
     def is_compatible_with(self, other_infrastructure):
@@ -211,15 +211,15 @@ class Infrastructure:
                 f"area={basic_chars['area_size']}x{basic_chars['area_size']}km, "
                 f"restaurants={basic_chars['restaurant_count']}, "
                 f"density={basic_chars['restaurant_density']:.3f}/km², "
-                f"seed={self.master_seed}, "
+                f"seed={self.structural_seed}, "
                 f"{analysis_status})")
     
     def __repr__(self):
         """Technical representation for debugging."""
-        return f"Infrastructure(structural_config={self.structural_config}, master_seed={self.master_seed})"
+        return f"Infrastructure(structural_config={self.structural_config}, structural_seed={self.structural_seed})"
 
 
-def create_infrastructure(structural_config, master_seed):
+def create_infrastructure(structural_config, structural_seed):
     """
     Factory function for creating Infrastructure instances.
     
@@ -228,9 +228,9 @@ def create_infrastructure(structural_config, master_seed):
     
     Args:
         structural_config: StructuralConfig defining physical environment
-        master_seed: Master seed for deterministic generation
+        structural_seed: structural seed for deterministic generation
         
     Returns:
         Infrastructure: Complete infrastructure instance ready for use/analysis
     """
-    return Infrastructure(structural_config, master_seed)
+    return Infrastructure(structural_config, structural_seed)
