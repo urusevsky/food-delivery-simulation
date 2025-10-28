@@ -245,10 +245,9 @@ for infra_config in infrastructure_configs:
             structural_seed
         )
         
-        # Analyze infrastructure (expensive - only once per infrastructure)
+        # Analyze infrastructure
         analyzer = InfrastructureAnalyzer(infrastructure)
-        scoring_config = ScoringConfig()  # Use defaults or customize
-        analysis_results = analyzer.analyze_complete_infrastructure(scoring_config)
+        analysis_results = analyzer.analyze_complete_infrastructure()
         
         print(f"  ✓ Infrastructure analyzed")
         print(f"    • Typical distance: {analysis_results['typical_distance']:.3f}km")
