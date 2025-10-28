@@ -363,7 +363,7 @@ for i, (design_name, replication_results) in enumerate(study_results.items(), 1)
 print(f"\n✓ Analysis pipeline complete for all {len(design_analysis_results)} design points")
 print(f"✓ Results stored in 'design_analysis_results'")
 
-# %% CELL 14: Extract and Present Key Metrics
+# %% CELL 14: Extract and Present Key Metrics (TABLE FORMAT)
 print("\n" + "="*80)
 print("KEY PERFORMANCE METRICS EXTRACTION AND PRESENTATION")
 print("="*80)
@@ -372,7 +372,6 @@ import re
 
 def extract_ratio_and_type(design_name):
     """Extract arrival interval ratio and interval type from design point name."""
-    # Pattern: ratio_3.0_baseline or ratio_3.0_2x_baseline
     match = re.match(r'ratio_([\d.]+)_(baseline|2x_baseline)', design_name)
     if match:
         ratio = float(match.group(1))
@@ -380,7 +379,7 @@ def extract_ratio_and_type(design_name):
         return ratio, interval_type
     return None, None
 
-# Extract key metrics for each design point
+# Extract comprehensive metrics for table
 metrics_data = []
 
 for design_name, analysis_result in design_analysis_results.items():
@@ -388,108 +387,112 @@ for design_name, analysis_result in design_analysis_results.items():
     if ratio is None:
         continue
     
-    # Extract order metrics
-    order_metrics = analysis_result.get('order_metrics', {})
-    assignment_time = order_metrics.get('assignment_time_statistics', {})
+    stats_with_cis = analysis_result.get('statistics_with_cis', {})
     
-    # Extract system metrics
-    system_metrics = analysis_result.get('system_metrics', {})
-    completion_rate = system_metrics.get('completion_rate_statistics', {})
+    # Extract assignment time statistics (nested under order_metrics)
+    order_metrics = stats_with_cis.get('order_metrics', {})
+    assignment_time = order_metrics.get('assignment_time', {})
     
-    # Get mean values with confidence intervals
+    # Mean of means with CI
+    mean_of_means = assignment_time.get('mean_of_means', {})
+    mom_estimate = mean_of_means.get('point_estimate', 0)
+    mom_ci = mean_of_means.get('confidence_interval', [0, 0])
+    mom_ci_width = (mom_ci[1] - mom_ci[0]) / 2 if mom_ci[0] is not None else 0
+    
+    # Std of means
+    std_of_means = assignment_time.get('std_of_means', {})
+    som_estimate = std_of_means.get('point_estimate', 0)
+    
+    # Mean of stds
+    mean_of_stds = assignment_time.get('mean_of_stds', {})
+    mos_estimate = mean_of_stds.get('point_estimate', 0)
+    
+    # Extract completion rate (flat under system_metrics)
+    system_metrics = stats_with_cis.get('system_metrics', {})
+    completion_rate = system_metrics.get('system_completion_rate', {})
+    
+    comp_estimate = completion_rate.get('point_estimate', 0)
+    comp_ci = completion_rate.get('confidence_interval', [0, 0])
+    comp_ci_width = (comp_ci[1] - comp_ci[0]) / 2 if comp_ci[0] is not None else 0
+    
     metrics_data.append({
-        'design_name': design_name,
         'ratio': ratio,
         'interval_type': interval_type,
-        'assignment_time_mean': assignment_time.get('mean', {}).get('experiment_mean'),
-        'assignment_time_ci_lower': assignment_time.get('mean', {}).get('ci_lower'),
-        'assignment_time_ci_upper': assignment_time.get('mean', {}).get('ci_upper'),
-        'completion_rate_mean': completion_rate.get('mean', {}).get('experiment_mean'),
-        'completion_rate_ci_lower': completion_rate.get('mean', {}).get('ci_lower'),
-        'completion_rate_ci_upper': completion_rate.get('mean', {}).get('ci_upper'),
+        'mom_estimate': mom_estimate,
+        'mom_ci_width': mom_ci_width,
+        'som_estimate': som_estimate,
+        'mos_estimate': mos_estimate,
+        'comp_estimate': comp_estimate,
+        'comp_ci_width': comp_ci_width,
     })
 
-# Create summary table
-import pandas as pd
-df_metrics = pd.DataFrame(metrics_data)
-df_metrics = df_metrics.sort_values(['ratio', 'interval_type'])
+# Sort by ratio then interval type
+metrics_data.sort(key=lambda x: (x['ratio'], x['interval_type']))
 
-print("\n📊 KEY PERFORMANCE METRICS SUMMARY")
-print("="*80)
-print("\nAssignment Time (minutes) with 95% CI:")
-print("-"*80)
+# Print formatted table
+print("\n🎯 KEY PERFORMANCE METRICS: ASSIGNMENT TIME & COMPLETION RATE")
+print("="*136)
+print(" Ratio    Interval        Mean of Means     Std of    Mean of           Completion Rate")
+print("              Type    (Assignment Time)      Means       Stds             (with 95% CI)")
+print("="*136)
 
-for ratio in sorted(df_metrics['ratio'].unique()):
-    print(f"\nRatio {ratio:.1f} (Driver intervals {ratio:.1f}× order intervals):")
-    ratio_data = df_metrics[df_metrics['ratio'] == ratio]
+for row in metrics_data:
+    ratio = row['ratio']
+    interval_display = "2x Baseline" if row['interval_type'] == '2x_baseline' else "Baseline"
     
-    for _, row in ratio_data.iterrows():
-        mean = row['assignment_time_mean']
-        ci_lower = row['assignment_time_ci_lower']
-        ci_upper = row['assignment_time_ci_upper']
-        
-        print(f"  {row['interval_type']:12s}: {mean:6.2f} min  [{ci_lower:6.2f}, {ci_upper:6.2f}]")
-
-print("\n" + "="*80)
-print("\nCompletion Rate (%) with 95% CI:")
-print("-"*80)
-
-for ratio in sorted(df_metrics['ratio'].unique()):
-    print(f"\nRatio {ratio:.1f}:")
-    ratio_data = df_metrics[df_metrics['ratio'] == ratio]
+    # Assignment time: mean ± CI_width
+    mom_str = f"{row['mom_estimate']:5.2f} ± {row['mom_ci_width']:5.2f}"
+    som_str = f"{row['som_estimate']:5.2f}"
+    mos_str = f"{row['mos_estimate']:5.2f}"
     
-    for _, row in ratio_data.iterrows():
-        mean = row['completion_rate_mean'] * 100  # Convert to percentage
-        ci_lower = row['completion_rate_ci_lower'] * 100
-        ci_upper = row['completion_rate_ci_upper'] * 100
-        
-        print(f"  {row['interval_type']:12s}: {mean:5.2f}%  [{ci_lower:5.2f}%, {ci_upper:5.2f}%]")
-
-print("\n" + "="*80)
-print("✓ Metric extraction complete")
-print("✓ Data available in 'df_metrics' DataFrame for further analysis")
-
-# %% CELL 15: Validation Pair Comparison
-print("\n" + "="*80)
-print("VALIDATION PAIR COMPARISON")
-print("="*80)
-print("\nTesting hypothesis: Do baseline and 2x_baseline show similar regime behavior?")
-print("="*80)
-
-for ratio in sorted(df_metrics['ratio'].unique()):
-    ratio_data = df_metrics[df_metrics['ratio'] == ratio]
-    baseline = ratio_data[ratio_data['interval_type'] == 'baseline'].iloc[0]
-    two_x = ratio_data[ratio_data['interval_type'] == '2x_baseline'].iloc[0]
+    # Completion rate: rate ± CI_width
+    comp_rate = row['comp_estimate']
+    comp_ci = row['comp_ci_width']
+    comp_str = f"{comp_rate:.3f} ± {comp_ci:.3f}"
     
-    # Compare assignment times
-    baseline_time = baseline['assignment_time_mean']
-    two_x_time = two_x['assignment_time_mean']
-    time_diff = abs(baseline_time - two_x_time)
-    time_pct_diff = (time_diff / baseline_time) * 100
-    
-    # Compare completion rates
-    baseline_comp = baseline['completion_rate_mean'] * 100
-    two_x_comp = two_x['completion_rate_mean'] * 100
-    comp_diff = abs(baseline_comp - two_x_comp)
-    
-    print(f"\nRatio {ratio:.1f}:")
-    print(f"  Assignment Time Difference: {time_diff:.2f} min ({time_pct_diff:.1f}%)")
-    print(f"  Completion Rate Difference: {comp_diff:.2f}%")
-    
-    # Simple interpretation
-    if time_pct_diff < 10 and comp_diff < 5:
-        print(f"  → Similar regime behavior (validates ratio hypothesis)")
-    else:
-        print(f"  → Different behavior (absolute scale matters)")
+    print(f"  {ratio:3.1f}  {interval_display:12s}     {mom_str:>16s}    {som_str:>7s}    {mos_str:>7s}          {comp_str:>15s}")
 
-print("\n" + "="*80)
-print("✓ Validation pair analysis complete")
+print("="*136)
 
-print("\n" + "="*80)
-print("ARRIVAL INTERVAL RATIO STUDY COMPLETE")
-print("="*80)
-print("\nKey findings:")
-print(f"✓ Tested {len(target_arrival_interval_ratios)} arrival interval ratios")
-print(f"✓ Each ratio validated with baseline vs 2x_baseline pairs")
-print(f"✓ Analyzed {len(design_points)} design points × {experiment_config.num_replications} replications")
-print(f"✓ Results show relationship between arrival interval ratio and system performance")
+# Alternative view grouped by interval type
+print("\n\nAlternative table view:")
+print("🎯 KEY PERFORMANCE METRICS: GROUPED BY INTERVAL TYPE")
+print("="*136)
+print(" Ratio    Interval        Mean of Means     Std of    Mean of           Completion Rate")
+print("              Type    (Assignment Time)      Means       Stds             (with 95% CI)")
+print("="*136)
+
+# Group by interval type
+baseline_data = [d for d in metrics_data if d['interval_type'] == '2x_baseline']
+for row in baseline_data:
+    ratio = row['ratio']
+    interval_display = "2x Baseline"
+    
+    mom_str = f"{row['mom_estimate']:5.2f} ± {row['mom_ci_width']:5.2f}"
+    som_str = f"{row['som_estimate']:5.2f}"
+    mos_str = f"{row['mos_estimate']:5.2f}"
+    comp_str = f"{row['comp_estimate']:.3f} ± {row['comp_ci_width']:.3f}"
+    
+    print(f"  {ratio:3.1f}  {interval_display:12s}     {mom_str:>16s}    {som_str:>7s}    {mos_str:>7s}          {comp_str:>15s}")
+
+print("-"*136)
+
+baseline_data = [d for d in metrics_data if d['interval_type'] == 'baseline']
+for row in baseline_data:
+    ratio = row['ratio']
+    interval_display = "Baseline"
+    
+    mom_str = f"{row['mom_estimate']:5.2f} ± {row['mom_ci_width']:5.2f}"
+    som_str = f"{row['som_estimate']:5.2f}"
+    mos_str = f"{row['mos_estimate']:5.2f}"
+    comp_str = f"{row['comp_estimate']:.3f} ± {row['comp_ci_width']:.3f}"
+    
+    print(f"  {ratio:3.1f}  {interval_display:12s}     {mom_str:>16s}    {som_str:>7s}    {mos_str:>7s}          {comp_str:>15s}")
+
+print("="*136)
+
+print("\n✓ Metric extraction complete")
+print("✓ Compare with original load_ratio study to verify exact reproduction")
+
+
+# %%
