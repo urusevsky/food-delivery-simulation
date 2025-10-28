@@ -117,17 +117,17 @@ target_arrival_interval_ratios = [2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7
 
 # Fixed pairing configuration (consistent across all design points)
 FIXED_PAIRING_CONFIG = {
-    'pairing_enabled': True,
-    'restaurants_proximity_threshold': 4.0,
-    'customers_proximity_threshold': 3.0
+    'pairing_enabled': False,
+    'restaurants_proximity_threshold': None,
+    'customers_proximity_threshold': None
 }
 
 # Fixed service duration configuration
 FIXED_SERVICE_CONFIG = {
-    'mean_service_duration': 120,
+    'mean_service_duration': 100,
     'service_duration_std_dev': 60,
     'min_service_duration': 30,
-    'max_service_duration': 240
+    'max_service_duration': 200
 }
 
 # Build operational configs
