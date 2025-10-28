@@ -31,7 +31,7 @@ class Infrastructure:
     experimental configurations that vary only operational parameters.
     """
     
-    def __init__(self, structural_config, master_seed):
+    def __init__(self, structural_config, structural_seed):
         """
         Initialize Infrastructure with deterministic generation.
         
@@ -43,10 +43,10 @@ class Infrastructure:
         
         # Store configuration for reference and validation
         self.structural_config = structural_config
-        self.master_seed = master_seed
+        self.structural_seed = structural_seed  # CHANGED
         
         # Initialize structural RNG for deterministic generation
-        self.structural_rng = StructuralRNGManager(master_seed)
+        self.structural_rng = StructuralRNGManager(structural_seed)  # CHANGED
         
         # Initialize restaurant repository
         self.restaurant_repository = RestaurantRepository()

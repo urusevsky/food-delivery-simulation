@@ -166,8 +166,8 @@ class SimulationRunner:
         self.event_dispatcher = EventDispatcher()
         
         # 3. Create fresh operational RNG (different seed per replication)
-        operational_base_seed = self.config.master_seed
-        self.operational_rng = OperationalRNGManager(operational_base_seed, replication_number)
+        operational_master_seed = self.config.operational_master_seed  # CHANGED
+        self.operational_rng = OperationalRNGManager(operational_master_seed, replication_number)  # CHANGED
         
         # Log sample seeds to verify replication independence
         sample_seeds = self.operational_rng.get_sample_stream_seeds()

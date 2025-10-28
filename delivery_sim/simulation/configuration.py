@@ -69,19 +69,19 @@ class OperationalConfig:
 
 
 class ExperimentConfig:
-    def __init__(self, simulation_duration, num_replications, master_seed, 
-                 collection_interval=1.0):  # Add this parameter with new default
+    def __init__(self, simulation_duration, num_replications, operational_master_seed, 
+                 collection_interval=1.0):
         self.simulation_duration = simulation_duration
         self.num_replications = num_replications
-        self.master_seed = master_seed
-        self.collection_interval = collection_interval  # Add this
+        self.operational_master_seed = operational_master_seed  # CHANGED
+        self.collection_interval = collection_interval
 
     def __str__(self):
         return (f"ExperimentConfig("
                 f"simulation_duration={self.simulation_duration}min, "
                 f"replications={self.num_replications}, "
-                f"master_seed={self.master_seed}, "
-                f"collection_interval={self.collection_interval}min)")  # Add this
+                f"operational_master_seed={self.operational_master_seed}, "  # CHANGED
+                f"collection_interval={self.collection_interval}min)")
     
 
 class LoggingConfig:
