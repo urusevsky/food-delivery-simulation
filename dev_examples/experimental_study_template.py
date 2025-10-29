@@ -5,24 +5,29 @@ TEMPLATE: Flexible Experimental Study Design for Food Delivery Simulation
 This template supports varying:
 - Infrastructure parameters (delivery area size, restaurant count, layout seeds)
 - Operational parameters (arrival rates, pairing configs, service durations, etc.)
-- Both simultaneously (interaction studies)
+- Scoring parameters (priority scoring weights)
+- All combinations (interaction studies)
 
 Design Philosophy:
 - Single configuration = list with 1 element (no special cases)
-- Uniform nested loop structure for all study types
+- Pre-create infrastructure instances for reviewability
+- Uniform nested loop structure for design point creation
 - Clear cell-based workflow for reproducibility
 - Generic placeholders - adapt for your specific research question
 
 Usage:
 1. Copy this template for your specific research question
-2. Fill in infrastructure and operational configurations
-3. Run uniform preprocessing steps (Steps 7-10)
-4. Implement custom analysis/plotting (Steps 11+) for your metrics
+2. Fill in configurations (Cells 4-5, 7-8)
+3. Create infrastructure instances (Cell 6)
+4. Review if needed (Cell 6.5)
+5. Run uniform preprocessing steps (Cells 9-14)
+6. Implement custom analysis (Cells 15+)
 
 Study Type Examples:
-- Infrastructure study: Multiple infrastructure configs × 1 operational config
-- Operational study: 1 infrastructure config × Multiple operational configs  
-- Interaction study: Multiple infrastructure configs × Multiple operational configs
+- Infrastructure study: Multiple infrastructure configs × 1 operational × 1 scoring
+- Operational study: 1 infrastructure config × Multiple operational × 1 scoring  
+- Weight study: 1 infrastructure × 1 operational × Multiple scoring
+- Interaction study: Multiple across any combination
 """
 
 # %% CELL 1: Enable Autoreload (Development Convenience)
@@ -133,7 +138,11 @@ infrastructure_configs = [
 # ]
 
 print(f"✓ Defined {len(infrastructure_configs)} infrastructure configuration(s)")
-
+for config in infrastructure_configs:
+    struct_config = config['config']
+    density = struct_config.num_restaurants / (struct_config.delivery_area_size ** 2)
+    print(f"  • {config['name']}: {struct_config.num_restaurants} restaurants, "
+          f"area={struct_config.delivery_area_size}km, density={density:.4f}/km²")
 
 # %% CELL 5: Structural Seeds (Layout Variation)
 """
@@ -154,7 +163,122 @@ structural_seeds = [42]
 
 print(f"✓ Structural seeds: {structural_seeds} ({len(structural_seeds)} layout(s) per infrastructure)")
 
-# %% CELL 6: Operational Configuration(s)
+# %% CELL 6: Create Infrastructure Instances
+"""
+Create and analyze all infrastructure instances.
+
+This allows reviewing infrastructures (e.g., visualizing layouts) 
+before proceeding to design point creation.
+"""
+
+infrastructure_instances = []
+
+print("\n" + "="*50)
+print("INFRASTRUCTURE INSTANCES CREATION")
+print("="*50)
+
+for infra_config in infrastructure_configs:
+    for structural_seed in structural_seeds:
+        
+        # Create infrastructure instance
+        instance_name = f"{infra_config['name']}_seed{structural_seed}"
+        print(f"\n📍 Creating infrastructure: {instance_name}")
+        
+        infrastructure = Infrastructure(
+            infra_config['config'],
+            structural_seed
+        )
+        
+        # Analyze infrastructure
+        analyzer = InfrastructureAnalyzer(infrastructure)
+        analysis_results = analyzer.analyze_complete_infrastructure()
+        
+        # Store instance with metadata
+        infrastructure_instances.append({
+            'name': instance_name,
+            'infrastructure': infrastructure,
+            'analysis': analysis_results,
+            'config_name': infra_config['name'],
+            'seed': structural_seed
+        })
+        
+        print(f"  ✓ Infrastructure created and analyzed")
+        print(f"    • Typical distance: {analysis_results['typical_distance']:.3f}km")
+        print(f"    • Restaurant density: {analysis_results['restaurant_density']:.4f}/km²")
+
+print(f"\n{'='*50}")
+print(f"✓ Created {len(infrastructure_instances)} infrastructure instance(s)")
+print(f"✓ Breakdown: {len(infrastructure_configs)} configs × {len(structural_seeds)} seeds")
+print(f"{'='*50}")
+
+# %% CELL 6.5: [OPTIONAL] Review Infrastructure Instances
+"""
+Optional cell for reviewing/visualizing infrastructures before proceeding.
+
+Uncomment and run if you want to inspect specific instances.
+Examples:
+- Visualize restaurant layouts
+- Review typical distances
+- Check spatial distributions
+"""
+
+# Example: Visualize first infrastructure
+# from delivery_sim.infrastructure.infrastructure_visualizer import visualize_infrastructure
+# visualize_infrastructure(infrastructure_instances[0]['infrastructure'])
+
+# Example: Review typical distances across all instances
+# print("\n📊 Infrastructure Analysis Summary:")
+# for instance in infrastructure_instances:
+#     print(f"  {instance['name']:20s}: typical_distance={instance['analysis']['typical_distance']:.3f}km")
+
+# Example: Visualize specific instance by name
+# target_instance = next(i for i in infrastructure_instances if i['name'] == 'infra_A_seed42')
+# visualize_infrastructure(target_instance['infrastructure'])
+
+# %% CELL 7: Scoring Configuration(s)
+"""
+Define scoring configuration(s) for priority scoring system.
+
+MOST STUDIES: Single baseline configuration
+WEIGHT STRATEGY STUDY: Multiple configurations to compare
+
+If studying weight strategies, define multiple configs here.
+Otherwise, use single default config.
+"""
+
+# For most studies - single default config
+scoring_configs = [
+    {
+        'name': 'baseline',
+        'config': ScoringConfig()  # Uses defaults
+    }
+]
+
+# For weight strategy studies - multiple configs
+# scoring_configs = [
+#     {
+#         'name': 'distance_focused',
+#         'config': ScoringConfig(
+#             weight_distance=0.5,
+#             weight_throughput=0.3,
+#             weight_fairness=0.2
+#         )
+#     },
+#     {
+#         'name': 'throughput_focused',
+#         'config': ScoringConfig(
+#             weight_distance=0.3,
+#             weight_throughput=0.5,
+#             weight_fairness=0.2
+#         )
+#     },
+# ]
+
+print(f"✓ Defined {len(scoring_configs)} scoring configuration(s)")
+for config in scoring_configs:
+    print(f"  • {config['name']}")
+
+# %% CELL 8: Operational Configuration(s)
 """
 Define operational configuration(s) to test.
 
@@ -217,16 +341,21 @@ operational_configs = [
 ]
 
 print(f"✓ Defined {len(operational_configs)} operational configuration(s)")
+for config in operational_configs:
+    op_config = config['config']
+    arrival_interval_ratio = op_config.mean_driver_inter_arrival_time / op_config.mean_order_inter_arrival_time
+    print(f"  • {config['name']}: arrival_interval_ratio={arrival_interval_ratio:.2f}, "
+          f"pairing={'enabled' if op_config.pairing_enabled else 'disabled'}")
 
-
-# %% CELL 7: Design Points Creation (UNIVERSAL STRUCTURE)
+# %% CELL 9: Design Point Creation (SIMPLIFIED)
 """
 Create design points from all combinations of:
-- Infrastructure configurations
-- Structural seeds (layout variations)
+- Infrastructure instances (pre-created)
 - Operational configurations
+- Scoring configurations
 
-Triple nested loop - same structure for all study types.
+The triple nested loop structure is universal across all study types.
+For most studies, one or more lists have only 1 element.
 """
 
 design_points = {}
@@ -235,36 +364,22 @@ print("\n" + "="*50)
 print("DESIGN POINTS CREATION")
 print("="*50)
 
-for infra_config in infrastructure_configs:
-    for structural_seed in structural_seeds:
-        
-        # Create infrastructure instance
-        print(f"\n📍 Creating infrastructure: {infra_config['name']}, seed={structural_seed}")
-        infrastructure = Infrastructure(
-            infra_config['config'],
-            structural_seed
-        )
-        
-        # Analyze infrastructure
-        analyzer = InfrastructureAnalyzer(infrastructure)
-        analysis_results = analyzer.analyze_complete_infrastructure()
-        
-        print(f"  ✓ Infrastructure analyzed")
-        print(f"    • Typical distance: {analysis_results['typical_distance']:.3f}km")
-        print(f"    • Restaurant density: {analysis_results['restaurant_density']:.4f}/km²")
-        
-        # Create design point for each operational configuration
-        for op_config in operational_configs:
+for infra_instance in infrastructure_instances:
+    for op_config in operational_configs:
+        for scoring_config_dict in scoring_configs:
             
             # Generate unique design point name
-            # Format: {infra_name}_seed{seed}_{op_name}
-            design_name = f"{infra_config['name']}_seed{structural_seed}_{op_config['name']}"
+            # For single scoring config studies:
+            design_name = f"{infra_instance['name']}_{op_config['name']}"
+            
+            # For weight strategy studies, include scoring config in name:
+            # design_name = f"{infra_instance['name']}_{op_config['name']}_{scoring_config_dict['name']}"
             
             # Create design point
             design_points[design_name] = DesignPoint(
-                infrastructure=infrastructure,
+                infrastructure=infra_instance['infrastructure'],
                 operational_config=op_config['config'],
-                scoring_config=scoring_config,
+                scoring_config=scoring_config_dict['config'],
                 name=design_name
             )
             
@@ -272,11 +387,11 @@ for infra_config in infrastructure_configs:
 
 print(f"\n{'='*50}")
 print(f"✓ Created {len(design_points)} design points")
-print(f"✓ Breakdown: {len(infrastructure_configs)} infra × "
-      f"{len(structural_seeds)} seeds × {len(operational_configs)} operational")
+print(f"✓ Breakdown: {len(infrastructure_instances)} infra × "
+      f"{len(operational_configs)} operational × {len(scoring_configs)} scoring")
 print(f"{'='*50}")
 
-# %% CELL 8: Experiment Configuration
+# %% CELL 10: Experiment Configuration
 """
 Define experiment execution parameters.
 
@@ -305,7 +420,7 @@ print(f"\n✓ Execution plan:")
 print(f"  • Total simulation runs: {total_runs}")
 print(f"  • Estimated time: ~{estimated_time:.0f} seconds (~{estimated_time/60:.1f} minutes)")
 
-# %% CELL 9: Execute Experimental Study
+# %% CELL 11: Execute Experimental Study
 """
 Run all design points through the experimental runner.
 Progress logged to console.
@@ -325,7 +440,7 @@ print(f"✓ Executed {len(design_points)} design points")
 print(f"✓ Total simulations: {total_runs}")
 print(f"✓ Results structure: dict[design_point_name] → list[replication_results]")
 
-# %% CELL 10: Time Series Data Processing for Warmup Analysis
+# %% CELL 12: Time Series Data Processing for Warmup Analysis
 """
 UNIFORM STEP: Extract time series data for warmup detection.
 
@@ -353,7 +468,7 @@ print(f"✓ Time series processing complete for {len(all_time_series_data)} desi
 print(f"✓ Metrics extracted: active_drivers, unassigned_delivery_entities")
 print(f"✓ Ready for warmup analysis visualization")
 
-# %% CELL 11: Warmup Analysis Visualization
+# %% CELL 13: Warmup Analysis Visualization
 """
 UNIFORM STEP: Visualize time series to identify warmup period.
 
@@ -392,25 +507,25 @@ print(f"✓ Inspect plots to determine warmup period")
 print(f"  • Look for active_drivers stabilizing around Little's Law value")
 print(f"  • Note any transient behavior in unassigned_delivery_entities")
 
-# %% CELL 12: Warmup Period Determination
+# %% CELL 14: Warmup Period Determination
 """
 MANUAL STEP: Set warmup period based on visual inspection.
 
-Update the value below after inspecting Cell 11 plots.
+Update the value below after inspecting Cell 13 plots.
 """
 
 print("\n" + "="*50)
 print("WARMUP PERIOD DETERMINATION")
 print("="*50)
 
-# ⚠️ UPDATE THIS VALUE based on visual inspection of Cell 11
+# ⚠️ UPDATE THIS VALUE based on visual inspection of Cell 13
 uniform_warmup_period = 500  # minutes
 
 print(f"✓ Warmup period set: {uniform_warmup_period} minutes")
 print(f"✓ Analysis window: {experiment_config.simulation_duration - uniform_warmup_period} minutes of steady-state data")
 print(f"⚠️  Remember to update this value based on your warmup plots!")
 
-# %% CELL 13: Process Through Analysis Pipeline
+# %% CELL 15: Process Through Analysis Pipeline
 """
 UNIFORM STEP: Run all design points through analysis pipeline.
 
@@ -450,7 +565,7 @@ print(f"\n✓ Analysis pipeline complete for all {len(design_analysis_results)} 
 print(f"✓ Results stored in 'design_analysis_results'")
 print(f"✓ Available metrics: order_metrics (assignment time, etc.), system_metrics (completion rate, etc.)")
 
-# %% CELL 14: Extract and Present Key Metrics
+# %% CELL 16: Extract and Present Key Metrics
 """
 CUSTOM STEP: Extract metrics relevant to your research question.
 
@@ -469,25 +584,32 @@ print("\n⚠️  TODO: Implement custom metric extraction for your research ques
 print("\nExample workflow:")
 print("  1. Decide which metrics matter for your hypothesis")
 print("  2. Extract from design_analysis_results")
-print("  3. Group/aggregate as needed (e.g., by infrastructure, by load ratio)")
+print("  3. Group/aggregate as needed (e.g., by infrastructure, by arrival ratio)")
 print("  4. Compute summary statistics (mean, std, confidence intervals)")
 print("  5. Present in tables or prepare for visualization")
 
 # Example structure (customize for your study):
 # for design_name, analysis_result in design_analysis_results.items():
-#     # Extract metrics
-#     if 'order_metrics' in analysis_result:
-#         order_metrics = analysis_result['order_metrics']
-#         assignment_time = order_metrics['assignment_time_statistics']
-#         
-#         mean_time = assignment_time['mean']['experiment_mean']
-#         ci_lower = assignment_time['mean']['ci_lower']
-#         ci_upper = assignment_time['mean']['ci_upper']
-#         
-#         print(f"\n{design_name}:")
-#         print(f"  Assignment Time: {mean_time:.2f} min [{ci_lower:.2f}, {ci_upper:.2f}]")
+#     # Extract metrics from statistics_with_cis
+#     stats_with_cis = analysis_result.get('statistics_with_cis', {})
+#     
+#     # Order metrics (nested under mean_of_means)
+#     order_metrics = stats_with_cis.get('order_metrics', {})
+#     assignment_time = order_metrics.get('assignment_time', {}).get('mean_of_means', {})
+#     mean_time = assignment_time.get('point_estimate')
+#     ci = assignment_time.get('confidence_interval', [None, None])
+#     
+#     # System metrics (flat structure)
+#     system_metrics = stats_with_cis.get('system_metrics', {})
+#     completion_rate = system_metrics.get('system_completion_rate', {})
+#     mean_comp = completion_rate.get('point_estimate')
+#     ci_comp = completion_rate.get('confidence_interval', [None, None])
+#     
+#     print(f"\n{design_name}:")
+#     print(f"  Assignment Time: {mean_time:.2f} min [{ci[0]:.2f}, {ci[1]:.2f}]")
+#     print(f"  Completion Rate: {mean_comp:.3f} [{ci_comp[0]:.3f}, {ci_comp[1]:.3f}]")
 
-# %% CELL 15: Visualization and Results Presentation
+# %% CELL 17: Visualization and Results Presentation
 """
 CUSTOM STEP: Create visualizations to communicate findings.
 
@@ -525,7 +647,7 @@ print("  • Color schemes and labels for clarity")
 # ax.set_title('Performance Comparison Across Configurations')
 # plt.show()
 
-# %% CELL 16: Statistical Analysis (Optional)
+# %% CELL 18: Statistical Analysis (Optional)
 """
 CUSTOM STEP: Perform statistical tests if needed.
 
@@ -558,7 +680,7 @@ print("  • What's the appropriate significance level?")
 # if p_value < 0.05:
 #     print("Significant difference detected (p < 0.05)")
 
-# %% CELL 17: Save Results (Optional)
+# %% CELL 19: Save Results (Optional)
 """
 CUSTOM STEP: Save processed results and figures.
 
@@ -598,8 +720,8 @@ print("\n" + "="*80)
 print("EXPERIMENTAL STUDY TEMPLATE COMPLETE")
 print("="*80)
 print("\nNext steps:")
-print("  ✓ Cells 1-13: Uniform preprocessing - executed")
-print("  ⚠️  Cells 14-17: Customize for your research question")
+print("  ✓ Cells 1-15: Uniform preprocessing - executed")
+print("  ⚠️  Cells 16-19: Customize for your research question")
 print("\nRemember:")
 print("  • Warmup analysis is critical - don't skip it!")
 print("  • Update warmup_period after visual inspection")

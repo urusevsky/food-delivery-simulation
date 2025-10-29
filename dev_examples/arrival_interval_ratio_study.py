@@ -101,7 +101,70 @@ structural_seeds = [42]
 
 print(f"✓ Structural seeds: {structural_seeds} (fixed layout for operational study)")
 
-# %% CELL 6: Operational Configuration(s)
+# %% CELL 6: Create Infrastructure Instances
+"""
+Create and analyze infrastructure instance.
+
+Even for single infrastructure, we follow the standard pattern.
+"""
+
+infrastructure_instances = []
+
+print("\n" + "="*50)
+print("INFRASTRUCTURE INSTANCES CREATION")
+print("="*50)
+
+for infra_config in infrastructure_configs:
+    for structural_seed in structural_seeds:
+        
+        # Create infrastructure instance
+        instance_name = f"{infra_config['name']}_seed{structural_seed}"
+        print(f"\n📍 Creating infrastructure: {instance_name}")
+        
+        infrastructure = Infrastructure(
+            infra_config['config'],
+            structural_seed
+        )
+        
+        # Analyze infrastructure
+        analyzer = InfrastructureAnalyzer(infrastructure)
+        analysis_results = analyzer.analyze_complete_infrastructure()
+        
+        # Store instance with metadata
+        infrastructure_instances.append({
+            'name': instance_name,
+            'infrastructure': infrastructure,
+            'analysis': analysis_results,
+            'config_name': infra_config['name'],
+            'seed': structural_seed
+        })
+        
+        print(f"  ✓ Infrastructure created and analyzed")
+        print(f"    • Typical distance: {analysis_results['typical_distance']:.3f}km")
+        print(f"    • Restaurant density: {analysis_results['restaurant_density']:.4f}/km²")
+
+print(f"\n{'='*50}")
+print(f"✓ Created {len(infrastructure_instances)} infrastructure instance(s)")
+print(f"✓ Breakdown: {len(infrastructure_configs)} configs × {len(structural_seeds)} seeds")
+print(f"{'='*50}")
+
+# %% CELL 7: Scoring Configuration(s)
+"""
+Single baseline scoring configuration for this study.
+"""
+
+scoring_configs = [
+    {
+        'name': 'baseline',
+        'config': ScoringConfig()  # Use defaults
+    }
+]
+
+print(f"✓ Defined {len(scoring_configs)} scoring configuration(s)")
+for config in scoring_configs:
+    print(f"  • {config['name']}")
+
+# %% CELL 8: Operational Configuration(s)
 """
 OPERATIONAL STUDY: Multiple configurations varying arrival interval ratios.
 
@@ -115,7 +178,7 @@ This tests whether ratio alone determines regime or if absolute scale matters.
 # Target arrival interval ratios to test
 target_arrival_interval_ratios = [2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0]
 
-# Fixed pairing configuration (consistent across all design points)
+# Fixed pairing configuration (pairing disabled for this study)
 FIXED_PAIRING_CONFIG = {
     'pairing_enabled': False,
     'restaurants_proximity_threshold': None,
@@ -169,10 +232,11 @@ for config in operational_configs:
           f"driver_interval={op_config.mean_driver_inter_arrival_time:.1f}min, "
           f"ratio={ratio:.1f}")
 
-# %% CELL 7: Design Points Creation
+# %% CELL 9: Design Point Creation (SIMPLIFIED)
 """
-Universal design points creation for operational study.
-1 infrastructure × 1 seed × N operational configs = N design points
+Create design points from combinations.
+
+Simplified loop structure: iterate over pre-created infrastructure instances.
 """
 
 design_points = {}
@@ -181,35 +245,18 @@ print("\n" + "="*50)
 print("DESIGN POINTS CREATION")
 print("="*50)
 
-for infra_config in infrastructure_configs:
-    for structural_seed in structural_seeds:
-        
-        # Create infrastructure instance
-        print(f"\n📍 Creating infrastructure: {infra_config['name']}, seed={structural_seed}")
-        infrastructure = Infrastructure(
-            infra_config['config'],
-            structural_seed
-        )
-     
-        # Analyze infrastructure
-        analyzer = InfrastructureAnalyzer(infrastructure)
-        analysis_results = analyzer.analyze_complete_infrastructure()
-        
-        print(f"  ✓ Infrastructure analyzed")
-        print(f"    • Typical distance: {analysis_results['typical_distance']:.3f}km")
-        print(f"    • Restaurant density: {analysis_results['restaurant_density']:.4f}/km²")
-        
-        # Create design point for each operational configuration
-        for op_config in operational_configs:
+for infra_instance in infrastructure_instances:
+    for op_config in operational_configs:
+        for scoring_config_dict in scoring_configs:
             
-            # Generate design point name (no need for seed since it's fixed)
+            # Generate design point name (no need for infra name since it's fixed)
             design_name = op_config['name']
             
             # Create design point
             design_points[design_name] = DesignPoint(
-                infrastructure=infrastructure,
+                infrastructure=infra_instance['infrastructure'],
                 operational_config=op_config['config'],
-                scoring_config=scoring_config,
+                scoring_config=scoring_config_dict['config'],
                 name=design_name
             )
             
@@ -217,11 +264,11 @@ for infra_config in infrastructure_configs:
 
 print(f"\n{'='*50}")
 print(f"✓ Created {len(design_points)} design points")
-print(f"✓ Breakdown: {len(infrastructure_configs)} infra × "
-      f"{len(structural_seeds)} seeds × {len(operational_configs)} operational")
+print(f"✓ Breakdown: {len(infrastructure_instances)} infra × "
+      f"{len(operational_configs)} operational × {len(scoring_configs)} scoring")
 print(f"{'='*50}")
 
-# %% CELL 8: Experiment Configuration
+# %% CELL 10: Experiment Configuration
 experiment_config = ExperimentConfig(
     simulation_duration=2000,  # Extended duration for regime pattern analysis
     num_replications=5,
@@ -241,7 +288,7 @@ print(f"\n✓ Execution plan:")
 print(f"  • Total simulation runs: {total_runs}")
 print(f"  • Estimated time: ~{estimated_time:.0f} seconds (~{estimated_time/60:.1f} minutes)")
 
-# %% CELL 9: Execute Experimental Study
+# %% CELL 11: Execute Experimental Study
 print("\n" + "="*50)
 print("EXECUTING EXPERIMENTAL STUDY")
 print("="*50)
@@ -255,7 +302,7 @@ print(f"{'='*50}")
 print(f"✓ Executed {len(design_points)} design points")
 print(f"✓ Total simulations: {total_runs}")
 
-# %% CELL 10: Time Series Data Processing for Warmup Analysis
+# %% CELL 12: Time Series Data Processing for Warmup Analysis
 print("\n" + "="*50)
 print("TIME SERIES DATA PROCESSING FOR WARMUP ANALYSIS")
 print("="*50)
@@ -275,7 +322,7 @@ print(f"✓ Time series processing complete for {len(all_time_series_data)} desi
 print(f"✓ Metrics extracted: active_drivers, unassigned_delivery_entities")
 print(f"✓ Ready for warmup analysis visualization")
 
-# %% CELL 11: Warmup Analysis Visualization
+# %% CELL 13: Warmup Analysis Visualization
 print("\n" + "="*50)
 print("WARMUP ANALYSIS VISUALIZATION")
 print("="*50)
@@ -319,19 +366,19 @@ print(f"\n✓ Warmup analysis visualization complete")
 print(f"✓ Created {plot_count} warmup analysis plots")
 print(f"✓ Organized by {len(ratio_groups)} arrival interval ratios")
 
-# %% CELL 12: Warmup Period Determination
+# %% CELL 14: Warmup Period Determination
 print("\n" + "="*50)
 print("WARMUP PERIOD DETERMINATION")
 print("="*50)
 
-# Set warmup period based on visual inspection of Cell 11 plots
+# Set warmup period based on visual inspection of Cell 13 plots
 uniform_warmup_period = 500  # UPDATE THIS based on visual inspection
 
 print(f"✓ Warmup period set: {uniform_warmup_period} minutes")
 print(f"✓ Based on visual inspection of active drivers oscillation around Little's Law values")
 print(f"✓ Analysis window: {experiment_config.simulation_duration - uniform_warmup_period} minutes of post-warmup data")
 
-# %% CELL 13: Process Through Analysis Pipeline
+# %% CELL 15: Process Through Analysis Pipeline
 print("\n" + "="*80)
 print("PROCESSING THROUGH ANALYSIS PIPELINE")
 print("="*80)
@@ -363,7 +410,7 @@ for i, (design_name, replication_results) in enumerate(study_results.items(), 1)
 print(f"\n✓ Analysis pipeline complete for all {len(design_analysis_results)} design points")
 print(f"✓ Results stored in 'design_analysis_results'")
 
-# %% CELL 14: Extract and Present Key Metrics (TABLE FORMAT)
+# %% CELL 16: Extract and Present Key Metrics (TABLE FORMAT)
 print("\n" + "="*80)
 print("KEY PERFORMANCE METRICS EXTRACTION AND PRESENTATION")
 print("="*80)
@@ -372,6 +419,7 @@ import re
 
 def extract_ratio_and_type(design_name):
     """Extract arrival interval ratio and interval type from design point name."""
+    # Pattern: ratio_3.0_baseline or ratio_3.0_2x_baseline
     match = re.match(r'ratio_([\d.]+)_(baseline|2x_baseline)', design_name)
     if match:
         ratio = float(match.group(1))
@@ -494,5 +542,58 @@ print("="*136)
 print("\n✓ Metric extraction complete")
 print("✓ Compare with original load_ratio study to verify exact reproduction")
 
+# %% CELL 17: Validation Pair Comparison
+print("\n" + "="*80)
+print("VALIDATION PAIR COMPARISON")
+print("="*80)
+print("\nTesting hypothesis: Do baseline and 2x_baseline show similar regime behavior?")
+print("="*80)
 
-# %%
+import pandas as pd
+df_metrics = pd.DataFrame(metrics_data)
+
+for ratio in sorted(df_metrics['ratio'].unique()):
+    ratio_data = df_metrics[df_metrics['ratio'] == ratio]
+    baseline = ratio_data[ratio_data['interval_type'] == 'baseline'].iloc[0]
+    two_x = ratio_data[ratio_data['interval_type'] == '2x_baseline'].iloc[0]
+    
+    # Compare assignment times
+    baseline_time = baseline['mom_estimate']
+    two_x_time = two_x['mom_estimate']
+    time_diff = abs(baseline_time - two_x_time)
+    
+    # Avoid division by zero for very small baseline times
+    if baseline_time > 0.01:
+        time_pct_diff = (time_diff / baseline_time) * 100
+    else:
+        time_pct_diff = float('inf') if time_diff > 0 else 0
+    
+    # Compare completion rates
+    baseline_comp = baseline['comp_estimate'] * 100
+    two_x_comp = two_x['comp_estimate'] * 100
+    comp_diff = abs(baseline_comp - two_x_comp)
+    
+    print(f"\nRatio {ratio:.1f}:")
+    if time_pct_diff == float('inf'):
+        print(f"  Assignment Time Difference: {time_diff:.2f} min (baseline near zero)")
+    else:
+        print(f"  Assignment Time Difference: {time_diff:.2f} min ({time_pct_diff:.1f}%)")
+    print(f"  Completion Rate Difference: {comp_diff:.2f}%")
+    
+    # Simple interpretation
+    if time_pct_diff < 10 and comp_diff < 5:
+        print(f"  → Similar regime behavior (validates ratio hypothesis)")
+    else:
+        print(f"  → Different behavior (absolute scale matters)")
+
+print("\n" + "="*80)
+print("✓ Validation pair analysis complete")
+
+print("\n" + "="*80)
+print("ARRIVAL INTERVAL RATIO STUDY COMPLETE")
+print("="*80)
+print("\nKey findings:")
+print(f"✓ Tested {len(target_arrival_interval_ratios)} arrival interval ratios")
+print(f"✓ Each ratio validated with baseline vs 2x_baseline pairs")
+print(f"✓ Analyzed {len(design_points)} design points × {experiment_config.num_replications} replications")
+print(f"✓ Results show relationship between arrival interval ratio and system performance")
