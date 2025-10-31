@@ -67,6 +67,56 @@ logging_config = LoggingConfig(
 configure_logging(logging_config)
 print("✓ Logging configured")
 
+# %% CELL 3.5: Research Question and Study Purpose
+"""
+REQUIRED: Articulate what you're investigating and why.
+
+This isn't bureaucracy - it's your decision anchor for:
+- Which parameters to vary (configurations)
+- Which metrics to focus on (analysis)
+- What patterns to look for (interpretation)
+
+Be specific enough to guide decisions, flexible enough to evolve.
+"""
+
+print("\n" + "="*80)
+print("RESEARCH QUESTION AND PURPOSE")
+print("="*80)
+
+research_question = """
+What specific phenomenon or gradient are you investigating?
+Example: How does the ratio of order arrival rate to driver arrival rate 
+affect system stability and performance?
+"""
+
+purpose_and_rationale = """
+Why does this question matter for understanding delivery systems?
+Example: This reveals whether the system is supply-constrained or 
+demand-constrained, and identifies critical operating regimes.
+"""
+
+expected_pattern = """
+What do you expect to find? (Intuition, not formal hypothesis)
+Example: Performance should degrade as load ratio increases, but 
+the functional form (linear/threshold/exponential) is unknown.
+"""
+
+analysis_focus = """
+Given this question, which metrics are most relevant?
+Example: Primary = assignment_time, completion_rate
+         Secondary = driver_utilization, order_waiting_time
+         Context = time series patterns to identify regime transitions
+"""
+
+print(research_question)
+print(purpose_and_rationale)
+print(expected_pattern)
+print(analysis_focus)
+
+print("\n" + "="*80)
+print("✓ Research question articulated - use this to guide all subsequent decisions")
+print("="*80)
+
 # %% CELL 4: Infrastructure Configuration(s)
 """
 OPERATIONAL STUDY: Single fixed infrastructure.
