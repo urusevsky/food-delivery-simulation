@@ -67,55 +67,160 @@ logging_config = LoggingConfig(
 configure_logging(logging_config)
 print("✓ Logging configured")
 
-# %% CELL 3.5: Research Question and Study Purpose
+# %% CELL 3.5: Research Question
 """
-REQUIRED: Articulate what you're investigating and why.
-
-This isn't bureaucracy - it's your decision anchor for:
-- Which parameters to vary (configurations)
-- Which metrics to focus on (analysis)
-- What patterns to look for (interpretation)
-
-Be specific enough to guide decisions, flexible enough to evolve.
+Document your research question and its evolution.
 """
 
 print("\n" + "="*80)
-print("RESEARCH QUESTION AND PURPOSE")
+print("RESEARCH QUESTION")
 print("="*80)
 
+# ==============================================================================
+# MAIN RESEARCH QUESTION
+# ==============================================================================
 research_question = """
-What specific phenomenon or gradient are you investigating?
-Example: How does the ratio of order arrival rate to driver arrival rate 
-affect system stability and performance?
+Are system operational regimes determined solely by arrival interval ratio,
+or do they also depend on the absolute scale of arrival rates?
+
+Test: For each target ratio, create paired configurations with identical 
+ratios but different absolute scales (baseline vs 2× baseline intervals).
+If ratio alone determines behavior, pairs should show same qualitative 
+patterns but different absolute performance.
 """
 
-purpose_and_rationale = """
-Why does this question matter for understanding delivery systems?
-Example: This reveals whether the system is supply-constrained or 
-demand-constrained, and identifies critical operating regimes.
+# ==============================================================================
+# CONTEXT & MOTIVATION
+# ==============================================================================
+context = """
+This study evolved from broader exploration of supply-demand interactions.
+
+Initial exploration (undocumented iterations):
+1. Started with: "How does supply-demand balance affect performance?"
+2. Tried varying both arrival rates independently → hard to interpret
+3. Realized ratio might be key → fixed order arrival, varied driver arrival
+4. Observed distinct operational regimes emerging at different ratios
+5. Generated hypothesis: ratio determines regime → need to test scale invariance
+
+Observed operational regimes (based on assignment time patterns):
+- Stable regime (low ratios): Near-zero assignment time, minimal variation
+- Volatile regime (medium ratios): Increasing assignment time, high variability  
+- Failure regime (high ratios ~6.5+): System breakdown, queue unbounded growth
+
+This mature experimental design is the product of that hidden evolution.
 """
 
-expected_pattern = """
-What do you expect to find? (Intuition, not formal hypothesis)
-Example: Performance should degrade as load ratio increases, but 
-the functional form (linear/threshold/exponential) is unknown.
+# ==============================================================================
+# SUB-QUESTIONS & HYPOTHESES
+# ==============================================================================
+sub_questions = """
+Scale invariance hypothesis predicts:
+
+1. Same regime classification
+   - If baseline is stable, 2× baseline should be stable
+   - If baseline is volatile, 2× baseline should be volatile
+   - Regime boundaries should occur at same ratio values
+
+2. Similar relative variability
+   - Coefficient of variation should match across scales
+   - Pattern of increasing variability should be parallel
+
+3. Proportional absolute performance
+   - 2× baseline should show roughly 2× higher assignment times
+   - But same qualitative behavior (stable/volatile/failure)
+
+Falsification: If baseline and 2× baseline fall into different regimes
+or show qualitatively different patterns, then ratio alone is insufficient.
 """
 
+# ==============================================================================
+# SCOPE & BOUNDARIES
+# ==============================================================================
+scope = """
+Fixed factors (limits generalizability - future work to vary):
+- Infrastructure: Single configuration (10km × 10km, 10 restaurants, seed=42)
+- Pairing: Disabled throughout study
+- Service duration: Fixed distribution (mean=100, std=60, min=30, max=200)
+- Driver speed: 0.5 km/min
+
+Varied factors:
+- Arrival interval ratio: 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0
+- Operational scale: Baseline vs 2× baseline for each ratio
+  - Baseline: order_interval=1.0, driver_interval=ratio
+  - 2× Baseline: order_interval=2.0, driver_interval=2×ratio
+
+Systematic validation design: 10 ratios × 2 scales = 20 design points
+"""
+
+# ==============================================================================
+# KEY METRICS & ANALYSIS FOCUS
+# ==============================================================================
 analysis_focus = """
-Given this question, which metrics are most relevant?
-Example: Primary = assignment_time, completion_rate
-         Secondary = driver_utilization, order_waiting_time
-         Context = time series patterns to identify regime transitions
+Primary metrics for testing scale invariance:
+
+1. Assignment time (order_metrics)
+   - Mean of means: Absolute performance comparison
+   - Standard deviation of means: Between-replication variability
+   - Mean of stds: Within-replication variability
+   - Coefficient of variation: Normalized comparison across scales
+
+2. Completion rate (system_metrics)
+   - System stability indicator
+   - Regime boundary marker (failure when < 0.95)
+
+3. Time series patterns (visual)
+   - Regime classification: stable/volatile/failure
+   - Pattern similarity between baseline and 2× baseline
+
+Analysis approach:
+- For each ratio: Compare baseline vs 2× baseline
+- Check regime consistency (qualitative behavior match)
+- Compare CVs (relative variability match)
+- Measure scale effects (proportionality of absolute values)
+"""
+
+# ==============================================================================
+# EVOLUTION NOTES
+# ==============================================================================
+evolution_notes = """
+Study maturity: This is a mature experimental design, product of prior 
+undocumented iterations.
+
+The specific research question emerged through:
+1. Broad exploration → identified ratio as key parameter
+2. Pattern observation → discovered regime transitions
+3. Hypothesis generation → scale invariance needs testing
+4. Systematic design → paired validation configurations
+
+Note: This cell documents the final state through reconstruction.
+Future studies will document evolution in real-time as research progresses.
 """
 
 print(research_question)
-print(purpose_and_rationale)
-print(expected_pattern)
+print("\n" + "-"*80)
+print("CONTEXT & MOTIVATION")
+print("-"*80)
+print(context)
+print("\n" + "-"*80)
+print("SUB-QUESTIONS & HYPOTHESES")
+print("-"*80)
+print(sub_questions)
+print("\n" + "-"*80)
+print("SCOPE & BOUNDARIES")
+print("-"*80)
+print(scope)
+print("\n" + "-"*80)
+print("KEY METRICS & ANALYSIS FOCUS")
+print("-"*80)
 print(analysis_focus)
-
+print("\n" + "-"*80)
+print("EVOLUTION NOTES")
+print("-"*80)
+print(evolution_notes)
 print("\n" + "="*80)
-print("✓ Research question articulated - use this to guide all subsequent decisions")
+print("✓ Research question documented - reference this to guide analysis decisions")
 print("="*80)
+
 
 # %% CELL 4: Infrastructure Configuration(s)
 """

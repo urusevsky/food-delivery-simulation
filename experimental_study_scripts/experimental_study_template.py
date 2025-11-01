@@ -85,55 +85,91 @@ logging_config = LoggingConfig(
 configure_logging(logging_config)
 print("✓ Logging configured")
 
-# %% CELL 3.5: Research Question and Study Purpose
+# %% CELL 3.5: Research Question
 """
-REQUIRED: Articulate what you're investigating and why.
+Document your research question and its evolution.
 
-This isn't bureaucracy - it's your decision anchor for:
-- Which parameters to vary (configurations)
-- Which metrics to focus on (analysis)
-- What patterns to look for (interpretation)
+Start minimal - just the main question. Fill in other sections as your 
+understanding develops through experimentation and analysis.
 
-Be specific enough to guide decisions, flexible enough to evolve.
+Sections marked [OPTIONAL] can be left blank initially and filled in later.
 """
 
 print("\n" + "="*80)
-print("RESEARCH QUESTION AND PURPOSE")
+print("RESEARCH QUESTION")
 print("="*80)
 
+# ==============================================================================
+# MAIN RESEARCH QUESTION (Always start here - can be vague initially)
+# ==============================================================================
 research_question = """
-What specific phenomenon or gradient are you investigating?
-Example: How does the ratio of order arrival rate to driver arrival rate 
-affect system stability and performance?
+[What are you investigating? Start with 1-3 sentences, refine as you learn]
+
+Example initial: "How does X affect Y?"
+Example refined: "How does X affect Y across different operating regimes?"
+Example mature: "At what threshold of X does Y transition from stable to unstable behavior?"
 """
 
-purpose_and_rationale = """
-Why does this question matter for understanding delivery systems?
-Example: This reveals whether the system is supply-constrained or 
-demand-constrained, and identifies critical operating regimes.
+# ==============================================================================
+# CONTEXT & MOTIVATION [OPTIONAL - add when relevant]
+# ==============================================================================
+context = """
+[Why does this question matter? What motivated it?]
+
+Examples:
+- Previous study revealed unexpected pattern...
+- Gaps in existing understanding...
+- Practical implications for...
 """
 
-expected_pattern = """
-What do you expect to find? (Intuition, not formal hypothesis)
-Example: Performance should degrade as load ratio increases, but 
-the functional form (linear/threshold/exponential) is unknown.
+# ==============================================================================
+# SUB-QUESTIONS & HYPOTHESES [OPTIONAL - emerge after initial exploration]
+# ==============================================================================
+sub_questions = """
+[Specific aspects to investigate - often emerge after seeing initial results]
+
+Examples:
+- Is there a critical threshold?
+- Does the pattern hold across different scales?
+- What mechanisms explain the observed behavior?
 """
 
+# ==============================================================================
+# SCOPE & BOUNDARIES [OPTIONAL - document what you're holding constant]
+# ==============================================================================
+scope = """
+[What are you controlling/fixing? Important for claiming generalizability later]
+
+Examples:
+- Infrastructure: Fixed 10km × 10km area, 10 restaurants
+- Pairing: Disabled for this study
+- Service duration: Fixed distribution
+- Parameter ranges: Arrival interval ratios 3.0-8.0
+"""
+
+# ==============================================================================
+# KEY METRICS & ANALYSIS FOCUS [OPTIONAL - clarifies as question sharpens]
+# ==============================================================================
 analysis_focus = """
-Given this question, which metrics are most relevant?
-Example: Primary = assignment_time, completion_rate
-         Secondary = driver_utilization, order_waiting_time
-         Context = time series patterns to identify regime transitions
+[Which metrics matter for answering your question?]
+
+Examples:
+Primary: Assignment time, completion rate
+Secondary: Driver utilization, queue length
+Analysis approach: Compare means, examine time series patterns, test for thresholds
 """
 
-print(research_question)
-print(purpose_and_rationale)
-print(expected_pattern)
-print(analysis_focus)
+# ==============================================================================
+# EVOLUTION NOTES [OPTIONAL - track how question changed]
+# ==============================================================================
+evolution_notes = """
+[Document major refinements - valuable for thesis writing]
 
-print("\n" + "="*80)
-print("✓ Research question articulated - use this to guide all subsequent decisions")
-print("="*80)
+Examples:
+- Initial: Broad exploration of supply-demand effects
+- After results: Focused on ratio as key determinant
+- Current: Testing scale invariance hypothesis
+"""
 
 # %% CELL 4: Infrastructure Configuration(s)
 """
