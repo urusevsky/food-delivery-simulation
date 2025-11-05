@@ -75,7 +75,7 @@ print("\n" + "="*50)
 print("ENHANCED DESIGN POINTS CREATION")
 print("="*50)
 
-target_load_ratios = [3.0, 5.0, 7.0, 8.0]
+target_load_ratios = [7.0, 8.0, 9.0, 10.0]
 
 # Base operational parameters
 base_params = {
