@@ -17,7 +17,15 @@ logger = get_logger("analysis_pipeline_redesigned.metric_configurations")
 
 METRIC_CONFIGURATIONS = {
     
-    # Two-level aggregation pattern
+    # ==========================================================================
+    # TWO-LEVEL PATTERN: ENTITY-BASED METRICS
+    # ==========================================================================
+    # Characteristics:
+    # - Metrics calculated POST-SIMULATION from preserved entity attributes
+    # - Each entity produces multiple metrics (e.g., assignment_time, fulfillment_time)
+    # - Aggregation: entities → statistics (replication) → statistics-of-statistics (experiment)
+    # - Example: calculate_all_order_metrics(order) reads order.arrival_time, order.assignment_time
+    
     'order_metrics': {
         'aggregation_pattern': 'two_level',
         'metric_module': 'delivery_sim.metrics.entity.order_metrics',
@@ -70,8 +78,39 @@ METRIC_CONFIGURATIONS = {
         ],
         'description': 'Delivery unit performance metrics'
     },
+
+    # ==========================================================================
+    # TWO-LEVEL PATTERN: SYSTEM STATE METRICS  
+    # ==========================================================================
+    # Characteristics:
+    # - Metrics calculated DURING-SIMULATION (transient state captured in real-time)
+    # - Each snapshot already contains multiple metrics (e.g., available_drivers, active_drivers)
+    # - Aggregation: snapshots → statistics (replication) → statistics-of-statistics (experiment)
+    # - Example: extract_snapshot_metrics(snapshot) just filters out timestamp
+    # - Why different timing: Cannot reconstruct "drivers available at t=501" post-simulation
     
-    # One-level aggregation pattern
+    'system_state_metrics': {
+        'aggregation_pattern': 'two_level',
+        'metric_module': 'delivery_sim.metrics.system.state_metrics',
+        'metric_function': 'extract_snapshot_metrics',  # EXTRACTS from snapshot
+        'data_key': 'post_warmup_snapshots',
+        'experiment_stats': [
+            {'name': 'mean_of_means', 'extract': 'mean', 'compute': 'mean', 'construct_ci': True},
+            {'name': 'std_of_means', 'extract': 'mean', 'compute': 'std', 'construct_ci': False},
+            {'name': 'mean_of_stds', 'extract': 'std', 'compute': 'mean', 'construct_ci': False}
+        ],
+        'description': 'System state metrics from time series snapshots (calculated during simulation)'
+    },
+
+    # ==========================================================================
+    # ONE-LEVEL PATTERN: ENTITY-DERIVED SYSTEM METRICS
+    # ==========================================================================
+    # Characteristics:
+    # - System-level metrics derived from entity populations
+    # - Direct calculation returns scalar values (no entity-level aggregation)
+    # - Aggregation: direct calculation (replication) → statistics (experiment)
+    # - Example: system_completion_rate = len(completed) / len(total)
+    
     'system_metrics': {
         'aggregation_pattern': 'one_level',
         'metric_module': 'delivery_sim.metrics.system.entity_derived_metrics', 

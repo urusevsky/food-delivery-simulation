@@ -47,23 +47,63 @@ class ReplicationProcessor:
     
     def _process_two_level_replication(self, analysis_data, metric_config):
         """
-        Two-level pattern: Individual entities → Statistics objects.
+        Two-level pattern: Items → Metrics → Statistics.
         
-        First aggregation happens here (within replication).
+        Handles both entity-based metrics and system state metrics through
+        identical processing structure despite different timing of calculation.
+        
+        PROCESSING FLOW:
+        1. Get items (entities or snapshots) from analysis_data
+        2. Apply metric_function to each item
+        - For entity metrics: CALCULATES metrics from entity attributes
+        - For state metrics: EXTRACTS pre-calculated metrics from snapshot
+        3. Aggregate metrics across items to statistics
+        
+        CONCRETE EXAMPLES:
+        
+        Entity-based metrics (order_metrics):
+            items = [Order1, Order2, ...]  # From cohort_completed_orders
+            metric_function = calculate_all_order_metrics
+            individual_metrics = [
+                {'assignment_time': 12.3, 'fulfillment_time': 25.7},  # Calculated from Order1 attributes
+                {'assignment_time': 15.1, 'fulfillment_time': 28.2},  # Calculated from Order2 attributes
+                ...
+            ]
+            → Aggregate to statistics: {'assignment_time': {mean: 13.7, std: 2.1, ...}, ...}
+        
+        System state metrics (system_state_metrics):
+            items = [Snapshot1, Snapshot2, ...]  # From post_warmup_snapshots
+            metric_function = extract_snapshot_metrics
+            individual_metrics = [
+                {'available_drivers': 5, 'active_drivers': 20, ...},  # Extracted from Snapshot1
+                {'available_drivers': 7, 'active_drivers': 22, ...},  # Extracted from Snapshot2
+                ...
+            ]
+            → Aggregate to statistics: {'available_drivers': {mean: 6.2, std: 1.5, ...}, ...}
+        
+        Args:
+            analysis_data: AnalysisData with filtered populations and snapshots
+            metric_config: Configuration specifying data_key and metric_function
+            
+        Returns:
+            dict: Statistics for each metric {metric_name: {mean, std, min, max, ...}}
         """
-        # Get entities from analysis data
-        entity_data_key = metric_config['entity_data_key']
-        entities = getattr(analysis_data, entity_data_key, [])
+        # Get items from analysis data
+        data_key = metric_config['data_key']
+        items = getattr(analysis_data, data_key, [])
         
-        if not entities:
-            self.logger.warning(f"No entities found for {entity_data_key}")
+        if not items:
+            self.logger.warning(f"No items found for {data_key}")
             return {}
         
-        # Calculate individual metrics for each entity
+        # Get/calculate metrics for each item
+        # For entity metrics: function CALCULATES from attributes
+        # For state metrics: function EXTRACTS pre-calculated values
         metric_function = self._get_metric_function(metric_config)
-        individual_metrics = [metric_function(entity) for entity in entities]
+        individual_metrics = [metric_function(item) for item in items]
         
-        # Aggregate individual values to statistics objects (first aggregation)
+        # Aggregate individual metric values to statistics (first aggregation)
+        # Identical process regardless of whether metrics were calculated or extracted
         return self._aggregate_individual_values(individual_metrics)
     
     def _process_one_level_replication(self, analysis_data, metric_config):
