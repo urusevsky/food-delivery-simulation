@@ -30,7 +30,7 @@ METRIC_CONFIGURATIONS = {
         'aggregation_pattern': 'two_level',
         'metric_module': 'delivery_sim.metrics.entity.order_metrics',
         'metric_function': 'calculate_all_order_metrics',
-        'entity_data_key': 'cohort_completed_orders',
+        'data_key': 'cohort_completed_orders',
         'experiment_stats': [
             {
                 'name': 'mean_of_means', 
@@ -61,7 +61,7 @@ METRIC_CONFIGURATIONS = {
         'aggregation_pattern': 'two_level', 
         'metric_module': 'delivery_sim.metrics.entity.delivery_unit_metrics',
         'metric_function': 'calculate_all_delivery_unit_metrics',
-        'entity_data_key': 'cohort_completed_delivery_units',
+        'data_key': 'cohort_completed_delivery_units',
         'experiment_stats': [
             {
                 'name': 'mean_of_means', 
@@ -110,12 +110,12 @@ METRIC_CONFIGURATIONS = {
     # - Direct calculation returns scalar values (no entity-level aggregation)
     # - Aggregation: direct calculation (replication) → statistics (experiment)
     # - Example: system_completion_rate = len(completed) / len(total)
-    
+
     'system_metrics': {
         'aggregation_pattern': 'one_level',
         'metric_module': 'delivery_sim.metrics.system.entity_derived_metrics', 
         'metric_function': 'calculate_all_entity_derived_system_metrics',
-        'entity_data_key': None,
+        'data_key': None,
         'ci_config': [
             {
                 'metric_name': 'system_completion_rate',  # ✅ Changed from 'completion_rate'
@@ -227,7 +227,7 @@ def validate_configurations():
     """Validate that all metric configurations are properly structured."""
     required_fields = {
         'two_level': ['aggregation_pattern', 'metric_module', 'metric_function', 
-                      'entity_data_key', 'experiment_stats'],
+                      'data_key', 'experiment_stats'],
         'one_level': ['aggregation_pattern', 'metric_module', 'metric_function']
     }
     
@@ -245,7 +245,7 @@ def validate_configurations():
         
         # Pattern-specific validation
         if pattern == 'two_level':
-            if config['entity_data_key'] is None:
+            if config['data_key'] is None:
                 raise ValueError(f"Two-level pattern {metric_type} must specify entity_data_key")
             
             # Validate experiment statistics configurations
