@@ -106,12 +106,13 @@ class ExperimentAnalysisPipeline:
         
         Transforms raw simulation results into analysis-ready data by:
         - Extracting repositories from each replication
+        - Extracting system snapshots from each replication
         - Applying warmup period filtering
         - Creating analytical populations
         
         Args:
             raw_replication_results: List of raw simulation results (one per replication)
-                Each result is a dict with 'repositories' key containing entity repositories
+                Each result is a dict with 'repositories' and 'system_snapshots' keys
                 
         Returns:
             list: Analysis data objects (one per replication) ready for metric processing
@@ -122,7 +123,13 @@ class ExperimentAnalysisPipeline:
         
         for i, raw_replication_result in enumerate(raw_replication_results):
             repositories = raw_replication_result['repositories']
-            analysis_data = prepare_analysis_data(repositories, self.warmup_period)
+            system_snapshots = raw_replication_result.get('system_snapshots', [])  # NEW
+            
+            analysis_data = prepare_analysis_data(
+                repositories, 
+                self.warmup_period,
+                system_snapshots  # NEW
+            )
             prepared_analysis_data.append(analysis_data)
             
             self.logger.debug(

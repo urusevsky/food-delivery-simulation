@@ -1,4 +1,4 @@
-# delivery_sim/simulation/data_preparation.py
+# delivery_sim/analysis_pipeline/data_preparation.py
 """
 Revamped data preparation module for analysis pipeline.
 
@@ -18,16 +18,18 @@ class AnalyticalPopulations:
     Each method creates a specific population tailored to particular metric needs.
     """
     
-    def __init__(self, repositories, warmup_period):
+    def __init__(self, repositories, warmup_period, system_snapshots=None):
         """
         Initialize the population factory.
         
         Args:
             repositories: Dict containing all entity repositories from simulation
             warmup_period: Duration to exclude from analysis (warmup bias elimination)
+            system_snapshots: List of system state snapshots (optional, for state metrics)
         """
         self._repositories = repositories
         self._warmup_period = warmup_period
+        self._system_snapshots = system_snapshots or []
     
     def get_cohort_orders(self):
         """
@@ -68,7 +70,7 @@ class AnalyticalPopulations:
         - "For completed cohort orders, what was their typical performance?"
         
         Returns:
-            list: All cohort orders that were delivered
+            list: Cohort orders that were delivered
         """
         cohort = self.get_cohort_orders()
         return [
@@ -117,7 +119,7 @@ class AnalyticalPopulations:
     
     def get_cohort_paired_orders(self):
         """
-        Get all cohort orders that were successfully paired.
+        Get cohort orders that were paired (regardless of completion).
         
         This captures the pairing decision for cohort orders regardless of whether 
         the pair was subsequently assigned to a driver. Used for calculating pairing 
@@ -133,6 +135,25 @@ class AnalyticalPopulations:
         return [
             order for order in cohort 
             if order.pair is not None
+        ]
+    
+    def get_post_warmup_snapshots(self):
+        """
+        Get system snapshots after warmup period.
+        
+        Filters snapshots to only include those captured during the representative
+        operational period, excluding the warmup phase where system state is still
+        stabilizing.
+        
+        Research Question: "What was the typical system state during 
+        the representative operational period?"
+        
+        Returns:
+            list: Snapshots with timestamp >= warmup_period
+        """
+        return [
+            snapshot for snapshot in self._system_snapshots
+            if snapshot['timestamp'] >= self._warmup_period
         ]
 
 
@@ -156,9 +177,10 @@ class AnalysisData:
         self.cohort_completed_orders = populations.get_cohort_completed_orders()
         self.cohort_completed_delivery_units = populations.get_cohort_completed_delivery_units()
         self.cohort_paired_orders = populations.get_cohort_paired_orders()
+        self.post_warmup_snapshots = populations.get_post_warmup_snapshots()  # NEW
 
 
-def prepare_analysis_data(repositories, warmup_period):
+def prepare_analysis_data(repositories, warmup_period, system_snapshots=None):
     """
     Main entry point for creating analysis-ready data populations.
     
@@ -168,11 +190,12 @@ def prepare_analysis_data(repositories, warmup_period):
     Args:
         repositories: Dict containing all entity repositories from simulation
         warmup_period: Duration to exclude from analysis
+        system_snapshots: List of system state snapshots (optional)
         
     Returns:
         AnalysisData: Container with all populations ready for metric calculations
     """
-    populations = AnalyticalPopulations(repositories, warmup_period)
+    populations = AnalyticalPopulations(repositories, warmup_period, system_snapshots)
     return AnalysisData(populations)
 
 
