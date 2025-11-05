@@ -503,12 +503,12 @@ print("Processing time series data for warmup detection...")
 all_time_series_data = extract_warmup_time_series(
     study_results=study_results,
     design_points=design_points,
-    metrics=['active_drivers', 'unassigned_delivery_entities'],
-    moving_average_window=100  # Larger window for 2000-minute simulation
+    metrics=['active_drivers', 'available_drivers', 'unassigned_delivery_entities'],  # ← ADDED available_drivers
+    moving_average_window=100
 )
 
 print(f"✓ Time series processing complete for {len(all_time_series_data)} design points")
-print(f"✓ Metrics extracted: active_drivers, unassigned_delivery_entities")
+print(f"✓ Metrics extracted: active_drivers, available_drivers, unassigned_delivery_entities")  # ← UPDATED
 print(f"✓ Ready for warmup analysis visualization")
 
 # %% CELL 13: Warmup Analysis Visualization
@@ -575,10 +575,10 @@ print("="*80)
 
 from delivery_sim.analysis_pipeline.pipeline_coordinator import ExperimentAnalysisPipeline
 
-# Initialize pipeline
+# Initialize pipeline with delivery_unit_metrics enabled
 pipeline = ExperimentAnalysisPipeline(
     warmup_period=uniform_warmup_period,
-    enabled_metric_types=['order_metrics', 'system_metrics'],
+    enabled_metric_types=['order_metrics', 'system_metrics', 'delivery_unit_metrics'],  # ← ADDED
     confidence_level=0.95
 )
 
@@ -627,7 +627,7 @@ for design_name, analysis_result in design_analysis_results.items():
     
     stats_with_cis = analysis_result.get('statistics_with_cis', {})
     
-    # Extract assignment time
+    # Extract assignment time (from order_metrics)
     order_metrics = stats_with_cis.get('order_metrics', {})
     assignment_time = order_metrics.get('assignment_time', {})
     
@@ -642,13 +642,23 @@ for design_name, analysis_result in design_analysis_results.items():
     mean_of_stds = assignment_time.get('mean_of_stds', {})
     mos_estimate = mean_of_stds.get('point_estimate', 0)
     
-    # Extract completion rate
+    # Extract completion rate (from system_metrics)
     system_metrics = stats_with_cis.get('system_metrics', {})
     completion_rate = system_metrics.get('system_completion_rate', {})
     
     comp_estimate = completion_rate.get('point_estimate', 0)
     comp_ci = completion_rate.get('confidence_interval', [0, 0])
     comp_ci_width = (comp_ci[1] - comp_ci[0]) / 2 if comp_ci[0] is not None else 0
+    
+    # ==================== NEW: Extract total distance (from delivery_unit_metrics) ====================
+    delivery_unit_metrics = stats_with_cis.get('delivery_unit_metrics', {})
+    total_distance_stats = delivery_unit_metrics.get('total_distance', {})
+    
+    distance_mean_of_means = total_distance_stats.get('mean_of_means', {})
+    distance_estimate = distance_mean_of_means.get('point_estimate', 0)
+    distance_ci = distance_mean_of_means.get('confidence_interval', [0, 0])
+    distance_ci_width = (distance_ci[1] - distance_ci[0]) / 2 if distance_ci[0] is not None else 0
+    # ================================================================================================
     
     metrics_data.append({
         'seed': seed,
@@ -660,17 +670,19 @@ for design_name, analysis_result in design_analysis_results.items():
         'mos_estimate': mos_estimate,
         'comp_estimate': comp_estimate,
         'comp_ci_width': comp_ci_width,
+        'distance_estimate': distance_estimate,      # NEW
+        'distance_ci_width': distance_ci_width,      # NEW
     })
 
 # Sort by ratio, then seed, then interval type
 metrics_data.sort(key=lambda x: (x['ratio'], x['seed'], x['interval_type']))
 
-# Print formatted table with seed column
-print("\n🎯 KEY PERFORMANCE METRICS: LAYOUT SENSITIVITY")
-print("="*150)
-print("  Seed   Ratio    Interval        Mean of Means     Std of    Mean of           Completion Rate")
-print("                      Type    (Assignment Time)      Means       Stds             (with 95% CI)")
-print("="*150)
+# Print formatted table with seed column AND total distance
+print("\n🎯 KEY PERFORMANCE METRICS: LAYOUT SENSITIVITY WITH DISTANCE")
+print("="*180)
+print("  Seed   Ratio    Interval        Mean of Means     Std of    Mean of           Completion Rate      Mean Total Distance")
+print("                      Type    (Assignment Time)      Means       Stds             (with 95% CI)            (with 95% CI)")
+print("="*180)
 
 for row in metrics_data:
     seed = row['seed']
@@ -681,22 +693,23 @@ for row in metrics_data:
     som_str = f"{row['som_estimate']:5.2f}"
     mos_str = f"{row['mos_estimate']:5.2f}"
     comp_str = f"{row['comp_estimate']:.3f} ± {row['comp_ci_width']:.3f}"
+    dist_str = f"{row['distance_estimate']:5.2f} ± {row['distance_ci_width']:5.2f}"  # NEW
     
-    print(f"  {seed:4d}   {ratio:3.1f}  {interval_display:12s}     {mom_str:>16s}    {som_str:>7s}    {mos_str:>7s}          {comp_str:>15s}")
+    print(f"  {seed:4d}   {ratio:3.1f}  {interval_display:12s}     {mom_str:>16s}    {som_str:>7s}    {mos_str:>7s}          {comp_str:>15s}          {dist_str:>18s}")
 
-print("="*150)
+print("="*180)
 
 # Alternative view: Group by ratio, then seed
 print("\n\nAlternative view grouped by ratio:")
 print("🎯 PERFORMANCE COMPARISON ACROSS LAYOUTS")
-print("="*150)
+print("="*180)
 
 for ratio in sorted(set(row['ratio'] for row in metrics_data)):
     print(f"\nRatio {ratio:.1f} - Comparing layouts:")
-    print("-"*150)
-    print("  Seed   Interval        Mean of Means     Std of    Mean of           Completion Rate")
-    print("             Type    (Assignment Time)      Means       Stds             (with 95% CI)")
-    print("-"*150)
+    print("-"*180)
+    print("  Seed   Interval        Mean of Means     Std of    Mean of           Completion Rate      Mean Total Distance")
+    print("             Type    (Assignment Time)      Means       Stds             (with 95% CI)            (with 95% CI)")
+    print("-"*180)
     
     ratio_data = [row for row in metrics_data if row['ratio'] == ratio]
     for row in ratio_data:
@@ -707,15 +720,16 @@ for ratio in sorted(set(row['ratio'] for row in metrics_data)):
         som_str = f"{row['som_estimate']:5.2f}"
         mos_str = f"{row['mos_estimate']:5.2f}"
         comp_str = f"{row['comp_estimate']:.3f} ± {row['comp_ci_width']:.3f}"
+        dist_str = f"{row['distance_estimate']:5.2f} ± {row['distance_ci_width']:5.2f}"
         
-        print(f"  {seed:4d}  {interval_display:12s}     {mom_str:>16s}    {som_str:>7s}    {mos_str:>7s}          {comp_str:>15s}")
+        print(f"  {seed:4d}  {interval_display:12s}     {mom_str:>16s}    {som_str:>7s}    {mos_str:>7s}          {comp_str:>15s}          {dist_str:>18s}")
 
-print("\n" + "="*150)
+print("\n" + "="*180)
 
 # Alternative view: Group by seed
 print("\n\nAlternative view grouped by seed:")
 print("🎯 LAYOUT-SPECIFIC PERFORMANCE")
-print("="*150)
+print("="*180)
 
 for seed in sorted(set(row['seed'] for row in metrics_data)):
     # Get typical distance for this seed
@@ -723,10 +737,10 @@ for seed in sorted(set(row['seed'] for row in metrics_data)):
     typical_dist = next(i['analysis']['typical_distance'] for i in infrastructure_instances if i['name'] == instance_name)
     
     print(f"\nSeed {seed} (typical_distance={typical_dist:.3f}km):")
-    print("-"*150)
-    print(" Ratio    Interval        Mean of Means     Std of    Mean of           Completion Rate")
-    print("              Type    (Assignment Time)      Means       Stds             (with 95% CI)")
-    print("-"*150)
+    print("-"*180)
+    print(" Ratio    Interval        Mean of Means     Std of    Mean of           Completion Rate      Mean Total Distance")
+    print("              Type    (Assignment Time)      Means       Stds             (with 95% CI)            (with 95% CI)")
+    print("-"*180)
     
     seed_data = [row for row in metrics_data if row['seed'] == seed]
     for row in seed_data:
@@ -737,73 +751,11 @@ for seed in sorted(set(row['seed'] for row in metrics_data)):
         som_str = f"{row['som_estimate']:5.2f}"
         mos_str = f"{row['mos_estimate']:5.2f}"
         comp_str = f"{row['comp_estimate']:.3f} ± {row['comp_ci_width']:.3f}"
+        dist_str = f"{row['distance_estimate']:5.2f} ± {row['distance_ci_width']:5.2f}"
         
-        print(f"  {ratio:3.1f}  {interval_display:12s}     {mom_str:>16s}    {som_str:>7s}    {mos_str:>7s}          {comp_str:>15s}")
+        print(f"  {ratio:3.1f}  {interval_display:12s}     {mom_str:>16s}    {som_str:>7s}    {mos_str:>7s}          {comp_str:>15s}          {dist_str:>18s}")
 
-print("\n" + "="*150)
-print("✓ Metric extraction complete with layout sensitivity analysis")
+print("\n" + "="*180)
+print("✓ Metric extraction complete with layout sensitivity analysis and distance data")
 
-# %% CELL 17: Layout Sensitivity Analysis
-print("\n" + "="*80)
-print("LAYOUT SENSITIVITY ANALYSIS")
-print("="*80)
-print("\nTesting hypothesis: Do regime boundaries hold across different layouts?")
-print("="*80)
 
-import pandas as pd
-df_metrics = pd.DataFrame(metrics_data)
-
-# For each ratio, compare performance across seeds
-for ratio in sorted(df_metrics['ratio'].unique()):
-    print(f"\n{'='*80}")
-    print(f"Ratio {ratio:.1f} - Layout Comparison")
-    print(f"{'='*80}")
-    
-    ratio_data = df_metrics[df_metrics['ratio'] == ratio]
-    
-    # Group by seed and interval type
-    for interval_type in ['baseline', '2x_baseline']:
-        print(f"\n{interval_type.replace('_', ' ').title()}:")
-        type_data = ratio_data[ratio_data['interval_type'] == interval_type]
-        
-        for _, row in type_data.iterrows():
-            seed = row['seed']
-            # Get typical distance for context
-            instance_name = f"area_10km_seed{seed}"
-            typical_dist = next(i['analysis']['typical_distance'] for i in infrastructure_instances if i['name'] == instance_name)
-            
-            print(f"  Seed {seed:3d} (typical_dist={typical_dist:.3f}km): "
-                  f"Assignment time={row['mom_estimate']:5.2f}±{row['mom_ci_width']:4.2f}min, "
-                  f"Completion={row['comp_estimate']:.3f}±{row['comp_ci_width']:.3f}")
-        
-        # Compare variance across seeds
-        assignment_times = type_data['mom_estimate'].values
-        if len(assignment_times) > 1:
-            mean_across_seeds = assignment_times.mean()
-            std_across_seeds = assignment_times.std()
-            cv_across_seeds = std_across_seeds / mean_across_seeds if mean_across_seeds > 0.01 else 0
-            
-            print(f"  → Across seeds: mean={mean_across_seeds:.2f}, std={std_across_seeds:.2f}, CV={cv_across_seeds:.2%}")
-            
-            if cv_across_seeds < 0.2:
-                print(f"  → Low variation across layouts (CV<20%) - regime behavior consistent")
-            elif cv_across_seeds < 0.5:
-                print(f"  → Moderate variation (20%<CV<50%) - layout has some effect")
-            else:
-                print(f"  → High variation (CV>50%) - layout critically affects performance")
-
-print("\n" + "="*80)
-print("✓ Layout sensitivity analysis complete")
-
-print("\n" + "="*80)
-print("INFRASTRUCTURE LAYOUT STUDY COMPLETE")
-print("="*80)
-print("\nKey findings:")
-print(f"✓ Tested {len(structural_seeds)} different restaurant layouts")
-print(f"✓ Across {len(target_arrival_interval_ratios)} critical ratios")
-print(f"✓ Each with baseline + 2× baseline validation")
-print(f"✓ Total: {len(design_points)} design points × {experiment_config.num_replications} replications")
-print("\nNext steps:")
-print("  • Analyze if regime boundaries hold across layouts")
-print("  • Examine if typical_distance predicts performance differences")
-print("  • Decide whether to test area_size or num_restaurants variation next")
