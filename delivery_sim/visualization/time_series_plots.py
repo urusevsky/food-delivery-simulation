@@ -146,7 +146,11 @@ class TimeSeriesVisualizer:
             fig, axes
         """
         n_pairs = len(metric_pairs)
-        fig, axes = plt.subplots(n_pairs, 1, figsize=self.figsize, sharex=True)
+        
+        # Use reasonable height: 5 inches per pair (instead of using full figsize height)
+        fig_height = n_pairs * 5
+        fig, axes = plt.subplots(n_pairs, 1, figsize=(self.figsize[0], fig_height), sharex=True)
+        
         if n_pairs == 1:
             axes = [axes]
         
@@ -181,9 +185,3 @@ class TimeSeriesVisualizer:
         
         plt.tight_layout()
         return fig, axes
-    
-    def _moving_average(self, values, window):
-        """Calculate moving average with window size."""
-        if len(values) < window:
-            return values
-        return np.convolve(values, np.ones(window)/window, mode='same')
