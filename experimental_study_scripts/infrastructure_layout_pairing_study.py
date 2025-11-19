@@ -983,13 +983,198 @@ print(f"{'Maximum Queue Length':<30} {max_queue_no_pair:>10.0f}     {max_queue_p
 print(f"{'% Time Zero Idle Drivers':<30} {zero_avail_pct_no_pair:>9.1f}%     {zero_avail_pct_pair:>9.1f}%     {(zero_avail_pct_pair - zero_avail_pct_no_pair):>+6.1f}pp")
 print("="*75)
 
-print("\n✓ Single replication analysis complete")
+print("\n✓ Ratio 5.0 analysis complete")
 print("\nKey Insight:")
-print("  This single replication clearly shows how pairing 'rescues' the system:")
+print("  Ratio 5.0 shows IMPROVEMENT - both systems operational, one performs better:")
 print("  • Similar active driver levels (same driver supply)")
 print("  • Doubles idle capacity (available drivers)")
 print("  • Cuts queue length by 70-80%")
 print("  • Reduces time spent at zero capacity")
-print("  • Same workforce, dramatically different outcomes due to throughput efficiency")
+
+# ========================================
+# Part 4: Ratio 7.0 - THE REAL RESCUE EFFECT
+# ========================================
+print("\n" + "="*80)
+print("PART 3: RATIO 7.0 - PAIRING RESCUES FAILING SYSTEM")
+print("="*80)
+
+print("\nNow examining ratio 7.0 where TRUE rescue occurs:")
+print("  • No pairing: System failure (83% completion, zero idle capacity)")
+print("  • With pairing: System viable (97% completion, some buffer exists)")
+print("  • This is REGIME CHANGE, not just improvement\n")
+
+design_no_pairing_70 = 'area_10km_seed200_ratio_7.0_no_pairing_baseline'
+design_with_pairing_70 = 'area_10km_seed200_ratio_7.0_pairing_baseline'
+
+# Get replication 1 data
+rep_no_pairing_70 = study_results[design_no_pairing_70][0]['system_snapshots']
+rep_with_pairing_70 = study_results[design_with_pairing_70][0]['system_snapshots']
+
+print(f"No Pairing design: {design_no_pairing_70}")
+print(f"  • Total snapshots: {len(rep_no_pairing_70)}")
+print(f"\nWith Pairing design: {design_with_pairing_70}")
+print(f"  • Total snapshots: {len(rep_with_pairing_70)}")
+
+# ========================================
+# Ratio 7.0: Enhanced Stacked Views
+# ========================================
+print("\n" + "-"*80)
+print("VISUALIZATION: SIDE-BY-SIDE COMPARISON AT RATIO 7.0")
+print("-"*80)
+
+print("\nCreating color-coded comparison plots for ratio 7.0...")
+
+# Plot 1: No Pairing at Ratio 7.0
+print("\n1. NO PAIRING - Seed 200, Ratio 7.0, Baseline (SYSTEM FAILURE)")
+fig1_70, axes1_70 = plot_enhanced_stacked_view(
+    rep_no_pairing_70,
+    'NO PAIRING: Seed 200, Ratio 7.0 - Replication 1 (SYSTEM FAILURE)'
+)
+plt.show()
+
+# Plot 2: With Pairing at Ratio 7.0
+print("\n2. WITH PAIRING - Seed 200, Ratio 7.0, Baseline (SYSTEM RESCUED)")
+fig2_70, axes2_70 = plot_enhanced_stacked_view(
+    rep_with_pairing_70,
+    'WITH PAIRING: Seed 200, Ratio 7.0 - Replication 1 (SYSTEM RESCUED)'
+)
+plt.show()
+
+print("\n✓ Ratio 7.0 enhanced stacked views created")
+print("\nExpected Patterns:")
+print("  • Blue (Active): Similar between conditions (same driver supply)")
+print("  • Green (Available): No pairing flatlined at ZERO, pairing shows rare spikes")
+print("  • Red (Queue): No pairing shows RUNAWAY GROWTH, pairing shows controlled oscillation")
+
+# ========================================
+# Ratio 7.0: Direct Overlay Comparison
+# ========================================
+print("\n" + "-"*80)
+print("DIRECT OVERLAY: RATIO 7.0 - FAILURE VS RESCUE")
+print("-"*80)
+
+print("\nCreating 3-panel direct overlay for ratio 7.0...")
+
+fig_70, axes_70 = plt.subplots(3, 1, figsize=(16, 14), sharex=True)
+
+# Extract data
+timestamps_no_pair_70 = [s['timestamp'] for s in rep_no_pairing_70]
+active_no_pair_70 = [s['active_drivers'] for s in rep_no_pairing_70]
+available_no_pair_70 = [s['available_drivers'] for s in rep_no_pairing_70]
+queue_no_pair_70 = [s['unassigned_delivery_entities'] for s in rep_no_pairing_70]
+
+timestamps_pair_70 = [s['timestamp'] for s in rep_with_pairing_70]
+active_pair_70 = [s['active_drivers'] for s in rep_with_pairing_70]
+available_pair_70 = [s['available_drivers'] for s in rep_with_pairing_70]
+queue_pair_70 = [s['unassigned_delivery_entities'] for s in rep_with_pairing_70]
+
+# Panel 1: Active Drivers Comparison
+axes_70[0].plot(timestamps_no_pair_70, active_no_pair_70, 
+            color='#D62828', linewidth=1.5, alpha=0.7,
+            label='No Pairing (FAILURE)')
+axes_70[0].plot(timestamps_pair_70, active_pair_70, 
+            color='#06A77D', linewidth=2.0, alpha=0.85,
+            label='With Pairing (RESCUED)')
+axes_70[0].set_ylabel('Active Drivers', fontsize=12, fontweight='bold')
+axes_70[0].legend(loc='upper right', fontsize=11, framealpha=0.9)
+axes_70[0].grid(True, alpha=0.3)
+axes_70[0].set_title('Active Drivers: Same Supply, Different Outcomes', 
+                  fontsize=13, fontweight='bold')
+
+# Panel 2: Available Drivers Comparison
+axes_70[1].plot(timestamps_no_pair_70, available_no_pair_70, 
+            color='#D62828', linewidth=1.5, alpha=0.7,
+            label='No Pairing (FAILURE)')
+axes_70[1].plot(timestamps_pair_70, available_pair_70, 
+            color='#06A77D', linewidth=2.0, alpha=0.85,
+            label='With Pairing (RESCUED)')
+axes_70[1].set_ylabel('Available Drivers', fontsize=12, fontweight='bold')
+axes_70[1].legend(loc='upper right', fontsize=11, framealpha=0.9)
+axes_70[1].grid(True, alpha=0.3)
+axes_70[1].set_title('Available Drivers: Zero vs Rare Buffer Spikes', 
+                  fontsize=13, fontweight='bold')
+
+# Panel 3: Queue Comparison - THE CRITICAL DIFFERENCE
+axes_70[2].plot(timestamps_no_pair_70, queue_no_pair_70, 
+            color='#D62828', linewidth=1.5, alpha=0.7,
+            label='No Pairing (FAILURE)')
+axes_70[2].plot(timestamps_pair_70, queue_pair_70, 
+            color='#06A77D', linewidth=2.0, alpha=0.85,
+            label='With Pairing (RESCUED)')
+axes_70[2].set_ylabel('Unassigned Delivery Entities', fontsize=12, fontweight='bold')
+axes_70[2].set_xlabel('Simulation Time (minutes)', fontsize=12)
+axes_70[2].legend(loc='upper left', fontsize=11, framealpha=0.9)
+axes_70[2].grid(True, alpha=0.3)
+axes_70[2].set_title('Queue Dynamics: RUNAWAY GROWTH vs CONTROLLED OSCILLATION', 
+                  fontsize=13, fontweight='bold')
+
+fig_70.suptitle('REGIME CHANGE: Seed 200, Ratio 7.0 (Baseline) - Replication 1', 
+             fontsize=15, fontweight='bold')
+plt.tight_layout()
+plt.show()
+
+print("\n✓ Ratio 7.0 direct overlay created")
+
+# ========================================
+# Ratio 7.0: Summary Statistics
+# ========================================
+print("\n" + "-"*80)
+print("SUMMARY STATISTICS: RATIO 7.0 - FAILURE VS RESCUE")
+print("-"*80)
+
+import numpy as np
+
+# Calculate summary stats for ratio 7.0
+avg_active_no_pair_70 = np.mean(active_no_pair_70)
+avg_active_pair_70 = np.mean(active_pair_70)
+avg_avail_no_pair_70 = np.mean(available_no_pair_70)
+avg_avail_pair_70 = np.mean(available_pair_70)
+avg_queue_no_pair_70 = np.mean(queue_no_pair_70)
+avg_queue_pair_70 = np.mean(queue_pair_70)
+
+max_queue_no_pair_70 = np.max(queue_no_pair_70)
+max_queue_pair_70 = np.max(queue_pair_70)
+
+zero_avail_pct_no_pair_70 = 100 * sum(1 for x in available_no_pair_70 if x == 0) / len(available_no_pair_70)
+zero_avail_pct_pair_70 = 100 * sum(1 for x in available_pair_70 if x == 0) / len(available_pair_70)
+
+print(f"\n{'Metric':<30} {'No Pairing':<15} {'With Pairing':<15} {'Change'}")
+print("="*75)
+print(f"{'Average Active Drivers':<30} {avg_active_no_pair_70:>10.2f}     {avg_active_pair_70:>10.2f}     {((avg_active_pair_70/avg_active_no_pair_70 - 1)*100):>+6.1f}%")
+print(f"{'Average Available Drivers':<30} {avg_avail_no_pair_70:>10.2f}     {avg_avail_pair_70:>10.2f}     {'N/A (0→pos)'}")
+print(f"{'Average Queue Length':<30} {avg_queue_no_pair_70:>10.2f}     {avg_queue_pair_70:>10.2f}     {((avg_queue_pair_70/avg_queue_no_pair_70 - 1)*100):>+6.1f}%")
+print(f"{'Maximum Queue Length':<30} {max_queue_no_pair_70:>10.0f}     {max_queue_pair_70:>10.0f}     {((max_queue_pair_70/max_queue_no_pair_70 - 1)*100):>+6.1f}%")
+print(f"{'% Time Zero Idle Drivers':<30} {zero_avail_pct_no_pair_70:>9.1f}%     {zero_avail_pct_pair_70:>9.1f}%     {(zero_avail_pct_pair_70 - zero_avail_pct_no_pair_70):>+6.1f}pp")
+print("="*75)
+
+print("\n✓ Ratio 7.0 analysis complete")
+
+# ========================================
+# Final Summary: Ratio 5.0 vs 7.0 Comparison
+# ========================================
+print("\n" + "="*80)
+print("FINAL SUMMARY: IMPROVEMENT (5.0) VS RESCUE (7.0)")
+print("="*80)
+
+print("\nRATIO 5.0 - IMPROVEMENT EFFECT:")
+print("  • No pairing: Stressed but operational (14 avg queue, 97% completion)")
+print("  • With pairing: Healthy operation (3 avg queue, 98% completion)")
+print("  • Interpretation: Both work, pairing performs 4× better")
+print("  • System state: Volatile regime → Stable regime")
+
+print("\nRATIO 7.0 - RESCUE EFFECT (REGIME CHANGE):")
+print("  • No pairing: SYSTEM FAILURE (runaway queue growth, 83% completion)")
+print("  • With pairing: System viable (controlled oscillation, 97% completion)")
+print("  • Interpretation: One fails, one survives")
+print("  • System state: Failure regime → Manageable regime")
+
+print("\n" + "="*80)
+print("KEY INSIGHT:")
+print("="*80)
+print("Ratio 5.0 demonstrates pairing's PERFORMANCE BENEFITS")
+print("Ratio 7.0 demonstrates pairing's OPERATIONAL NECESSITY")
+print("\nPairing isn't just an optimization - at high load ratios, it's the difference")
+print("between a functioning system and a failing one. This is the 'rescue effect.'")
+print("="*80)
 
 # %%
