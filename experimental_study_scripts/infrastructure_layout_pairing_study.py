@@ -680,9 +680,10 @@ for design_name, analysis_result in design_analysis_results.items():
         'avail_mos_estimate': avail_mos_estimate,
     })
 
-# Sort by ratio, seed, pairing status, then interval type
-# This groups results by seed so no_pairing and pairing are juxtaposed for easy comparison
-metrics_data.sort(key=lambda x: (x['ratio'], x['seed'], x['pairing_status'], x['interval_type']))
+# Sort by interval type, ratio, seed, then pairing status
+# This groups all Baselines together, then all 2x Baselines
+# Within each interval type, pairing vs no_pairing are juxtaposed for easy comparison
+metrics_data.sort(key=lambda x: (x['interval_type'], x['ratio'], x['seed'], x['pairing_status']))
 
 # ========================================
 # VIEW 1: Complete table with pairing
