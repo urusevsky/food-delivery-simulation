@@ -731,9 +731,9 @@ for design_name, analysis_result in design_analysis_results.items():
         'formation_ci_width': formation_ci_width,
     })
 
-# Sort by: interval_type, seed, ratio, density, pairing_status
-# This groups same seed with different densities together for easy comparison
-metrics_data.sort(key=lambda x: (x['interval_type'], x['seed'], x['ratio'], x['density'], x['pairing_status']))
+# Sort by: interval_type, pairing_status, ratio, seed, density
+# This groups all pairing conditions together, then by ratio, seed, with density varying
+metrics_data.sort(key=lambda x: (x['interval_type'], x['pairing_status'], x['ratio'], x['seed'], x['density']))
 
 # ========================================
 # MAIN TABLE: Density effects by seed
@@ -767,7 +767,7 @@ for row in metrics_data:
 
 print("="*220)
 print("\n✓ Metric extraction complete with density × pairing × ratio analysis")
-print("✓ Sorted by: interval_type → seed → ratio → density → pairing_status")
+print("✓ Sorted by: interval_type → pairing_status → ratio → seed → density")
 print("✓ Compare density effects within same seed group to understand infrastructure design principles")
 
 # %%
