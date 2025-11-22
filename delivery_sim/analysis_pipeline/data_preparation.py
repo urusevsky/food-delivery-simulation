@@ -77,7 +77,38 @@ class AnalyticalPopulations:
             order for order in cohort 
             if order.delivery_time is not None
         ]
-    
+
+    def get_cohort_completed_pairs(self):
+        """
+        Get completed pairs where both constituent orders arrived post-warmup.
+        
+        This population provides unbiased pair-level performance metrics by
+        excluding "hybrid" pairs where one order arrived during warmup.
+        
+        Research Question: "For pairs formed entirely within the representative
+        operational period, what is their typical formation/assignment/fulfillment time?"
+        
+        Returns:
+            list: Completed Pair entities where both orders arrived post-warmup
+        """
+        if 'pair' not in self._repositories:
+            return []
+        
+        all_pairs = self._repositories['pair'].find_all()
+        unbiased_pairs = []
+        
+        for pair in all_pairs:
+            # Must be completed
+            if pair.completion_time is None:
+                continue
+            
+            # Both constituent orders must have arrived post-warmup
+            if (pair.order1.arrival_time >= self._warmup_period and 
+                pair.order2.arrival_time >= self._warmup_period):
+                unbiased_pairs.append(pair)
+        
+        return unbiased_pairs
+
     def get_cohort_completed_delivery_units(self):
         """
         Get completed cohort delivery units for calculating unbiased average performance metrics.
@@ -175,6 +206,7 @@ class AnalysisData:
         # Create all populations upfront for this replication
         self.cohort_orders = populations.get_cohort_orders()
         self.cohort_completed_orders = populations.get_cohort_completed_orders()
+        self.cohort_completed_pairs = populations.get_cohort_completed_pairs()  # ADD THIS
         self.cohort_completed_delivery_units = populations.get_cohort_completed_delivery_units()
         self.cohort_paired_orders = populations.get_cohort_paired_orders()
         self.post_warmup_snapshots = populations.get_post_warmup_snapshots()  # NEW
