@@ -56,7 +56,35 @@ METRIC_CONFIGURATIONS = {
         ],
         'description': 'Individual order performance metrics'
     },
-    
+    'pair_metrics': {
+        'aggregation_pattern': 'two_level',
+        'metric_module': 'delivery_sim.metrics.entity.pair_metrics',
+        'metric_function': 'calculate_all_pair_metrics',
+        'data_key': 'cohort_completed_pairs',
+        'experiment_stats': [
+            {
+                'name': 'mean_of_means', 
+                'extract': 'mean', 
+                'compute': 'mean',
+                'construct_ci': True,
+                'description': 'Average of metric means across replications'
+            },
+            {
+                'name': 'std_of_means', 
+                'extract': 'mean', 
+                'compute': 'std',
+                'construct_ci': False,
+                'description': 'Between-replication consistency'
+            },
+            {
+                'name': 'mean_of_stds', 
+                'extract': 'std', 
+                'compute': 'mean',
+                'construct_ci': False,
+                'description': 'Average within-replication volatility'
+            }
+        ]
+    },    
     'delivery_unit_metrics': {
         'aggregation_pattern': 'two_level', 
         'metric_module': 'delivery_sim.metrics.entity.delivery_unit_metrics',
