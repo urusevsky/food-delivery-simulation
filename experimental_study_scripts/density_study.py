@@ -654,7 +654,7 @@ def extract_density_seed_ratio_pairing_and_type(design_name):
         return density, seed, ratio, pairing_status, interval_type
     return None, None, None, None, None
 
-# Extract comprehensive metrics including pairing rate
+# Extract comprehensive metrics including pairing rate and pair formation time
 metrics_data = []
 
 for design_name, analysis_result in design_analysis_results.items():
@@ -673,12 +673,6 @@ for design_name, analysis_result in design_analysis_results.items():
     mom_ci = mean_of_means.get('confidence_interval', [0, 0])
     mom_ci_width = (mom_ci[1] - mom_ci[0]) / 2 if mom_ci[0] is not None else 0
     
-    std_of_means = assignment_time.get('std_of_means', {})
-    som_estimate = std_of_means.get('point_estimate', 0)
-    
-    mean_of_stds = assignment_time.get('mean_of_stds', {})
-    mos_estimate = mean_of_stds.get('point_estimate', 0)
-    
     # Extract completion rate (from system_metrics)
     system_metrics = stats_with_cis.get('system_metrics', {})
     completion_rate = system_metrics.get('system_completion_rate', {})
@@ -693,29 +687,29 @@ for design_name, analysis_result in design_analysis_results.items():
     pairing_rate_ci = pairing_rate_stats.get('confidence_interval', [0, 0])
     pairing_rate_ci_width = (pairing_rate_ci[1] - pairing_rate_ci[0]) / 2 if pairing_rate_ci[0] is not None else 0
     
-    # Extract total distance (from delivery_unit_metrics)
+    # Extract mean total distance (from delivery_unit_metrics)
     delivery_unit_metrics = stats_with_cis.get('delivery_unit_metrics', {})
-    total_distance_stats = delivery_unit_metrics.get('total_distance', {})
-    
-    distance_mean_of_means = total_distance_stats.get('mean_of_means', {})
-    distance_estimate = distance_mean_of_means.get('point_estimate', 0)
-    distance_ci = distance_mean_of_means.get('confidence_interval', [0, 0])
+    total_distance = delivery_unit_metrics.get('total_distance', {})
+    distance_mom = total_distance.get('mean_of_means', {})
+    distance_estimate = distance_mom.get('point_estimate', 0)
+    distance_ci = distance_mom.get('confidence_interval', [0, 0])
     distance_ci_width = (distance_ci[1] - distance_ci[0]) / 2 if distance_ci[0] is not None else 0
     
-    # Extract available_drivers (from system_state_metrics)
-    state_metrics = stats_with_cis.get('system_state_metrics', {})
-    available_drivers_stats = state_metrics.get('available_drivers', {})
-    
-    avail_mean_of_means = available_drivers_stats.get('mean_of_means', {})
-    avail_mom_estimate = avail_mean_of_means.get('point_estimate', 0)
-    avail_mom_ci = avail_mean_of_means.get('confidence_interval', [0, 0])
+    # Extract available drivers (from system_state_metrics)
+    system_state_metrics = stats_with_cis.get('system_state_metrics', {})
+    available_drivers = system_state_metrics.get('available_drivers', {})
+    avail_mom = available_drivers.get('mean_of_means', {})
+    avail_mom_estimate = avail_mom.get('point_estimate', 0)
+    avail_mom_ci = avail_mom.get('confidence_interval', [0, 0])
     avail_mom_ci_width = (avail_mom_ci[1] - avail_mom_ci[0]) / 2 if avail_mom_ci[0] is not None else 0
     
-    avail_std_of_means = available_drivers_stats.get('std_of_means', {})
-    avail_som_estimate = avail_std_of_means.get('point_estimate', 0)
-    
-    avail_mean_of_stds = available_drivers_stats.get('mean_of_stds', {})
-    avail_mos_estimate = avail_mean_of_stds.get('point_estimate', 0)
+    # Extract pair formation time (from pair_metrics) - only available when pairing enabled
+    pair_metrics = stats_with_cis.get('pair_metrics', {})
+    formation_time = pair_metrics.get('formation_time', {})
+    formation_mom = formation_time.get('mean_of_means', {})
+    formation_estimate = formation_mom.get('point_estimate', None)
+    formation_ci = formation_mom.get('confidence_interval', [None, None])
+    formation_ci_width = (formation_ci[1] - formation_ci[0]) / 2 if formation_ci[0] is not None else None
     
     metrics_data.append({
         'density': density,
@@ -725,8 +719,6 @@ for design_name, analysis_result in design_analysis_results.items():
         'interval_type': interval_type,
         'mom_estimate': mom_estimate,
         'mom_ci_width': mom_ci_width,
-        'som_estimate': som_estimate,
-        'mos_estimate': mos_estimate,
         'comp_estimate': comp_estimate,
         'comp_ci_width': comp_ci_width,
         'pairing_rate_estimate': pairing_rate_estimate,
@@ -735,24 +727,22 @@ for design_name, analysis_result in design_analysis_results.items():
         'distance_ci_width': distance_ci_width,
         'avail_mom_estimate': avail_mom_estimate,
         'avail_mom_ci_width': avail_mom_ci_width,
-        'avail_som_estimate': avail_som_estimate,
-        'avail_mos_estimate': avail_mos_estimate,
+        'formation_estimate': formation_estimate,
+        'formation_ci_width': formation_ci_width,
     })
 
-# Sort by interval type, density, ratio, seed, then pairing status
-# This groups all Baselines together, then all 2x Baselines
-# Within each interval type, density and pairing are juxtaposed for easy comparison
-metrics_data.sort(key=lambda x: (x['interval_type'], x['density'], x['ratio'], x['seed'], x['pairing_status']))
+# Sort by: interval_type, seed, ratio, density, pairing_status
+# This groups same seed with different densities together for easy comparison
+metrics_data.sort(key=lambda x: (x['interval_type'], x['seed'], x['ratio'], x['density'], x['pairing_status']))
 
 # ========================================
-# VIEW 1: Complete table with density
+# MAIN TABLE: Density effects by seed
 # ========================================
 print("\n🎯 KEY PERFORMANCE METRICS: DENSITY × PAIRING × RATIO EFFECTS")
-print("="*260)
-print(" Density  Seed   Ratio   Pairing      Interval        Mean of Means     Std of    Mean of           Completion Rate      Pairing Rate         Mean Total Distance      Available Drivers (mean_of_means)    Avail     Avail")
-print(" (/km²)                   Status           Type    (Assignment Time)      Means       Stds             (with 95% CI)        (with 95% CI)            (with 95% CI)                  (with 95% CI)          Std of   Mean of")
-print("                                                                                                                                                                                                                Means     Stds")
-print("="*260)
+print("="*220)
+print(" Density  Seed   Ratio   Pairing      Interval       Assignment Time       Completion Rate        Pairing Rate       Pair Formation Time      Mean Total Distance      Available Drivers")
+print(" (/km²)                  Status           Type       (mean_of_means)         (with 95% CI)         (with 95% CI)         (mean_of_means)           (with 95% CI)          (mean_of_means)")
+print("="*220)
 
 for row in metrics_data:
     density = row['density']
@@ -762,60 +752,22 @@ for row in metrics_data:
     interval_display = "2x Baseline" if row['interval_type'] == '2x_baseline' else "Baseline"
     
     mom_str = f"{row['mom_estimate']:5.2f} ± {row['mom_ci_width']:5.2f}"
-    som_str = f"{row['som_estimate']:5.2f}"
-    mos_str = f"{row['mos_estimate']:5.2f}"
     comp_str = f"{row['comp_estimate']:.3f} ± {row['comp_ci_width']:.3f}"
     pairing_rate_str = f"{row['pairing_rate_estimate']*100:4.1f}% ± {row['pairing_rate_ci_width']*100:4.1f}%"
     dist_str = f"{row['distance_estimate']:5.2f} ± {row['distance_ci_width']:5.2f}"
     avail_mom_str = f"{row['avail_mom_estimate']:5.2f} ± {row['avail_mom_ci_width']:5.2f}"
-    avail_som_str = f"{row['avail_som_estimate']:5.2f}"
-    avail_mos_str = f"{row['avail_mos_estimate']:5.2f}"
     
-    print(f"  {density:5.3f}  {seed:4d}   {ratio:3.1f}  {pairing_display:10s}  {interval_display:12s}     {mom_str:>16s}    {som_str:>7s}    {mos_str:>7s}          {comp_str:>15s}          {pairing_rate_str:>18s}          {dist_str:>18s}          {avail_mom_str:>22s}    {avail_som_str:>7s}   {avail_mos_str:>7s}")
+    # Pair formation time - N/A for no_pairing
+    if row['formation_estimate'] is not None:
+        formation_str = f"{row['formation_estimate']:5.2f} ± {row['formation_ci_width']:5.2f}"
+    else:
+        formation_str = "N/A".center(16)
+    
+    print(f"  {density:5.3f}  {seed:4d}   {ratio:3.1f}  {pairing_display:10s}  {interval_display:12s}     {mom_str:>16s}       {comp_str:>15s}       {pairing_rate_str:>18s}       {formation_str:>16s}          {dist_str:>18s}        {avail_mom_str:>18s}")
 
-print("="*260)
-
-# ========================================
-# VIEW 2: Grouped by density and pairing
-# ========================================
-print("\n\nAlternative view - grouped by density, ratio, and pairing status:")
-print("🎯 DENSITY EFFECTS ON SYSTEM PERFORMANCE")
-print("="*260)
-
-for density in sorted(set(row['density'] for row in metrics_data)):
-    for ratio in sorted(set(row['ratio'] for row in metrics_data)):
-        for pairing_status in ['no_pairing', 'pairing']:
-            pairing_display = "WITH PAIRING" if pairing_status == 'pairing' else "NO PAIRING"
-            print(f"\nDensity {density:.3f}/km² - Ratio {ratio:.1f} - {pairing_display}:")
-            print("-"*260)
-            print("  Seed   Interval        Mean of Means     Std of    Mean of           Completion Rate      Pairing Rate         Mean Total Distance      Available Drivers (mean_of_means)    Avail     Avail")
-            print("             Type    (Assignment Time)      Means       Stds             (with 95% CI)        (with 95% CI)            (with 95% CI)                  (with 95% CI)          Std of   Mean of")
-            print("                                                                                                                                                                                     Means     Stds")
-            print("-"*260)
-            
-            filtered_data = [row for row in metrics_data 
-                           if row['density'] == density 
-                           and row['ratio'] == ratio 
-                           and row['pairing_status'] == pairing_status]
-            
-            for row in filtered_data:
-                seed = row['seed']
-                interval_display = "2x Baseline" if row['interval_type'] == '2x_baseline' else "Baseline"
-                
-                mom_str = f"{row['mom_estimate']:5.2f} ± {row['mom_ci_width']:5.2f}"
-                som_str = f"{row['som_estimate']:5.2f}"
-                mos_str = f"{row['mos_estimate']:5.2f}"
-                comp_str = f"{row['comp_estimate']:.3f} ± {row['comp_ci_width']:.3f}"
-                pairing_rate_str = f"{row['pairing_rate_estimate']*100:4.1f}% ± {row['pairing_rate_ci_width']*100:4.1f}%"
-                dist_str = f"{row['distance_estimate']:5.2f} ± {row['distance_ci_width']:5.2f}"
-                avail_mom_str = f"{row['avail_mom_estimate']:5.2f} ± {row['avail_mom_ci_width']:5.2f}"
-                avail_som_str = f"{row['avail_som_estimate']:5.2f}"
-                avail_mos_str = f"{row['avail_mos_estimate']:5.2f}"
-                
-                print(f"  {seed:4d}  {interval_display:12s}     {mom_str:>16s}    {som_str:>7s}    {mos_str:>7s}          {comp_str:>15s}          {pairing_rate_str:>18s}          {dist_str:>18s}          {avail_mom_str:>22s}    {avail_som_str:>7s}   {avail_mos_str:>7s}")
-
-print("\n" + "="*260)
-print("✓ Metric extraction complete with density × pairing × ratio analysis")
-print("✓ Compare density effects across conditions to understand infrastructure design principles")
+print("="*220)
+print("\n✓ Metric extraction complete with density × pairing × ratio analysis")
+print("✓ Sorted by: interval_type → seed → ratio → density → pairing_status")
+print("✓ Compare density effects within same seed group to understand infrastructure design principles")
 
 # %%
