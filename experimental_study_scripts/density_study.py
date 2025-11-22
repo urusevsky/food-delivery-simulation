@@ -320,7 +320,7 @@ for instance in infrastructure_instances:
     print(f"{'='*50}")
     print(f"Layout: {instance['name']}")
     print(f"Density: {instance['density']:.3f} restaurants/km²")
-    print(f"Restaurants: {instance['infrastructure'].config.num_restaurants}")
+    print(f"Restaurants: {instance['infrastructure'].structural_config.num_restaurants}")
     print(f"Typical Distance: {instance['analysis']['typical_distance']:.3f}km")
     print(f"{'='*50}")
     
@@ -331,7 +331,7 @@ for instance in infrastructure_instances:
     fig = plt.gcf()
     seed = instance['seed']
     density = instance['density']
-    n_restaurants = instance['infrastructure'].config.num_restaurants
+    n_restaurants = instance['infrastructure'].structural_config.num_restaurants
     typical_dist = instance['analysis']['typical_distance']
     
     custom_title = (f"Infrastructure Layout: Density {density:.3f}/km² (Seed {seed})\n"
@@ -603,10 +603,16 @@ print("="*80)
 
 from delivery_sim.analysis_pipeline.pipeline_coordinator import ExperimentAnalysisPipeline
 
-# Initialize pipeline with delivery_unit_metrics enabled
+# Initialize pipeline with metric type enabled
 pipeline = ExperimentAnalysisPipeline(
     warmup_period=uniform_warmup_period,
-    enabled_metric_types=['order_metrics', 'system_metrics', 'delivery_unit_metrics', 'system_state_metrics'],
+    enabled_metric_types=[
+        'order_metrics', 
+        'system_metrics', 
+        'delivery_unit_metrics', 
+        'system_state_metrics',
+        'pair_metrics'  # ADD THIS
+    ],
     confidence_level=0.95
 )
 
