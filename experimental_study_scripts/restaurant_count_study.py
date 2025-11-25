@@ -385,50 +385,71 @@ For each ratio, create validation pair (baseline + 2× baseline) for both
 pairing enabled and disabled conditions.
 """
 
+# Critical ratios where restaurant count effects likely matter most
+target_arrival_interval_ratios = [5.0, 7.0]
+
+# Pairing configurations
+pairing_params = {
+    'pairing_enabled': True,
+    'restaurants_proximity_threshold': 4.0,
+    'customers_proximity_threshold': 3.0,
+}
+
+no_pairing_params = {
+    'pairing_enabled': False,
+    'restaurants_proximity_threshold': None,
+    'customers_proximity_threshold': None,
+}
+
+# Fixed service duration configuration
+FIXED_SERVICE_CONFIG = {
+    'mean_service_duration': 100,
+    'service_duration_std_dev': 60,
+    'min_service_duration': 30,
+    'max_service_duration': 200
+}
+
+# Build operational configs
 operational_configs = []
 
-# Define arrival interval ratios to test
-ratios = [5.0, 7.0]
-
-# Define interval scales for validation
-scales = [
-    {'name': '2x_baseline', 'order': 2.0, 'driver_multiplier': 2.0},
-    {'name': 'baseline', 'order': 1.0, 'driver_multiplier': 1.0}
-]
-
-# Define pairing configurations
-pairing_modes = [
-    {'name': 'no_pairing', 'enabled': False},
-    {'name': 'pairing', 'enabled': True}
-]
-
-for ratio in ratios:
-    for scale in scales:
-        for pairing in pairing_modes:
-            
-            mean_order = scale['order']
-            mean_driver = scale['driver_multiplier'] * ratio
-            
-            config_name = f"ratio_{ratio}_{pairing['name']}_{scale['name']}"
-            
-            operational_configs.append({
-                'name': config_name,
-                'config': OperationalConfig(
-                    mean_order_inter_arrival_time=mean_order,
-                    mean_driver_inter_arrival_time=mean_driver,
-                    pairing_enabled=pairing['enabled'],
-                    restaurants_proximity_threshold=4.0,
-                    customers_proximity_threshold=3.5,
-                    mean_service_duration=100,
-                    service_duration_std_dev=20,
-                    min_service_duration=60,
-                    max_service_duration=140
-                )
-            })
+for ratio in target_arrival_interval_ratios:
+    for pairing_config, pairing_name in [(no_pairing_params, 'no_pairing'), (pairing_params, 'pairing')]:
+        # Baseline configuration: (1.0, ratio)
+        operational_configs.append({
+            'name': f'ratio_{ratio:.1f}_{pairing_name}_baseline',
+            'config': OperationalConfig(
+                mean_order_inter_arrival_time=1.0,
+                mean_driver_inter_arrival_time=ratio,
+                **pairing_config,
+                **FIXED_SERVICE_CONFIG
+            )
+        })
+        
+        # 2x Baseline configuration: (2.0, 2×ratio)
+        operational_configs.append({
+            'name': f'ratio_{ratio:.1f}_{pairing_name}_2x_baseline',
+            'config': OperationalConfig(
+                mean_order_inter_arrival_time=2.0,
+                mean_driver_inter_arrival_time=2.0 * ratio,
+                **pairing_config,
+                **FIXED_SERVICE_CONFIG
+            )
+        })
 
 print(f"✓ Defined {len(operational_configs)} operational configurations")
-print(f"✓ Ratios: {ratios}")
-print(f"✓ Each ratio tested with: pairing × no_pairing × baseline × 2x_baseline")
+print(f"✓ Testing {len(target_arrival_interval_ratios)} critical arrival interval ratios")
+print(f"✓ Each ratio has 2 pairing configs × 2 validation pairs = 4 configs")
+
+# Display configurations
+print("\nConfiguration breakdown:")
+for config in operational_configs:
+    op_config = config['config']
+    ratio = op_config.mean_driver_inter_arrival_time / op_config.mean_order_inter_arrival_time
+    pairing_status = "PAIRING" if op_config.pairing_enabled else "NO_PAIRING"
+    print(f"  • {config['name']}: "
+          f"ratio={ratio:.1f}, {pairing_status}, "
+          f"order_interval={op_config.mean_order_inter_arrival_time:.1f}min, "
+          f"driver_interval={op_config.mean_driver_inter_arrival_time:.1f}min")
 
 # %% CELL 9: Create Design Points
 """
