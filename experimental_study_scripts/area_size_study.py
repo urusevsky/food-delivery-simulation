@@ -772,4 +772,114 @@ print("✓ Compare area size effects within same seed group")
 print("\nSCOPE REMINDER: Results specific to 10 restaurants. ")
 print("Effects of restaurant count not tested in this study.")
 
+# %% AD HOC ANALYSIS: Eligible Restaurant Pairs by Area Size
+"""
+Verify hypothesis: Larger delivery areas have fewer eligible restaurant pairs
+within the fixed 4.0 km pairing threshold.
+
+This addresses the gap identified in analysis: we need empirical evidence that
+spatial dilution actually reduces pairing opportunities as area size increases.
+"""
+
+print("\n" + "="*80)
+print("AD HOC ANALYSIS: ELIGIBLE RESTAURANT PAIRS BY AREA SIZE")
+print("="*80)
+
+from delivery_sim.utils.location_utils import calculate_distance
+
+# Fixed pairing threshold from operational configs
+RESTAURANT_PAIRING_THRESHOLD = 4.0  # km
+
+# Analyze each infrastructure instance
+eligible_pairs_data = []
+
+print(f"\nAnalyzing eligible restaurant pairs with threshold = {RESTAURANT_PAIRING_THRESHOLD} km")
+print(f"Total infrastructure instances: {len(infrastructure_instances)}\n")
+
+for instance in infrastructure_instances:
+    area_size = instance['area_size']
+    seed = instance['seed']
+    infrastructure = instance['infrastructure']
+    
+    # Get all restaurants from repository
+    restaurants = infrastructure.restaurant_repository.find_all()
+    num_restaurants = len(restaurants)
+    
+    # Calculate all pairwise distances
+    eligible_pairs = []
+    all_distances = []
+    
+    for i, rest1 in enumerate(restaurants):
+        for j, rest2 in enumerate(restaurants[i+1:], i+1):
+            distance = calculate_distance(rest1.location, rest2.location)
+            all_distances.append(distance)
+            
+            if distance <= RESTAURANT_PAIRING_THRESHOLD:
+                eligible_pairs.append({
+                    'restaurant_1': rest1.restaurant_id,
+                    'restaurant_2': rest2.restaurant_id,
+                    'distance': distance
+                })
+    
+    # Calculate statistics
+    total_possible_pairs = len(all_distances)
+    num_eligible_pairs = len(eligible_pairs)
+    eligible_percentage = (num_eligible_pairs / total_possible_pairs * 100) if total_possible_pairs > 0 else 0
+    
+    # Distance statistics
+    min_distance = min(all_distances) if all_distances else 0
+    max_distance = max(all_distances) if all_distances else 0
+    mean_distance = sum(all_distances) / len(all_distances) if all_distances else 0
+    
+    eligible_pairs_data.append({
+        'area_size': area_size,
+        'seed': seed,
+        'num_restaurants': num_restaurants,
+        'total_possible_pairs': total_possible_pairs,
+        'num_eligible_pairs': num_eligible_pairs,
+        'eligible_percentage': eligible_percentage,
+        'min_distance': min_distance,
+        'max_distance': max_distance,
+        'mean_distance': mean_distance
+    })
+    
+    print(f"Area {area_size}×{area_size} km (Seed {seed}):")
+    print(f"  Total possible pairs: {total_possible_pairs}")
+    print(f"  Eligible pairs: {num_eligible_pairs} ({eligible_percentage:.1f}%)")
+    print(f"  Distance range: {min_distance:.2f} - {max_distance:.2f} km (mean: {mean_distance:.2f})")
+    print()
+
+# Create summary table by area size
+print("="*80)
+print("SUMMARY: ELIGIBLE PAIRS BY AREA SIZE")
+print("="*80)
+
+# Group by area size
+from collections import defaultdict
+area_summaries = defaultdict(list)
+
+for data in eligible_pairs_data:
+    area_summaries[data['area_size']].append(data)
+
+print(f"\n{'Area Size':<12} {'Seed':<6} {'Total Pairs':<12} {'Eligible':<10} {'Eligible %':<12} {'Mean Dist (km)':<15}")
+print("-"*80)
+
+for area_size in sorted(area_summaries.keys()):
+    for data in sorted(area_summaries[area_size], key=lambda x: x['seed']):
+        print(f"{area_size:>4}×{area_size:<4} km   {data['seed']:<6} {data['total_possible_pairs']:<12} "
+              f"{data['num_eligible_pairs']:<10} {data['eligible_percentage']:>7.1f}%      {data['mean_distance']:>7.2f}")
+    
+    # Calculate mean across seeds for this area size
+    area_data = area_summaries[area_size]
+    mean_eligible_pct = sum(d['eligible_percentage'] for d in area_data) / len(area_data)
+    mean_mean_dist = sum(d['mean_distance'] for d in area_data) / len(area_data)
+    
+    print(f"{'  Mean':<12} {'':>6} {'':>12} {'':>10} {mean_eligible_pct:>7.1f}%      {mean_mean_dist:>7.2f}")
+    print("-"*80)
+
+print("\n✓ Analysis complete")
+print("\nINTERPRETATION:")
+print("  • If eligible percentage decreases with area size → spatial dilution confirmed")
+print("  • Fixed threshold (4.0 km) captures fewer pairs as restaurants spread out")
+print("  • This provides mechanistic explanation for area size performance effects")
 # %%
