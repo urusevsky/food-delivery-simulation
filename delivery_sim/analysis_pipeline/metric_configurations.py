@@ -159,6 +159,20 @@ METRIC_CONFIGURATIONS = {
             },
         ],
         'description': 'System-wide performance metrics'
+    },
+    'queue_dynamics_metrics': {
+        'aggregation_pattern': 'one_level',
+        'metric_module': 'delivery_sim.metrics.system.queue_dynamics_metrics',
+        'metric_function': 'calculate_all_queue_dynamics_metrics',
+        'data_key': None,  # Uses analysis_data directly
+        'ci_config': [
+            {
+                'metric_name': 'unassigned_entities_growth_rate',
+                'target_statistic': 'mean',
+                'construct_ci': True
+            }
+        ],
+        'description': 'Queue dynamics metrics (growth rate, trend analysis)'
     }
 }
 
