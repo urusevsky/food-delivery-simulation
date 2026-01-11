@@ -593,7 +593,9 @@ for design_name, analysis_result in design_analysis_results.items():
     
     stats_with_cis = analysis_result.get('statistics_with_cis', {})
     
-    # Extract assignment time statistics (nested under order_metrics)
+    # =====================================================================
+    # ASSIGNMENT TIME STATISTICS (nested under order_metrics)
+    # =====================================================================
     order_metrics = stats_with_cis.get('order_metrics', {})
     assignment_time = order_metrics.get('assignment_time', {})
     
@@ -611,34 +613,61 @@ for design_name, analysis_result in design_analysis_results.items():
     mean_of_stds = assignment_time.get('mean_of_stds', {})
     mos_estimate = mean_of_stds.get('point_estimate', 0)
     
-    # Extract completion rate (flat under system_metrics)
-    system_metrics = stats_with_cis.get('system_metrics', {})
-    completion_rate = system_metrics.get('system_completion_rate', {})
+    # =====================================================================
+    # QUEUE DYNAMICS METRICS (replacing completion rate)
+    # =====================================================================
     
-    comp_estimate = completion_rate.get('point_estimate', 0)
-    comp_ci = completion_rate.get('confidence_interval', [0, 0])
-    comp_ci_width = (comp_ci[1] - comp_ci[0]) / 2 if comp_ci[0] is not None else 0
+    # 1. Mean Unassigned Entities (from system_state_metrics)
+    system_state_metrics = stats_with_cis.get('system_state_metrics', {})
+    unassigned_entities = system_state_metrics.get('unassigned_delivery_entities', {})
     
+    mean_unassigned = unassigned_entities.get('mean_of_means', {})
+    mean_unassigned_estimate = mean_unassigned.get('point_estimate', 0)
+    mean_unassigned_ci = mean_unassigned.get('confidence_interval', [0, 0])
+    mean_unassigned_ci_width = (mean_unassigned_ci[1] - mean_unassigned_ci[0]) / 2 if mean_unassigned_ci[0] is not None else 0
+    
+    # 2. Std Unassigned Entities (from system_state_metrics)
+    std_unassigned = unassigned_entities.get('mean_of_stds', {})
+    std_unassigned_estimate = std_unassigned.get('point_estimate', 0)
+    
+    # 3. Growth Rate (from queue_dynamics_metrics)
+    queue_dynamics_metrics = stats_with_cis.get('queue_dynamics_metrics', {})
+    growth_rate_metric = queue_dynamics_metrics.get('unassigned_entities_growth_rate', {})
+    
+    growth_rate_estimate = growth_rate_metric.get('point_estimate', 0)
+    growth_rate_ci = growth_rate_metric.get('confidence_interval', [0, 0])
+    growth_rate_ci_width = (growth_rate_ci[1] - growth_rate_ci[0]) / 2 if growth_rate_ci[0] is not None else 0
+    
+    # =====================================================================
+    # BUILD ROW
+    # =====================================================================
     metrics_data.append({
         'ratio': ratio,
         'interval_type': interval_type,
+        # Assignment time
         'mom_estimate': mom_estimate,
         'mom_ci_width': mom_ci_width,
         'som_estimate': som_estimate,
         'mos_estimate': mos_estimate,
-        'comp_estimate': comp_estimate,
-        'comp_ci_width': comp_ci_width,
+        # Queue dynamics
+        'mean_unassigned_estimate': mean_unassigned_estimate,
+        'mean_unassigned_ci_width': mean_unassigned_ci_width,
+        'std_unassigned_estimate': std_unassigned_estimate,
+        'growth_rate_estimate': growth_rate_estimate,
+        'growth_rate_ci_width': growth_rate_ci_width,
     })
 
 # Sort by ratio then interval type
 metrics_data.sort(key=lambda x: (x['ratio'], x['interval_type']))
 
-# Print formatted table
-print("\n🎯 KEY PERFORMANCE METRICS: ASSIGNMENT TIME & COMPLETION RATE")
-print("="*136)
-print(" Ratio    Interval        Mean of Means     Std of    Mean of           Completion Rate")
-print("              Type    (Assignment Time)      Means       Stds             (with 95% CI)")
-print("="*136)
+# =========================================================================
+# PRINT FORMATTED TABLE
+# =========================================================================
+print("\n🎯 KEY PERFORMANCE METRICS: ASSIGNMENT TIME & QUEUE DYNAMICS")
+print("="*160)
+print(" Ratio    Interval        Mean of Means     Std of    Mean of      Mean Unassigned       Std Unassigned     Growth Rate")
+print("              Type    (Assignment Time)      Means       Stds         (entities)            (entities)     (entities/min)")
+print("="*160)
 
 for row in metrics_data:
     ratio = row['ratio']
@@ -649,38 +678,47 @@ for row in metrics_data:
     som_str = f"{row['som_estimate']:5.2f}"
     mos_str = f"{row['mos_estimate']:5.2f}"
     
-    # Completion rate: rate ± CI_width
-    comp_rate = row['comp_estimate']
-    comp_ci = row['comp_ci_width']
-    comp_str = f"{comp_rate:.3f} ± {comp_ci:.3f}"
+    # Mean Unassigned: value ± CI_width
+    mean_unassigned_str = f"{row['mean_unassigned_estimate']:6.2f} ± {row['mean_unassigned_ci_width']:6.2f}"
     
-    print(f"  {ratio:3.1f}  {interval_display:12s}     {mom_str:>16s}    {som_str:>7s}    {mos_str:>7s}          {comp_str:>15s}")
+    # Std Unassigned: value only (no CI)
+    std_unassigned_str = f"{row['std_unassigned_estimate']:6.2f}"
+    
+    # Growth Rate: value ± CI_width
+    growth_rate_str = f"{row['growth_rate_estimate']:7.4f} ± {row['growth_rate_ci_width']:7.4f}"
+    
+    print(f"  {ratio:3.1f}  {interval_display:12s}     {mom_str:>16s}    {som_str:>7s}    {mos_str:>7s}    {mean_unassigned_str:>19s}    {std_unassigned_str:>14s}    {growth_rate_str:>21s}")
 
-print("="*136)
+print("="*160)
 
-# Alternative view grouped by interval type
-print("\n\nAlternative table view:")
-print("🎯 KEY PERFORMANCE METRICS: GROUPED BY INTERVAL TYPE")
-print("="*136)
-print(" Ratio    Interval        Mean of Means     Std of    Mean of           Completion Rate")
-print("              Type    (Assignment Time)      Means       Stds             (with 95% CI)")
-print("="*136)
+# =========================================================================
+# ALTERNATIVE VIEW GROUPED BY INTERVAL TYPE
+# =========================================================================
+print("\n\n🎯 ALTERNATIVE VIEW: GROUPED BY INTERVAL TYPE")
+print("="*160)
+print(" Ratio    Interval        Mean of Means     Std of    Mean of      Mean Unassigned       Std Unassigned     Growth Rate")
+print("              Type    (Assignment Time)      Means       Stds         (entities)            (entities)     (entities/min)")
+print("="*160)
 
 # Group by interval type
-baseline_data = [d for d in metrics_data if d['interval_type'] == '2x_baseline']
-for row in baseline_data:
+print("2x BASELINE CONFIGURATIONS:")
+print("-"*160)
+baseline_2x_data = [d for d in metrics_data if d['interval_type'] == '2x_baseline']
+for row in baseline_2x_data:
     ratio = row['ratio']
     interval_display = "2x Baseline"
     
     mom_str = f"{row['mom_estimate']:5.2f} ± {row['mom_ci_width']:5.2f}"
     som_str = f"{row['som_estimate']:5.2f}"
     mos_str = f"{row['mos_estimate']:5.2f}"
-    comp_str = f"{row['comp_estimate']:.3f} ± {row['comp_ci_width']:.3f}"
+    mean_unassigned_str = f"{row['mean_unassigned_estimate']:6.2f} ± {row['mean_unassigned_ci_width']:6.2f}"
+    std_unassigned_str = f"{row['std_unassigned_estimate']:6.2f}"
+    growth_rate_str = f"{row['growth_rate_estimate']:7.4f} ± {row['growth_rate_ci_width']:7.4f}"
     
-    print(f"  {ratio:3.1f}  {interval_display:12s}     {mom_str:>16s}    {som_str:>7s}    {mos_str:>7s}          {comp_str:>15s}")
+    print(f"  {ratio:3.1f}  {interval_display:12s}     {mom_str:>16s}    {som_str:>7s}    {mos_str:>7s}    {mean_unassigned_str:>19s}    {std_unassigned_str:>14s}    {growth_rate_str:>21s}")
 
-print("-"*136)
-
+print("\nBASELINE CONFIGURATIONS:")
+print("-"*160)
 baseline_data = [d for d in metrics_data if d['interval_type'] == 'baseline']
 for row in baseline_data:
     ratio = row['ratio']
@@ -689,14 +727,37 @@ for row in baseline_data:
     mom_str = f"{row['mom_estimate']:5.2f} ± {row['mom_ci_width']:5.2f}"
     som_str = f"{row['som_estimate']:5.2f}"
     mos_str = f"{row['mos_estimate']:5.2f}"
-    comp_str = f"{row['comp_estimate']:.3f} ± {row['comp_ci_width']:.3f}"
+    mean_unassigned_str = f"{row['mean_unassigned_estimate']:6.2f} ± {row['mean_unassigned_ci_width']:6.2f}"
+    std_unassigned_str = f"{row['std_unassigned_estimate']:6.2f}"
+    growth_rate_str = f"{row['growth_rate_estimate']:7.4f} ± {row['growth_rate_ci_width']:7.4f}"
     
-    print(f"  {ratio:3.1f}  {interval_display:12s}     {mom_str:>16s}    {som_str:>7s}    {mos_str:>7s}          {comp_str:>15s}")
+    print(f"  {ratio:3.1f}  {interval_display:12s}     {mom_str:>16s}    {som_str:>7s}    {mos_str:>7s}    {mean_unassigned_str:>19s}    {std_unassigned_str:>14s}    {growth_rate_str:>21s}")
 
-print("="*136)
+print("="*160)
+
+# =========================================================================
+# INTERPRETATION GUIDE
+# =========================================================================
+print("\n📊 METRIC INTERPRETATION GUIDE:")
+print("-"*80)
+print("ASSIGNMENT TIME METRICS:")
+print("  • Mean of Means: Average customer wait time (with 95% CI)")
+print("  • Std of Means: System consistency across replications")
+print("  • Mean of Stds: Within-replication volatility")
+print()
+print("QUEUE DYNAMICS METRICS (Unassigned Delivery Entities):")
+print("  • Mean Unassigned: Average queue burden/severity (with 95% CI)")
+print("  • Std Unassigned: Temporal volatility (oscillation magnitude)")
+print("  • Growth Rate: System trajectory (≈0 = bounded, >0 = deteriorating)")
+print()
+print("REGIME SIGNATURES:")
+print("  • Stable (ratio ≤4.0):        Low mean, low std, growth ≈0")
+print("  • Oscillatory (ratio 4.5-5.5): Moderate mean/std, growth ≈0")
+print("  • Deteriorating (ratio ≥6.0):  High mean/std, growth >0")
+print("="*80)
 
 print("\n✓ Metric extraction complete")
-print("✓ Compare with original load_ratio study to verify exact reproduction")
+print("✓ Queue dynamics metrics replace completion rate as primary system indicators")
 
 # %% CELL 17: Validation Pair Comparison
 print("\n" + "="*80)
