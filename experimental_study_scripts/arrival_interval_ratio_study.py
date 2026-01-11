@@ -469,12 +469,12 @@ print("Processing time series data for warmup detection...")
 all_time_series_data = extract_warmup_time_series(
     study_results=study_results,
     design_points=design_points,
-    metrics=['active_drivers', 'unassigned_delivery_entities'],
-    moving_average_window=100  # Larger window for 2000-minute simulation
+    metrics=['active_drivers', 'available_drivers', 'unassigned_delivery_entities'],  # ← Added 'available_drivers'
+    moving_average_window=100
 )
 
 print(f"✓ Time series processing complete for {len(all_time_series_data)} design points")
-print(f"✓ Metrics extracted: active_drivers, unassigned_delivery_entities")
+print(f"✓ Metrics extracted: active_drivers, available_drivers, unassigned_delivery_entities")  # ← Updated
 print(f"✓ Ready for warmup analysis visualization")
 
 # %% CELL 13: Warmup Analysis Visualization
@@ -543,7 +543,8 @@ from delivery_sim.analysis_pipeline.pipeline_coordinator import ExperimentAnalys
 # Initialize pipeline
 pipeline = ExperimentAnalysisPipeline(
     warmup_period=uniform_warmup_period,
-    enabled_metric_types=['order_metrics', 'system_metrics'],
+    enabled_metric_types=['order_metrics', 'system_metrics', 
+                         'system_state_metrics', 'queue_dynamics_metrics'],
     confidence_level=0.95
 )
 
