@@ -160,6 +160,17 @@ METRIC_CONFIGURATIONS = {
         ],
         'description': 'System-wide performance metrics'
     },
+    # ==========================================================================
+    # ONE-LEVEL PATTERN: QUEUE DYNAMICS METRICS
+    # ==========================================================================
+    # Characteristics:
+    # - Calculated from post-warmup snapshots (time series)
+    # - Requires custom logic (growth rate = endpoint difference / window)
+    # - Returns scalar values directly (no entity iteration)
+    # - Aggregation: scalars → statistics (experiment)
+    # - Why one-level: Not a standard statistic; needs custom calculation
+    # - Example: growth_rate needs (terminal - initial) / window_length
+    
     'queue_dynamics_metrics': {
         'aggregation_pattern': 'one_level',
         'metric_module': 'delivery_sim.metrics.system.queue_dynamics_metrics',
