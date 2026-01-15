@@ -767,8 +767,7 @@ how severe the regime behavior is (quantitative magnitude)."
 
 Expected Evidence:
 1. Zero-crossing (regime boundary) occurs at similar ratio for both configurations
-2. Curve shapes are similar but vertically offset
-3. Severity ratio shows interpretable pattern across regimes
+2. Assignment time shows parallel behavior with absolute differences
 """
 
 import matplotlib.pyplot as plt
@@ -854,87 +853,7 @@ plt.tight_layout()
 plt.show()
 
 # ============================================================================
-# PLOT 2: Mean Unassigned vs Ratio (Severity Comparison)
-# ============================================================================
-plt.figure(figsize=(10, 6))
-
-# Plot baseline
-plt.errorbar(baseline_metrics['ratios'], baseline_metrics['mean_unassigned'],
-             yerr=baseline_metrics['mean_unassigned_err'],
-             marker='o', linewidth=2, markersize=8, capsize=5,
-             label='Baseline (higher intensity)', color='#2E86AB', linestyle='-')
-
-# Plot 2x baseline
-plt.errorbar(baseline_2x_metrics['ratios'], baseline_2x_metrics['mean_unassigned'],
-             yerr=baseline_2x_metrics['mean_unassigned_err'],
-             marker='s', linewidth=2, markersize=8, capsize=5,
-             label='2× Baseline (half intensity)', color='#A23B72', linestyle='--')
-
-plt.xlabel('Arrival Interval Ratio (driver/order)', fontsize=12, fontweight='bold')
-plt.ylabel('Mean Unassigned Entities', fontsize=12, fontweight='bold')
-plt.title('Plot 2: Severity Comparison (Queue Burden)', fontsize=14, fontweight='bold', pad=15)
-plt.legend(loc='upper left', fontsize=11)
-plt.grid(True, alpha=0.3, linestyle='--')
-plt.xlim([2.25, 7.25])
-plt.yscale('log')  # Log scale for better visibility
-
-plt.tight_layout()
-plt.show()
-
-# ============================================================================
-# PLOT 3: Severity Ratio (Baseline / 2× Baseline) vs Ratio
-# ============================================================================
-plt.figure(figsize=(10, 6))
-
-# Calculate severity ratios (avoiding division by zero)
-severity_ratio_unassigned = []
-severity_ratio_growth = []
-
-for r in ratios:
-    # Mean unassigned ratio
-    baseline_val = baseline_data[r]['mean_unassigned_estimate']
-    baseline_2x_val = baseline_2x_data[r]['mean_unassigned_estimate']
-    if baseline_2x_val > 0.01:  # Avoid near-zero denominators
-        severity_ratio_unassigned.append(baseline_val / baseline_2x_val)
-    else:
-        severity_ratio_unassigned.append(np.nan)
-    
-    # Growth rate ratio (only for positive growth rates to avoid noise)
-    baseline_growth = baseline_data[r]['growth_rate_estimate']
-    baseline_2x_growth = baseline_2x_data[r]['growth_rate_estimate']
-    if abs(baseline_2x_growth) > 0.001:  # Avoid near-zero denominators
-        severity_ratio_growth.append(baseline_growth / baseline_2x_growth)
-    else:
-        severity_ratio_growth.append(np.nan)
-
-# Plot severity ratios
-plt.plot(ratios, severity_ratio_unassigned, marker='o', linewidth=2, markersize=8,
-         label='Mean Unassigned Ratio', color='#2E86AB', linestyle='-')
-plt.plot(ratios, severity_ratio_growth, marker='s', linewidth=2, markersize=8,
-         label='Growth Rate Ratio', color='#A23B72', linestyle='--', alpha=0.7)
-
-# Add reference line at y=2.0 (expected if severity scales linearly with intensity)
-plt.axhline(y=2.0, color='red', linestyle=':', linewidth=2, alpha=0.7, 
-            label='Expected if linear scaling (ratio=2.0)')
-
-plt.xlabel('Arrival Interval Ratio (driver/order)', fontsize=12, fontweight='bold')
-plt.ylabel('Severity Ratio (Baseline / 2× Baseline)', fontsize=12, fontweight='bold')
-plt.title('Plot 3: Intensity Scaling Effect', fontsize=14, fontweight='bold', pad=15)
-plt.legend(loc='upper left', fontsize=11)
-plt.grid(True, alpha=0.3, linestyle='--')
-plt.xlim([2.25, 7.25])
-plt.ylim([0, 6])
-
-# Add interpretation note
-plt.text(0.98, 0.02, 'Ratio ≈ 2.0 suggests severity scales linearly with intensity\nDeviation indicates regime-specific effects',
-         transform=plt.gca().transAxes, ha='right', va='bottom', fontsize=9, style='italic',
-         bbox=dict(boxstyle='round,pad=0.5', facecolor='yellow', alpha=0.3))
-
-plt.tight_layout()
-plt.show()
-
-# ============================================================================
-# PLOT 4: Assignment Time Comparison (Customer-Facing Performance)
+# PLOT 4: Assignment Time Comparison - LINEAR SCALE
 # ============================================================================
 plt.figure(figsize=(10, 6))
 
@@ -942,102 +861,24 @@ plt.figure(figsize=(10, 6))
 plt.errorbar(baseline_metrics['ratios'], baseline_metrics['assignment_time'],
              yerr=baseline_metrics['assignment_time_err'],
              marker='o', linewidth=2, markersize=8, capsize=5,
-             label='Baseline (higher intensity)', color='#2E86AB', linestyle='-')
+             label='Baseline (higher intensity)', color='#17BEBB', linestyle='-')
 
 # Plot 2x baseline
 plt.errorbar(baseline_2x_metrics['ratios'], baseline_2x_metrics['assignment_time'],
              yerr=baseline_2x_metrics['assignment_time_err'],
              marker='s', linewidth=2, markersize=8, capsize=5,
-             label='2× Baseline (half intensity)', color='#A23B72', linestyle='--')
+             label='2× Baseline (half intensity)', color='#9B59B6', linestyle='--')
 
 plt.xlabel('Arrival Interval Ratio (driver/order)', fontsize=12, fontweight='bold')
 plt.ylabel('Mean Assignment Time (min)', fontsize=12, fontweight='bold')
-plt.title('Plot 4: Customer-Facing Performance', fontsize=14, fontweight='bold', pad=15)
+plt.title('Assignment Time: Customer-Facing Performance', fontsize=14, fontweight='bold', pad=15)
 plt.legend(loc='upper left', fontsize=11)
 plt.grid(True, alpha=0.3, linestyle='--')
 plt.xlim([2.25, 7.25])
-plt.yscale('log')  # Log scale for better visibility
+plt.ylim([0, 50])  # Linear scale from 0 to 50 minutes
 
 plt.tight_layout()
 plt.show()
 
-# ============================================================================
-# NUMERICAL ANALYSIS: Zero-Crossing Points
-# ============================================================================
-print("\n" + "="*80)
-print("REGIME BOUNDARY ANALYSIS: Zero-Crossing Detection")
-print("="*80)
 
-def find_zero_crossing(ratios_list, growth_rates):
-    """Find the ratio where growth rate crosses zero"""
-    for i in range(len(growth_rates) - 1):
-        if growth_rates[i] <= 0 and growth_rates[i+1] > 0:
-            # Linear interpolation to estimate crossing point
-            r1, g1 = ratios_list[i], growth_rates[i]
-            r2, g2 = ratios_list[i+1], growth_rates[i+1]
-            crossing = r1 + (0 - g1) * (r2 - r1) / (g2 - g1)
-            return crossing, r1, r2
-    return None, None, None
-
-baseline_crossing, b_lower, b_upper = find_zero_crossing(
-    baseline_metrics['ratios'], baseline_metrics['growth_rate'])
-baseline_2x_crossing, b2x_lower, b2x_upper = find_zero_crossing(
-    baseline_2x_metrics['ratios'], baseline_2x_metrics['growth_rate'])
-
-print(f"\nBaseline Configuration:")
-print(f"  Zero-crossing (estimated): {baseline_crossing:.2f}" if baseline_crossing else "  No crossing detected")
-print(f"  Bounded regime: ratio ≤ {b_upper if b_upper else 'N/A'}")
-print(f"  Deteriorating regime: ratio ≥ {b_upper if b_upper else 'N/A'}")
-
-print(f"\n2× Baseline Configuration:")
-print(f"  Zero-crossing (estimated): {baseline_2x_crossing:.2f}" if baseline_2x_crossing else "  No crossing detected")
-print(f"  Bounded regime: ratio ≤ {b2x_upper if b2x_upper else 'N/A'}")
-print(f"  Deteriorating regime: ratio ≥ {b2x_upper if b2x_upper else 'N/A'}")
-
-if baseline_crossing and baseline_2x_crossing:
-    difference = abs(baseline_crossing - baseline_2x_crossing)
-    print(f"\n📊 Regime Boundary Consistency:")
-    print(f"  Difference in zero-crossing points: {difference:.3f}")
-    print(f"  Interpretation: {'✓ CONSISTENT - Ratio determines regime' if difference < 0.5 else '✗ INCONSISTENT - Intensity affects regime boundary'}")
-
-# ============================================================================
-# SEVERITY RATIO STATISTICS
-# ============================================================================
-print("\n" + "="*80)
-print("SEVERITY SCALING ANALYSIS")
-print("="*80)
-
-# Calculate statistics for severity ratios (excluding NaN values)
-valid_unassigned_ratios = [r for r in severity_ratio_unassigned if not np.isnan(r)]
-valid_growth_ratios = [r for r in severity_ratio_growth if not np.isnan(r)]
-
-if valid_unassigned_ratios:
-    mean_unassigned_ratio = np.mean(valid_unassigned_ratios)
-    std_unassigned_ratio = np.std(valid_unassigned_ratios)
-    print(f"\nMean Unassigned Severity Ratio:")
-    print(f"  Mean: {mean_unassigned_ratio:.2f} ± {std_unassigned_ratio:.2f}")
-    print(f"  Expected (linear scaling): 2.00")
-    print(f"  Interpretation: {'✓ Nearly linear scaling' if abs(mean_unassigned_ratio - 2.0) < 0.5 else '⚠ Non-linear scaling detected'}")
-
-if valid_growth_ratios:
-    # Focus on deteriorating regime (ratio >= 6.0)
-    deteriorating_ratios = [severity_ratio_growth[i] for i, r in enumerate(ratios) 
-                           if r >= 6.0 and not np.isnan(severity_ratio_growth[i])]
-    if deteriorating_ratios:
-        mean_growth_ratio = np.mean(deteriorating_ratios)
-        std_growth_ratio = np.std(deteriorating_ratios)
-        print(f"\nGrowth Rate Severity Ratio (Deteriorating Regime, ratio ≥ 6.0):")
-        print(f"  Mean: {mean_growth_ratio:.2f} ± {std_growth_ratio:.2f}")
-        print(f"  Expected (linear scaling): 2.00")
-        print(f"  Interpretation: {'✓ Nearly linear scaling' if abs(mean_growth_ratio - 2.0) < 0.5 else '⚠ Non-linear scaling detected'}")
-
-print("\n" + "="*80)
-print("HYPOTHESIS VALIDATION SUMMARY")
-print("="*80)
-print("\n✓ Visualization complete - Review plots to verify:")
-print("  1. Regime boundary consistency (Plot 1)")
-print("  2. Similar curve shapes with vertical offset (Plot 2)")
-print("  3. Severity ratio patterns across regimes (Plot 3)")
-print("  4. Customer-facing performance similarity (Plot 4)")
-print("="*80)
 # %%
