@@ -159,22 +159,17 @@ def _extract_metric_from_replications(replication_snapshots, metric_name):
 
 def _apply_moving_average(data_series, window):
     """
-    Apply moving average smoothing (Welch's method).
+    Apply moving average smoothing (Welch's method) using trailing window.
     
-    Args:
-        data_series: 1D numpy array of values
-        window: Window size for moving average
-        
-    Returns:
-        list: Smoothed values
+    This uses only historical data (causal), making the representation
+    honest: smoothed values at time t use only data from [t-window+1, t].
     """
     if len(data_series) < window:
-        # If series is shorter than window, return original data
         return data_series.tolist()
     
-    # Use pandas rolling mean with center=True for better smoothing
     series = pd.Series(data_series)
-    smoothed = series.rolling(window=window, center=True, min_periods=1).mean()
+    # Remove center=True to use trailing (backward-looking) window
+    smoothed = series.rolling(window=window, min_periods=1).mean()
     
     return smoothed.tolist()
 
