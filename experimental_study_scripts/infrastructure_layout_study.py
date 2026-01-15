@@ -575,10 +575,11 @@ print("="*80)
 
 from delivery_sim.analysis_pipeline.pipeline_coordinator import ExperimentAnalysisPipeline
 
-# Initialize pipeline with delivery_unit_metrics enabled
+# Initialize pipeline with queue_dynamics_metrics enabled
 pipeline = ExperimentAnalysisPipeline(
     warmup_period=uniform_warmup_period,
-    enabled_metric_types=['order_metrics', 'system_metrics', 'delivery_unit_metrics', 'system_state_metrics'],  # ← ADDED
+    enabled_metric_types=['order_metrics', 'system_metrics', 'delivery_unit_metrics', 
+                         'system_state_metrics', 'queue_dynamics_metrics'],  # ← ADDED queue_dynamics_metrics
     confidence_level=0.95
 )
 
@@ -627,7 +628,9 @@ for design_name, analysis_result in design_analysis_results.items():
     
     stats_with_cis = analysis_result.get('statistics_with_cis', {})
     
-    # Extract assignment time (from order_metrics)
+    # =====================================================================
+    # ASSIGNMENT TIME STATISTICS (from order_metrics)
+    # =====================================================================
     order_metrics = stats_with_cis.get('order_metrics', {})
     assignment_time = order_metrics.get('assignment_time', {})
     
@@ -642,15 +645,19 @@ for design_name, analysis_result in design_analysis_results.items():
     mean_of_stds = assignment_time.get('mean_of_stds', {})
     mos_estimate = mean_of_stds.get('point_estimate', 0)
     
-    # Extract completion rate (from system_metrics)
-    system_metrics = stats_with_cis.get('system_metrics', {})
-    completion_rate = system_metrics.get('system_completion_rate', {})
+    # =====================================================================
+    # GROWTH RATE (from queue_dynamics_metrics)
+    # =====================================================================
+    queue_dynamics_metrics = stats_with_cis.get('queue_dynamics_metrics', {})
+    growth_rate_metric = queue_dynamics_metrics.get('unassigned_entities_growth_rate', {})
     
-    comp_estimate = completion_rate.get('point_estimate', 0)
-    comp_ci = completion_rate.get('confidence_interval', [0, 0])
-    comp_ci_width = (comp_ci[1] - comp_ci[0]) / 2 if comp_ci[0] is not None else 0
+    growth_rate_estimate = growth_rate_metric.get('point_estimate', 0)
+    growth_rate_ci = growth_rate_metric.get('confidence_interval', [0, 0])
+    growth_rate_ci_width = (growth_rate_ci[1] - growth_rate_ci[0]) / 2 if growth_rate_ci[0] is not None else 0
     
-    # Extract total distance (from delivery_unit_metrics)
+    # =====================================================================
+    # TOTAL DISTANCE (from delivery_unit_metrics)
+    # =====================================================================
     delivery_unit_metrics = stats_with_cis.get('delivery_unit_metrics', {})
     total_distance_stats = delivery_unit_metrics.get('total_distance', {})
     
@@ -659,51 +666,37 @@ for design_name, analysis_result in design_analysis_results.items():
     distance_ci = distance_mean_of_means.get('confidence_interval', [0, 0])
     distance_ci_width = (distance_ci[1] - distance_ci[0]) / 2 if distance_ci[0] is not None else 0
     
-    # Extract available_drivers (from system_state_metrics)
-    state_metrics = stats_with_cis.get('system_state_metrics', {})
-    available_drivers_stats = state_metrics.get('available_drivers', {})
-    
-    avail_mean_of_means = available_drivers_stats.get('mean_of_means', {})
-    avail_mom_estimate = avail_mean_of_means.get('point_estimate', 0)
-    avail_mom_ci = avail_mean_of_means.get('confidence_interval', [0, 0])
-    avail_mom_ci_width = (avail_mom_ci[1] - avail_mom_ci[0]) / 2 if avail_mom_ci[0] is not None else 0
-    
-    avail_std_of_means = available_drivers_stats.get('std_of_means', {})
-    avail_som_estimate = avail_std_of_means.get('point_estimate', 0)
-    
-    avail_mean_of_stds = available_drivers_stats.get('mean_of_stds', {})
-    avail_mos_estimate = avail_mean_of_stds.get('point_estimate', 0)
-    
+    # =====================================================================
+    # BUILD ROW
+    # =====================================================================
     metrics_data.append({
         'seed': seed,
         'ratio': ratio,
         'interval_type': interval_type,
+        # Assignment time
         'mom_estimate': mom_estimate,
         'mom_ci_width': mom_ci_width,
         'som_estimate': som_estimate,
         'mos_estimate': mos_estimate,
-        'comp_estimate': comp_estimate,
-        'comp_ci_width': comp_ci_width,
+        # Queue dynamics
+        'growth_rate_estimate': growth_rate_estimate,
+        'growth_rate_ci_width': growth_rate_ci_width,
+        # Distance
         'distance_estimate': distance_estimate,
         'distance_ci_width': distance_ci_width,
-        'avail_mom_estimate': avail_mom_estimate,
-        'avail_mom_ci_width': avail_mom_ci_width,
-        'avail_som_estimate': avail_som_estimate,
-        'avail_mos_estimate': avail_mos_estimate,
     })
 
 # Sort by ratio, then seed, then interval type
 metrics_data.sort(key=lambda x: (x['ratio'], x['seed'], x['interval_type']))
 
-# ========================================
-# VIEW 1: Complete table sorted by ratio
-# ========================================
-print("\n🎯 KEY PERFORMANCE METRICS: WITH AVAILABLE DRIVERS")
-print("="*220)
-print("  Seed   Ratio    Interval        Mean of Means     Std of    Mean of           Completion Rate      Mean Total Distance      Available Drivers (mean_of_means)    Avail     Avail")
-print("                      Type    (Assignment Time)      Means       Stds             (with 95% CI)            (with 95% CI)                  (with 95% CI)          Std of   Mean of")
-print("                                                                                                                                                                     Means     Stds")
-print("="*220)
+# =========================================================================
+# PRINT FORMATTED TABLE
+# =========================================================================
+print("\n🎯 KEY PERFORMANCE METRICS: LAYOUT SENSITIVITY ANALYSIS")
+print("="*160)
+print("  Seed   Ratio    Interval        Mean of Means     Std of    Mean of        Growth Rate      Mean Total Distance")
+print("                      Type    (Assignment Time)      Means       Stds      (entities/min)            (with 95% CI)")
+print("="*160)
 
 for row in metrics_data:
     seed = row['seed']
@@ -713,297 +706,62 @@ for row in metrics_data:
     mom_str = f"{row['mom_estimate']:5.2f} ± {row['mom_ci_width']:5.2f}"
     som_str = f"{row['som_estimate']:5.2f}"
     mos_str = f"{row['mos_estimate']:5.2f}"
-    comp_str = f"{row['comp_estimate']:.3f} ± {row['comp_ci_width']:.3f}"
+    growth_rate_str = f"{row['growth_rate_estimate']:7.4f} ± {row['growth_rate_ci_width']:7.4f}"
     dist_str = f"{row['distance_estimate']:5.2f} ± {row['distance_ci_width']:5.2f}"
-    avail_mom_str = f"{row['avail_mom_estimate']:5.2f} ± {row['avail_mom_ci_width']:5.2f}"
-    avail_som_str = f"{row['avail_som_estimate']:5.2f}"
-    avail_mos_str = f"{row['avail_mos_estimate']:5.2f}"
     
-    print(f"  {seed:4d}   {ratio:3.1f}  {interval_display:12s}     {mom_str:>16s}    {som_str:>7s}    {mos_str:>7s}          {comp_str:>15s}          {dist_str:>18s}          {avail_mom_str:>22s}    {avail_som_str:>7s}   {avail_mos_str:>7s}")
+    print(f"  {seed:4d}   {ratio:3.1f}  {interval_display:12s}     {mom_str:>16s}    {som_str:>7s}    {mos_str:>7s}    {growth_rate_str:>21s}          {dist_str:>18s}")
 
-print("="*220)
+print("="*160)
 
-# ========================================
-# VIEW 2: Grouped by seed
-# ========================================
-print("\n\nAlternative view grouped by seed:")
-print("🎯 LAYOUT-SPECIFIC PERFORMANCE")
-print("="*220)
+# =========================================================================
+# ALTERNATIVE VIEW GROUPED BY INTERVAL TYPE
+# =========================================================================
+print("\n\n🎯 ALTERNATIVE VIEW: GROUPED BY INTERVAL TYPE")
+print("="*160)
+print("  Seed   Ratio    Interval        Mean of Means     Std of    Mean of        Growth Rate      Mean Total Distance")
+print("                      Type    (Assignment Time)      Means       Stds      (entities/min)            (with 95% CI)")
+print("="*160)
 
-for seed in sorted(set(row['seed'] for row in metrics_data)):
-    # Get typical distance for this seed
-    instance_name = f"area_10km_seed{seed}"
-    typical_dist = next(i['analysis']['typical_distance'] for i in infrastructure_instances if i['name'] == instance_name)
+# Group by interval type
+print("2x BASELINE CONFIGURATIONS:")
+print("-"*160)
+baseline_2x_data = [d for d in metrics_data if d['interval_type'] == '2x_baseline']
+for row in baseline_2x_data:
+    seed = row['seed']
+    ratio = row['ratio']
+    interval_display = "2x Baseline"
     
-    print(f"\nSeed {seed} (typical_distance={typical_dist:.3f}km):")
-    print("-"*220)
-    print(" Ratio    Interval        Mean of Means     Std of    Mean of           Completion Rate      Mean Total Distance      Available Drivers (mean_of_means)    Avail     Avail")
-    print("              Type    (Assignment Time)      Means       Stds             (with 95% CI)            (with 95% CI)                  (with 95% CI)          Std of   Mean of")
-    print("                                                                                                                                                              Means     Stds")
-    print("-"*220)
+    mom_str = f"{row['mom_estimate']:5.2f} ± {row['mom_ci_width']:5.2f}"
+    som_str = f"{row['som_estimate']:5.2f}"
+    mos_str = f"{row['mos_estimate']:5.2f}"
+    growth_rate_str = f"{row['growth_rate_estimate']:7.4f} ± {row['growth_rate_ci_width']:7.4f}"
+    dist_str = f"{row['distance_estimate']:5.2f} ± {row['distance_ci_width']:5.2f}"
     
-    seed_data = [row for row in metrics_data if row['seed'] == seed]
-    for row in seed_data:
-        ratio = row['ratio']
-        interval_display = "2x Baseline" if row['interval_type'] == '2x_baseline' else "Baseline"
-        
-        mom_str = f"{row['mom_estimate']:5.2f} ± {row['mom_ci_width']:5.2f}"
-        som_str = f"{row['som_estimate']:5.2f}"
-        mos_str = f"{row['mos_estimate']:5.2f}"
-        comp_str = f"{row['comp_estimate']:.3f} ± {row['comp_ci_width']:.3f}"
-        dist_str = f"{row['distance_estimate']:5.2f} ± {row['distance_ci_width']:5.2f}"
-        avail_mom_str = f"{row['avail_mom_estimate']:5.2f} ± {row['avail_mom_ci_width']:5.2f}"
-        avail_som_str = f"{row['avail_som_estimate']:5.2f}"
-        avail_mos_str = f"{row['avail_mos_estimate']:5.2f}"
-        
-        print(f"  {ratio:3.1f}  {interval_display:12s}     {mom_str:>16s}    {som_str:>7s}    {mos_str:>7s}          {comp_str:>15s}          {dist_str:>18s}          {avail_mom_str:>22s}    {avail_som_str:>7s}   {avail_mos_str:>7s}")
+    print(f"  {seed:4d}   {ratio:3.1f}  {interval_display:12s}     {mom_str:>16s}    {som_str:>7s}    {mos_str:>7s}    {growth_rate_str:>21s}          {dist_str:>18s}")
 
-# ========================================
-# VIEW 3: Grouped by ratio
-# ========================================
-print("\n\nAlternative view grouped by ratio:")
-print("🎯 PERFORMANCE COMPARISON ACROSS LAYOUTS")
-print("="*220)
-
-for ratio in sorted(set(row['ratio'] for row in metrics_data)):
-    print(f"\nRatio {ratio:.1f} - Comparing layouts:")
-    print("-"*220)
-    print("  Seed   Interval        Mean of Means     Std of    Mean of           Completion Rate      Mean Total Distance      Available Drivers (mean_of_means)    Avail     Avail")
-    print("             Type    (Assignment Time)      Means       Stds             (with 95% CI)            (with 95% CI)                  (with 95% CI)          Std of   Mean of")
-    print("                                                                                                                                                              Means     Stds")
-    print("-"*220)
+print("\nBASELINE CONFIGURATIONS:")
+print("-"*160)
+baseline_data = [d for d in metrics_data if d['interval_type'] == 'baseline']
+for row in baseline_data:
+    seed = row['seed']
+    ratio = row['ratio']
+    interval_display = "Baseline"
     
-    ratio_data = [row for row in metrics_data if row['ratio'] == ratio]
-    for row in ratio_data:
-        seed = row['seed']
-        interval_display = "2x Baseline" if row['interval_type'] == '2x_baseline' else "Baseline"
-        
-        mom_str = f"{row['mom_estimate']:5.2f} ± {row['mom_ci_width']:5.2f}"
-        som_str = f"{row['som_estimate']:5.2f}"
-        mos_str = f"{row['mos_estimate']:5.2f}"
-        comp_str = f"{row['comp_estimate']:.3f} ± {row['comp_ci_width']:.3f}"
-        dist_str = f"{row['distance_estimate']:5.2f} ± {row['distance_ci_width']:5.2f}"
-        avail_mom_str = f"{row['avail_mom_estimate']:5.2f} ± {row['avail_mom_ci_width']:5.2f}"
-        avail_som_str = f"{row['avail_som_estimate']:5.2f}"
-        avail_mos_str = f"{row['avail_mos_estimate']:5.2f}"
-        
-        print(f"  {seed:4d}  {interval_display:12s}     {mom_str:>16s}    {som_str:>7s}    {mos_str:>7s}          {comp_str:>15s}          {dist_str:>18s}          {avail_mom_str:>22s}    {avail_som_str:>7s}   {avail_mos_str:>7s}")
-
-print("\n" + "="*220)
-print("✓ Metric extraction complete with layout sensitivity analysis, distance data, and available drivers")
-
-
-# %% CELL 17: [APPENDIX] Single Replication Analysis - Testing Complementary Hypothesis
-"""
-EXPLORATORY ANALYSIS: Test hypothesis that available_drivers and unassigned_delivery_entities
-should be complementary in individual replications.
-
-Background: Cross-replication averaging in warmup plots shows both metrics positive simultaneously.
-This is expected because different replications are in different stochastic phases.
-
-Hypothesis: In individual replications, the two metrics should be more complementary
-(when one is high, the other should be low).
-
-Test cases:
-- Ratio 5.0 (volatile regime) - expect some complementary behavior with oscillations
-- Ratio 7.0 (failure regime) - expect available_drivers ≈ 0 always
-"""
-
-print("\n" + "="*80)
-print("APPENDIX: SINGLE REPLICATION TIME SERIES ANALYSIS")
-print("="*80)
-
-from delivery_sim.visualization.time_series_plots import TimeSeriesVisualizer
-import matplotlib.pyplot as plt
-
-# Initialize visualizer
-viz = TimeSeriesVisualizer(figsize=(16, 12))
-
-# ========================================
-# Test Case 1: Ratio 5.0, Seed 200, Baseline
-# ========================================
-print("\n" + "="*80)
-print("TEST CASE 1: Ratio 5.0 - Volatile Regime (Seed 200, Baseline)")
-print("="*80)
-
-design_name_50 = 'area_10km_seed200_ratio_5.0_baseline'
-replication_results_50 = study_results[design_name_50]
-
-print(f"\nDesign point: {design_name_50}")
-print(f"Total replications available: {len(replication_results_50)}")
-
-# Plot first 3 replications individually
-print("\n--- Individual Replication Analysis ---")
-for rep_idx in range(min(3, len(replication_results_50))):
-    print(f"\nReplication {rep_idx + 1}:")
+    mom_str = f"{row['mom_estimate']:5.2f} ± {row['mom_ci_width']:5.2f}"
+    som_str = f"{row['som_estimate']:5.2f}"
+    mos_str = f"{row['mos_estimate']:5.2f}"
+    growth_rate_str = f"{row['growth_rate_estimate']:7.4f} ± {row['growth_rate_ci_width']:7.4f}"
+    dist_str = f"{row['distance_estimate']:5.2f} ± {row['distance_ci_width']:5.2f}"
     
-    single_rep_snapshots = replication_results_50[rep_idx]['system_snapshots']
-    print(f"  • Total snapshots: {len(single_rep_snapshots)}")
-    
-    # Plot 1: Standard stacked view
-    fig, axes = viz.plot_single_replication(
-        single_rep_snapshots,
-        metrics=['available_drivers', 'unassigned_delivery_entities', 'active_drivers'],
-        title=f'{design_name_50} - Replication {rep_idx + 1} (Stacked View)',
-        apply_smoothing=False,  # Show raw data first
-        window=100
-    )
-    plt.show()
-    
-    # Plot 2: Complementary analysis view (dual y-axis)
-    fig, axes = viz.plot_complementary_analysis(
-        single_rep_snapshots,
-        metric_pairs=[
-            ('available_drivers', 'unassigned_delivery_entities')
-        ],
-        title=f'{design_name_50} - Rep {rep_idx + 1}: Complementary Dynamics Test'
-    )
-    plt.show()
-    
-    print(f"  ✓ Replication {rep_idx + 1} plotted")
+    print(f"  {seed:4d}   {ratio:3.1f}  {interval_display:12s}     {mom_str:>16s}    {som_str:>7s}    {mos_str:>7s}    {growth_rate_str:>21s}          {dist_str:>18s}")
 
-# Plot all replications overlaid for comparison
-print("\n--- All Replications Overlaid ---")
-fig, axes = viz.plot_multiple_replications(
-    replication_results_50,
-    metrics=['available_drivers', 'unassigned_delivery_entities'],
-    design_name=design_name_50,
-    show_average=True,
-    apply_smoothing=False  # Show raw variability
-)
-plt.show()
+print("="*160)
 
-print(f"\n✓ Ratio 5.0 analysis complete")
-print("Observations:")
-print("  • Do individual replications show complementary patterns?")
-print("  • How much do replications differ from each other?")
-print("  • Does the average (black line) look different from individuals?")
+print("\n✓ Metric extraction complete with layout sensitivity analysis")
+print("✓ Growth rate replaces completion rate as primary system indicator")
+print("✓ Mean total distance retained for infrastructure comparison")
 
-# ========================================
-# Test Case 2: Ratio 7.0, Seed 200, Baseline
-# ========================================
-print("\n" + "="*80)
-print("TEST CASE 2: Ratio 7.0 - Failure Regime (Seed 200, Baseline)")
-print("="*80)
-
-design_name_70 = 'area_10km_seed200_ratio_7.0_baseline'
-replication_results_70 = study_results[design_name_70]
-
-print(f"\nDesign point: {design_name_70}")
-print(f"Total replications available: {len(replication_results_70)}")
-
-# Plot first 3 replications individually
-print("\n--- Individual Replication Analysis ---")
-for rep_idx in range(min(3, len(replication_results_70))):
-    print(f"\nReplication {rep_idx + 1}:")
-    
-    single_rep_snapshots = replication_results_70[rep_idx]['system_snapshots']
-    print(f"  • Total snapshots: {len(single_rep_snapshots)}")
-    
-    # Plot 1: Standard stacked view
-    fig, axes = viz.plot_single_replication(
-        single_rep_snapshots,
-        metrics=['available_drivers', 'unassigned_delivery_entities', 'active_drivers'],
-        title=f'{design_name_70} - Replication {rep_idx + 1} (Stacked View)',
-        apply_smoothing=False,
-        window=100
-    )
-    plt.show()
-    
-    # Plot 2: Complementary analysis view
-    fig, axes = viz.plot_complementary_analysis(
-        single_rep_snapshots,
-        metric_pairs=[
-            ('available_drivers', 'unassigned_delivery_entities')
-        ],
-        title=f'{design_name_70} - Rep {rep_idx + 1}: Complementary Dynamics Test'
-    )
-    plt.show()
-    
-    print(f"  ✓ Replication {rep_idx + 1} plotted")
-
-# Plot all replications overlaid
-print("\n--- All Replications Overlaid ---")
-fig, axes = viz.plot_multiple_replications(
-    replication_results_70,
-    metrics=['available_drivers', 'unassigned_delivery_entities'],
-    design_name=design_name_70,
-    show_average=True,
-    apply_smoothing=False
-)
-plt.show()
-
-print(f"\n✓ Ratio 7.0 analysis complete")
-print("Observations:")
-print("  • Are available_drivers consistently zero across all replications?")
-print("  • How consistent is the queue growth across replications?")
-print("  • Is this fundamentally different from ratio 5.0?")
-
-# ========================================
-# Test Case 3: Ratio 3.5 for Comparison
-# ========================================
-print("\n" + "="*80)
-print("TEST CASE 3: Ratio 3.5 - Stable Regime (Seed 200, Baseline) [For Comparison]")
-print("="*80)
-
-design_name_35 = 'area_10km_seed200_ratio_3.5_baseline'
-replication_results_35 = study_results[design_name_35]
-
-print(f"\nDesign point: {design_name_35}")
-print(f"Total replications available: {len(replication_results_35)}")
-
-# Just plot first replication as representative
-print("\n--- Representative Replication ---")
-single_rep_snapshots = replication_results_35[0]['system_snapshots']
-
-fig, axes = viz.plot_single_replication(
-    single_rep_snapshots,
-    metrics=['available_drivers', 'unassigned_delivery_entities', 'active_drivers'],
-    title=f'{design_name_35} - Replication 1 (Stable Regime)',
-    apply_smoothing=False,
-    window=100
-)
-plt.show()
-
-fig, axes = viz.plot_complementary_analysis(
-    single_rep_snapshots,
-    metric_pairs=[
-        ('available_drivers', 'unassigned_delivery_entities')
-    ],
-    title=f'{design_name_35} - Rep 1: Complementary Dynamics (Stable System)'
-)
-plt.show()
-
-print(f"\n✓ Ratio 3.5 analysis complete")
-print("Observations:")
-print("  • High available drivers, low/zero unassigned entities")
-print("  • System clearly has excess capacity")
-print("  • Strong complementary pattern expected")
-
-# ========================================
-# Summary
-# ========================================
-print("\n" + "="*80)
-print("SUMMARY: COMPLEMENTARY HYPOTHESIS TEST")
-print("="*80)
-
-print("\nKey Questions to Answer:")
-print("1. Do individual replications show more complementary behavior than cross-rep averages?")
-print("2. At ratio 5.0, do we see oscillations between 'drivers available' and 'orders waiting' states?")
-print("3. At ratio 7.0, is available_drivers truly zero in ALL individual replications?")
-print("4. How much between-replication variability exists at each ratio?")
-
-print("\nExpected Findings:")
-print("✓ Ratio 3.5: Clear complementarity - high drivers, low queue")
-print("✓ Ratio 5.0: Oscillating complementarity - phases of catching up vs falling behind")
-print("✓ Ratio 7.0: No complementarity - always zero drivers, always growing queue")
-
-print("\n" + "="*80)
-print("✓ Single replication analysis complete")
-print("✓ Review plots to validate complementary hypothesis")
-print("="*80)
-
-# %% CELL 18: [APPENDIX] Infrastructure Layout Effect - Visual Validation
+# %% CELL [APPENDIX I] Infrastructure Layout Effect - Visual Validation
 """
 MECHANISTIC VALIDATION: Visualize the key finding from infrastructure layout study.
 
