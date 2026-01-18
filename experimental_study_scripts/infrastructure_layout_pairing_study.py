@@ -554,10 +554,11 @@ print("="*80)
 
 from delivery_sim.analysis_pipeline.pipeline_coordinator import ExperimentAnalysisPipeline
 
-# Initialize pipeline with delivery_unit_metrics enabled
+# Initialize pipeline with delivery_unit_metrics, pair_metrics, and queue_dynamics_metrics enabled
 pipeline = ExperimentAnalysisPipeline(
     warmup_period=uniform_warmup_period,
-    enabled_metric_types=['order_metrics', 'system_metrics', 'delivery_unit_metrics', 'system_state_metrics'],
+    enabled_metric_types=['order_metrics', 'system_metrics', 'delivery_unit_metrics', 
+                         'system_state_metrics', 'queue_dynamics_metrics'],
     confidence_level=0.95
 )
 
@@ -597,7 +598,7 @@ def extract_seed_ratio_pairing_and_type(design_name):
         return seed, ratio, pairing_status, interval_type
     return None, None, None, None
 
-# Extract comprehensive metrics including pairing rate
+# Extract comprehensive metrics
 metrics_data = []
 
 for design_name, analysis_result in design_analysis_results.items():
@@ -622,15 +623,8 @@ for design_name, analysis_result in design_analysis_results.items():
     mean_of_stds = assignment_time.get('mean_of_stds', {})
     mos_estimate = mean_of_stds.get('point_estimate', 0)
     
-    # Extract completion rate (from system_metrics)
-    system_metrics = stats_with_cis.get('system_metrics', {})
-    completion_rate = system_metrics.get('system_completion_rate', {})
-    
-    comp_estimate = completion_rate.get('point_estimate', 0)
-    comp_ci = completion_rate.get('confidence_interval', [0, 0])
-    comp_ci_width = (comp_ci[1] - comp_ci[0]) / 2 if comp_ci[0] is not None else 0
-    
     # Extract pairing rate (from system_metrics) - NOTE: metric name is 'system_pairing_rate'
+    system_metrics = stats_with_cis.get('system_metrics', {})
     pairing_rate_stats = system_metrics.get('system_pairing_rate', {})
     pairing_rate_estimate = pairing_rate_stats.get('point_estimate', 0)
     pairing_rate_ci = pairing_rate_stats.get('confidence_interval', [0, 0])
@@ -645,20 +639,13 @@ for design_name, analysis_result in design_analysis_results.items():
     distance_ci = distance_mean_of_means.get('confidence_interval', [0, 0])
     distance_ci_width = (distance_ci[1] - distance_ci[0]) / 2 if distance_ci[0] is not None else 0
     
-    # Extract available_drivers (from system_state_metrics)
-    state_metrics = stats_with_cis.get('system_state_metrics', {})
-    available_drivers_stats = state_metrics.get('available_drivers', {})
+    # Extract growth rate (from queue_dynamics_metrics)
+    queue_dynamics_metrics = stats_with_cis.get('queue_dynamics_metrics', {})
+    growth_rate_metric = queue_dynamics_metrics.get('unassigned_entities_growth_rate', {})
     
-    avail_mean_of_means = available_drivers_stats.get('mean_of_means', {})
-    avail_mom_estimate = avail_mean_of_means.get('point_estimate', 0)
-    avail_mom_ci = avail_mean_of_means.get('confidence_interval', [0, 0])
-    avail_mom_ci_width = (avail_mom_ci[1] - avail_mom_ci[0]) / 2 if avail_mom_ci[0] is not None else 0
-    
-    avail_std_of_means = available_drivers_stats.get('std_of_means', {})
-    avail_som_estimate = avail_std_of_means.get('point_estimate', 0)
-    
-    avail_mean_of_stds = available_drivers_stats.get('mean_of_stds', {})
-    avail_mos_estimate = avail_mean_of_stds.get('point_estimate', 0)
+    growth_rate_estimate = growth_rate_metric.get('point_estimate', 0)
+    growth_rate_ci = growth_rate_metric.get('confidence_interval', [0, 0])
+    growth_rate_ci_width = (growth_rate_ci[1] - growth_rate_ci[0]) / 2 if growth_rate_ci[0] is not None else 0
     
     metrics_data.append({
         'seed': seed,
@@ -669,69 +656,58 @@ for design_name, analysis_result in design_analysis_results.items():
         'mom_ci_width': mom_ci_width,
         'som_estimate': som_estimate,
         'mos_estimate': mos_estimate,
-        'comp_estimate': comp_estimate,
-        'comp_ci_width': comp_ci_width,
         'pairing_rate_estimate': pairing_rate_estimate,
         'pairing_rate_ci_width': pairing_rate_ci_width,
         'distance_estimate': distance_estimate,
         'distance_ci_width': distance_ci_width,
-        'avail_mom_estimate': avail_mom_estimate,
-        'avail_mom_ci_width': avail_mom_ci_width,
-        'avail_som_estimate': avail_som_estimate,
-        'avail_mos_estimate': avail_mos_estimate,
+        'growth_rate_estimate': growth_rate_estimate,
+        'growth_rate_ci_width': growth_rate_ci_width,
     })
 
-# Sort by interval type, ratio, seed, then pairing status
-# This groups all Baselines together, then all 2x Baselines
-# Within each interval type, pairing vs no_pairing are juxtaposed for easy comparison
-metrics_data.sort(key=lambda x: (x['interval_type'], x['ratio'], x['seed'], x['pairing_status']))
+# Sort by seed, ratio, pairing_status, then interval type
+metrics_data.sort(key=lambda x: (x['seed'], x['ratio'], x['pairing_status'], x['interval_type']))
 
-# ========================================
-# VIEW 1: Complete table with pairing
-# ========================================
+# =========================================================================
+# PRINT FORMATTED TABLE - Main View
+# =========================================================================
 print("\n🎯 KEY PERFORMANCE METRICS: LAYOUT × PAIRING INTERACTION")
-print("="*240)
-print("  Seed   Ratio   Pairing      Interval        Mean of Means     Std of    Mean of           Completion Rate      Pairing Rate         Mean Total Distance      Available Drivers (mean_of_means)    Avail     Avail")
-print("                 Status           Type    (Assignment Time)      Means       Stds             (with 95% CI)        (with 95% CI)            (with 95% CI)                  (with 95% CI)          Std of   Mean of")
-print("                                                                                                                                                                                                     Means     Stds")
-print("="*240)
+print("="*200)
+print("  Seed   Ratio    Pairing      Interval        Mean of Means     Std of    Mean of         Pairing Rate         Mean Total Distance       Growth Rate")
+print("                   Status          Type    (Assignment Time)      Means       Stds         (with 95% CI)            (with 95% CI)         (entities/min)")
+print("="*200)
 
 for row in metrics_data:
     seed = row['seed']
     ratio = row['ratio']
-    pairing_display = "Pairing" if row['pairing_status'] == 'pairing' else "No Pairing"
+    pairing_display = "WITH PAIRING" if row['pairing_status'] == 'pairing' else "NO PAIRING"
     interval_display = "2x Baseline" if row['interval_type'] == '2x_baseline' else "Baseline"
     
     mom_str = f"{row['mom_estimate']:5.2f} ± {row['mom_ci_width']:5.2f}"
     som_str = f"{row['som_estimate']:5.2f}"
     mos_str = f"{row['mos_estimate']:5.2f}"
-    comp_str = f"{row['comp_estimate']:.3f} ± {row['comp_ci_width']:.3f}"
     pairing_rate_str = f"{row['pairing_rate_estimate']*100:4.1f}% ± {row['pairing_rate_ci_width']*100:4.1f}%"
     dist_str = f"{row['distance_estimate']:5.2f} ± {row['distance_ci_width']:5.2f}"
-    avail_mom_str = f"{row['avail_mom_estimate']:5.2f} ± {row['avail_mom_ci_width']:5.2f}"
-    avail_som_str = f"{row['avail_som_estimate']:5.2f}"
-    avail_mos_str = f"{row['avail_mos_estimate']:5.2f}"
+    growth_rate_str = f"{row['growth_rate_estimate']:7.4f} ± {row['growth_rate_ci_width']:7.4f}"
     
-    print(f"  {seed:4d}   {ratio:3.1f}  {pairing_display:10s}  {interval_display:12s}     {mom_str:>16s}    {som_str:>7s}    {mos_str:>7s}          {comp_str:>15s}          {pairing_rate_str:>18s}          {dist_str:>18s}          {avail_mom_str:>22s}    {avail_som_str:>7s}   {avail_mos_str:>7s}")
+    print(f"  {seed:4d}   {ratio:3.1f}  {pairing_display:12s}  {interval_display:12s}     {mom_str:>16s}    {som_str:>7s}    {mos_str:>7s}          {pairing_rate_str:>18s}          {dist_str:>18s}          {growth_rate_str:>21s}")
 
-print("="*240)
+print("="*200)
 
 # ========================================
 # VIEW 2: Grouped by ratio and pairing
 # ========================================
 print("\n\nAlternative view - grouped by ratio and pairing status:")
 print("🎯 PAIRING EFFECT ON LAYOUT SENSITIVITY")
-print("="*240)
+print("="*200)
 
 for ratio in sorted(set(row['ratio'] for row in metrics_data)):
     for pairing_status in ['no_pairing', 'pairing']:
         pairing_display = "WITH PAIRING" if pairing_status == 'pairing' else "NO PAIRING"
         print(f"\nRatio {ratio:.1f} - {pairing_display}:")
-        print("-"*240)
-        print("  Seed   Interval        Mean of Means     Std of    Mean of           Completion Rate      Pairing Rate         Mean Total Distance      Available Drivers (mean_of_means)    Avail     Avail")
-        print("             Type    (Assignment Time)      Means       Stds             (with 95% CI)        (with 95% CI)            (with 95% CI)                  (with 95% CI)          Std of   Mean of")
-        print("                                                                                                                                                                                     Means     Stds")
-        print("-"*240)
+        print("-"*200)
+        print("  Seed   Interval        Mean of Means     Std of    Mean of         Pairing Rate         Mean Total Distance       Growth Rate")
+        print("             Type    (Assignment Time)      Means       Stds         (with 95% CI)            (with 95% CI)         (entities/min)")
+        print("-"*200)
         
         filtered_data = [row for row in metrics_data if row['ratio'] == ratio and row['pairing_status'] == pairing_status]
         for row in filtered_data:
@@ -741,18 +717,47 @@ for ratio in sorted(set(row['ratio'] for row in metrics_data)):
             mom_str = f"{row['mom_estimate']:5.2f} ± {row['mom_ci_width']:5.2f}"
             som_str = f"{row['som_estimate']:5.2f}"
             mos_str = f"{row['mos_estimate']:5.2f}"
-            comp_str = f"{row['comp_estimate']:.3f} ± {row['comp_ci_width']:.3f}"
             pairing_rate_str = f"{row['pairing_rate_estimate']*100:4.1f}% ± {row['pairing_rate_ci_width']*100:4.1f}%"
             dist_str = f"{row['distance_estimate']:5.2f} ± {row['distance_ci_width']:5.2f}"
-            avail_mom_str = f"{row['avail_mom_estimate']:5.2f} ± {row['avail_mom_ci_width']:5.2f}"
-            avail_som_str = f"{row['avail_som_estimate']:5.2f}"
-            avail_mos_str = f"{row['avail_mos_estimate']:5.2f}"
+            growth_rate_str = f"{row['growth_rate_estimate']:7.4f} ± {row['growth_rate_ci_width']:7.4f}"
             
-            print(f"  {seed:4d}  {interval_display:12s}     {mom_str:>16s}    {som_str:>7s}    {mos_str:>7s}          {comp_str:>15s}          {pairing_rate_str:>18s}          {dist_str:>18s}          {avail_mom_str:>22s}    {avail_som_str:>7s}   {avail_mos_str:>7s}")
+            print(f"  {seed:4d}  {interval_display:12s}     {mom_str:>16s}    {som_str:>7s}    {mos_str:>7s}          {pairing_rate_str:>18s}          {dist_str:>18s}          {growth_rate_str:>21s}")
 
-print("\n" + "="*240)
-print("✓ Metric extraction complete with layout × pairing interaction analysis")
-print("✓ Compare pairing rates and performance across layouts to understand interaction effects")
+# ========================================
+# VIEW 3: Grouped by seed
+# ========================================
+print("\n\nAlternative view - grouped by seed:")
+print("🎯 LAYOUT-SPECIFIC PERFORMANCE ACROSS PAIRING CONDITIONS")
+print("="*200)
+
+for seed in sorted(set(row['seed'] for row in metrics_data)):
+    # Get typical distance for this seed
+    instance_name = f"area_10km_seed{seed}"
+    typical_dist = next(i['analysis']['typical_distance'] for i in infrastructure_instances if i['name'] == instance_name)
+    
+    print(f"\nSeed {seed} (typical_distance={typical_dist:.3f}km):")
+    print("-"*200)
+    print(" Ratio    Pairing      Interval        Mean of Means     Std of    Mean of         Pairing Rate         Mean Total Distance       Growth Rate")
+    print("           Status          Type    (Assignment Time)      Means       Stds         (with 95% CI)            (with 95% CI)         (entities/min)")
+    print("-"*200)
+    
+    seed_data = [row for row in metrics_data if row['seed'] == seed]
+    for row in seed_data:
+        ratio = row['ratio']
+        pairing_display = "WITH PAIRING" if row['pairing_status'] == 'pairing' else "NO PAIRING"
+        interval_display = "2x Baseline" if row['interval_type'] == '2x_baseline' else "Baseline"
+        
+        mom_str = f"{row['mom_estimate']:5.2f} ± {row['mom_ci_width']:5.2f}"
+        som_str = f"{row['som_estimate']:5.2f}"
+        mos_str = f"{row['mos_estimate']:5.2f}"
+        pairing_rate_str = f"{row['pairing_rate_estimate']*100:4.1f}% ± {row['pairing_rate_ci_width']*100:4.1f}%"
+        dist_str = f"{row['distance_estimate']:5.2f} ± {row['distance_ci_width']:5.2f}"
+        growth_rate_str = f"{row['growth_rate_estimate']:7.4f} ± {row['growth_rate_ci_width']:7.4f}"
+        
+        print(f"  {ratio:3.1f}  {pairing_display:12s}  {interval_display:12s}     {mom_str:>16s}    {som_str:>7s}    {mos_str:>7s}          {pairing_rate_str:>18s}          {dist_str:>18s}          {growth_rate_str:>21s}")
+
+print("\n" + "="*200)
+print("✓ Metric extraction complete with pairing interaction analysis")
 
 # %% CELL 17: [AD HOC] Single Replication Time Series - Pairing Rescue Effect
 """
