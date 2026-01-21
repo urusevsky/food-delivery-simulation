@@ -680,14 +680,14 @@ for design_name, analysis_result in design_analysis_results.items():
     
     # Growth Rate
     queue_dynamics_metrics = stats_with_cis.get('queue_dynamics_metrics', {})
-    growth_rate = queue_dynamics_metrics.get('unassigned_orders_growth_rate', {})
+    growth_rate = queue_dynamics_metrics.get('unassigned_entities_growth_rate', {})
     growth_rate_estimate = growth_rate.get('point_estimate', 0)
     growth_rate_ci = growth_rate.get('confidence_interval', [0, 0])
     growth_rate_ci_width = (growth_rate_ci[1] - growth_rate_ci[0]) / 2 if growth_rate_ci[0] is not None else 0
     
     # Pairing Rate (only for pairing=ON)
     system_metrics = stats_with_cis.get('system_metrics', {})
-    pairing_rate_data = system_metrics.get('pairing_rate', {})
+    pairing_rate_data = system_metrics.get('system_pairing_rate', {})
     pairing_rate_estimate = pairing_rate_data.get('point_estimate', None)
     pairing_rate_ci = pairing_rate_data.get('confidence_interval', [None, None])
     if pairing_rate_ci[0] is not None and pairing_rate_ci[1] is not None:
