@@ -88,34 +88,41 @@ Study 3 showed that random spatial layout variation has relatively small effects
 on performance when pairing is enabled. However, Study 3 varied layout (spatial 
 arrangement) while holding restaurant count constant.
 
-This study varies restaurant COUNT while holding area constant, which affects:
-1. Spatial mechanism: More restaurants → shorter customer-to-restaurant distances
-2. Temporal mechanism: More restaurants → orders distributed across more locations
+This study varies restaurant COUNT while holding area constant. Restaurant count 
+could affect the system through multiple mechanisms:
+1. Spatial mechanism: More restaurants could mean shorter customer-to-restaurant distances
+2. Temporal mechanism: More restaurants means orders distributed across more locations
 
-The net effect is unclear a priori due to these competing mechanisms.
+The interaction between these mechanisms is unclear. Do they work together, offset 
+each other, or operate independently? We'll observe the results and develop 
+mechanistic explanations.
 
 Platform operators can control restaurant count through recruitment strategies.
-Understanding whether adding more restaurants improves performance is a practical 
+Understanding whether and how restaurant count affects performance is a practical 
 question with direct operational implications.
 """
 
 sub_questions = """
-SUB-QUESTIONS & HYPOTHESES:
+SUB-QUESTIONS:
 
 1. Does restaurant count affect performance?
-   Hypothesis: Spatial benefits (shorter distances) may be offset by temporal 
-   dilution (orders spread across more locations), resulting in minimal net effect
+   - Does assignment time change as we vary count from 5 to 10 to 15?
+   - Is the effect monotonic, or do we see plateaus or diminishing returns?
+   - What is the magnitude compared to other factors (ratio, pairing)?
 
 2. Does the count effect interact with pairing?
-   Hypothesis: Without pairing, spatial efficiency matters more. With pairing, 
-   capacity boost may dominate, making count effects secondary
+   - Does count matter more when pairing is OFF vs ON?
+   - Or is the count effect similar regardless of pairing condition?
+   - What does this tell us about the mechanisms at play?
 
 3. Does the count effect vary by load ratio?
-   Hypothesis: Count effects most visible when system is stressed (ratio 7.0) 
-   rather than in comfortable regime (ratio 5.0)
+   - Is count more impactful at ratio 7.0 (high stress) vs 5.0 (critical)?
+   - Or does count have consistent effects across stress levels?
 
 4. How does typical distance scale with count?
-   Expected: Distance should decrease following approximate 1/√density scaling
+   - Infrastructure analysis will show actual distance patterns
+   - Do we see the spatial efficiency improvement we'd expect?
+   - How does this relate to operational performance changes?
 """
 
 scope = """
@@ -139,27 +146,29 @@ analysis_focus = """
 KEY METRICS & ANALYSIS FOCUS:
 
 1. Assignment time (order_metrics)
-   - Mean of means: Does count matter? By how much?
+   - Mean of means: Primary performance indicator
    - Compare 5 vs 10 vs 15 restaurants
-   - Look for monotonic improvement or plateaus
+   - Observe: Monotonic improvement? Plateaus? Non-monotonic patterns?
 
 2. Infrastructure characteristics
-   - Typical distance: Verify expected distance reduction with count
+   - Typical distance: How does it change with count?
    - Restaurant density: 0.05, 0.10, 0.15 per km²
+   - Spatial efficiency patterns
 
 3. Count × Pairing interaction
-   - Does count help more without pairing (spatial efficiency critical)?
-   - Or does count help similarly regardless (independent mechanisms)?
+   - Does count effect differ between pairing OFF and ON?
+   - What does the interaction pattern tell us about mechanisms?
 
 4. Count × Ratio interaction
-   - Does count matter more at higher stress (ratio 7.0)?
-   - Or consistent effect across ratios?
+   - Does count effect differ between ratio 5.0 and 7.0?
+   - How does system stress level modulate count effects?
 
 Analysis Approach:
 - Primary: Main effect of count (averaged across conditions)
-- Secondary: Interaction with pairing and ratio
-- Mechanism: Infrastructure analysis showing distance scaling
+- Secondary: Interactions with pairing and ratio
+- Mechanism: Infrastructure analysis showing distance patterns
 - Context: Compare effect magnitude to Study 1 (ratio) and Study 2 (pairing)
+- Explanation: Develop mechanistic explanations based on observed patterns
 """
 
 evolution_notes = """
@@ -205,6 +214,7 @@ print(evolution_notes)
 print("\n" + "="*80)
 print("✓ Research question documented")
 print("="*80)
+
 
 
 # %% CELL 4: Infrastructure Configuration(s)
