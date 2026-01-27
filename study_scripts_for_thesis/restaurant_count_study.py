@@ -625,7 +625,7 @@ from delivery_sim.analysis_pipeline.pipeline_coordinator import ExperimentAnalys
 pipeline = ExperimentAnalysisPipeline(
     warmup_period=uniform_warmup_period,
     enabled_metric_types=['order_metrics', 'system_metrics', 
-                         'system_state_metrics', 'queue_dynamics_metrics'],
+                         'system_state_metrics', 'queue_dynamics_metrics', 'delivery_unit_metrics'],
     confidence_level=0.95
 )
 
@@ -719,6 +719,14 @@ for design_name, analysis_result in design_analysis_results.items():
     fulfillment_time_ci = fulfillment_time_mom.get('confidence_interval', [0, 0])
     fulfillment_time_ci_width = (fulfillment_time_ci[1] - fulfillment_time_ci[0]) / 2 if fulfillment_time_ci[0] is not None else 0
     
+    # First Contact Time Statistics (Mean of Means with CI) - from delivery_unit_metrics
+    delivery_unit_metrics = stats_with_cis.get('delivery_unit_metrics', {})
+    first_contact_time = delivery_unit_metrics.get('first_contact_time', {})
+    first_contact_time_mom = first_contact_time.get('mean_of_means', {})
+    first_contact_time_estimate = first_contact_time_mom.get('point_estimate', 0)
+    first_contact_time_ci = first_contact_time_mom.get('confidence_interval', [0, 0])
+    first_contact_time_ci_width = (first_contact_time_ci[1] - first_contact_time_ci[0]) / 2 if first_contact_time_ci[0] is not None else 0
+    
     # Growth Rate
     queue_dynamics_metrics = stats_with_cis.get('queue_dynamics_metrics', {})
     growth_rate = queue_dynamics_metrics.get('unassigned_entities_growth_rate', {})
@@ -744,6 +752,8 @@ for design_name, analysis_result in design_analysis_results.items():
         'mom_ci_width': mom_ci_width,
         'som_estimate': som_estimate,
         'mos_estimate': mos_estimate,
+        'first_contact_time_estimate': first_contact_time_estimate,
+        'first_contact_time_ci_width': first_contact_time_ci_width,
         'pickup_travel_time_estimate': pickup_travel_time_estimate,
         'pickup_travel_time_ci_width': pickup_travel_time_ci_width,
         'delivery_travel_time_estimate': delivery_travel_time_estimate,
@@ -763,16 +773,16 @@ metrics_data.sort(key=lambda x: (x['count'], x['ratio'], x['pairing_status']))
 
 # Display table grouped by restaurant count
 print("\n🎯 PRIMARY VIEW: GROUPED BY RESTAURANT COUNT")
-print("="*240)
-print(f"  {'Count':<6} {'Ratio':<6} {'Pairing':<12} │ {'Mean of Means':>18} {'Std of':>10} {'Mean of':>10} │ {'Pickup':>18} │ {'Delivery':>18} │ {'Travel Time':>18} │ {'Fulfillment':>18} │ {'Growth Rate':>22} │ {'Pairing Rate':>18}")
-print(f"  {'':6} {'':6} {'Status':12} │ {'(Assign Time)':>18} {'Means':>10} {'Stds':>10} │ {'Travel':>18} │ {'Travel':>18} │ {'(Total)':>18} │ {'Time':>18} │ {'(entities/min)':>22} │ {'(% paired)':>18}")
-print("="*240)
+print("="*260)
+print(f"  {'Count':<6} {'Ratio':<6} {'Pairing':<12} │ {'Mean of Means':>18} {'Std of':>10} {'Mean of':>10} │ {'First Contact':>18} │ {'Pickup':>18} │ {'Delivery':>18} │ {'Travel Time':>18} │ {'Fulfillment':>18} │ {'Growth Rate':>22} │ {'Pairing Rate':>18}")
+print(f"  {'':6} {'':6} {'Status':12} │ {'(Assign Time)':>18} {'Means':>10} {'Stds':>10} │ {'Time':>18} │ {'Travel':>18} │ {'Travel':>18} │ {'(Total)':>18} │ {'Time':>18} │ {'(entities/min)':>22} │ {'(% paired)':>18}")
+print("="*260)
 
 current_count = None
 for row in metrics_data:
     # Add separator between different restaurant counts
     if current_count is not None and row['count'] != current_count:
-        print("-" * 240)
+        print("-" * 260)
     current_count = row['count']
     
     # Format metrics
@@ -780,6 +790,7 @@ for row in metrics_data:
     mom_str = f"{row['mom_estimate']:6.2f} ± {row['mom_ci_width']:5.2f}"
     som_str = f"{row['som_estimate']:6.2f}"
     mos_str = f"{row['mos_estimate']:6.2f}"
+    first_contact_str = f"{row['first_contact_time_estimate']:6.2f} ± {row['first_contact_time_ci_width']:5.2f}"
     pickup_str = f"{row['pickup_travel_time_estimate']:6.2f} ± {row['pickup_travel_time_ci_width']:5.2f}"
     delivery_str = f"{row['delivery_travel_time_estimate']:6.2f} ± {row['delivery_travel_time_ci_width']:5.2f}"
     travel_str = f"{row['travel_time_estimate']:6.2f} ± {row['travel_time_ci_width']:5.2f}"
@@ -793,9 +804,9 @@ for row in metrics_data:
     else:
         pairing_str = f"{0:6.2f} ± {0:5.2f}%"
     
-    print(f"  {row['count']:<6} {row['ratio']:<6.1f} {pairing_display:<12} │ {mom_str:>18} {som_str:>10} {mos_str:>10} │ {pickup_str:>18} │ {delivery_str:>18} │ {travel_str:>18} │ {fulfill_str:>18} │ {growth_str:>22} │ {pairing_str:>18}")
+    print(f"  {row['count']:<6} {row['ratio']:<6.1f} {pairing_display:<12} │ {mom_str:>18} {som_str:>10} {mos_str:>10} │ {first_contact_str:>18} │ {pickup_str:>18} │ {delivery_str:>18} │ {travel_str:>18} │ {fulfill_str:>18} │ {growth_str:>22} │ {pairing_str:>18}")
 
-print("="*240)
+print("="*260)
 
 # =========================================================================
 # ALTERNATIVE VIEW: COMPARING ASSIGNMENT TIMES ACROSS RESTAURANT COUNTS
@@ -839,11 +850,15 @@ print("  • Mean of Means: Average customer wait time (with 95% CI)")
 print("  • Std of Means: System consistency across replications")
 print("  • Mean of Stds: Within-replication volatility")
 print()
-print("ORDER TIMING BREAKDOWN:")
-print("  • Pickup Travel: Average time driver→restaurant (with 95% CI)")
-print("  • Delivery Travel: Average time restaurant→customer (with 95% CI)")
-print("  • Travel Time (Total): Pickup + Delivery = assignment→delivery (with 95% CI)")
-print("  • Fulfillment Time: Assignment + Travel = arrival→delivery (with 95% CI)")
+print("DELIVERY TIMING BREAKDOWN:")
+print("  • First Contact Time: Driver→first restaurant (tests nearest-restaurant effect)")
+print("  • Pickup Travel: Driver→restaurant (order-level, averaged across all pickups)")
+print("  • Delivery Travel: Restaurant→customer (order-level)")
+print("  • Travel Time (Total): Assignment→delivery completion (Pickup + Delivery)")
+print("  • Fulfillment Time: Arrival→delivery (Assignment + Travel)")
+print()
+print("NOTE: First Contact Time is delivery-unit-level (pure first leg),")
+print("      while Pickup Travel is order-level (includes inter-restaurant travel for pairs).")
 print()
 print("QUEUE DYNAMICS METRIC:")
 print("  • Growth Rate: System trajectory (≈0 = bounded, >0 = deteriorating)")
@@ -852,11 +867,12 @@ print("PAIRING METRIC:")
 print("  • Pairing Rate: % of arrived orders that were paired (with 95% CI)")
 print()
 print("KEY QUESTIONS TO ANSWER:")
-print("  1. Does restaurant count affect assignment time? By how much?")
-print("  2. Is the count effect monotonic (5 > 10 > 15) or plateauing?")
-print("  3. Does count effect interact with pairing? (larger without pairing?)")
-print("  4. Does count effect interact with ratio? (larger at ratio 7.0?)")
-print("  5. How does count effect magnitude compare to ratio/pairing effects?")
+print("  1. Does restaurant count affect first contact time? (nearest-restaurant effect)")
+print("  2. Does restaurant count affect assignment time? By how much?")
+print("  3. Is the count effect monotonic (5 > 10 > 15) or plateauing?")
+print("  4. Does count effect interact with pairing? (larger without pairing?)")
+print("  5. Does count effect interact with ratio? (larger at ratio 7.0?)")
+print("  6. How does count effect magnitude compare to ratio/pairing effects?")
 print("="*80)
 
 print("\n✓ Metric extraction complete")
