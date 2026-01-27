@@ -691,6 +691,34 @@ for design_name, analysis_result in design_analysis_results.items():
     mean_of_stds = assignment_time.get('mean_of_stds', {})
     mos_estimate = mean_of_stds.get('point_estimate', 0)
     
+    # Pickup Travel Time Statistics (Mean of Means with CI)
+    pickup_travel_time = order_metrics.get('pickup_travel_time', {})
+    pickup_travel_time_mom = pickup_travel_time.get('mean_of_means', {})
+    pickup_travel_time_estimate = pickup_travel_time_mom.get('point_estimate', 0)
+    pickup_travel_time_ci = pickup_travel_time_mom.get('confidence_interval', [0, 0])
+    pickup_travel_time_ci_width = (pickup_travel_time_ci[1] - pickup_travel_time_ci[0]) / 2 if pickup_travel_time_ci[0] is not None else 0
+    
+    # Delivery Travel Time Statistics (Mean of Means with CI)
+    delivery_travel_time = order_metrics.get('delivery_travel_time', {})
+    delivery_travel_time_mom = delivery_travel_time.get('mean_of_means', {})
+    delivery_travel_time_estimate = delivery_travel_time_mom.get('point_estimate', 0)
+    delivery_travel_time_ci = delivery_travel_time_mom.get('confidence_interval', [0, 0])
+    delivery_travel_time_ci_width = (delivery_travel_time_ci[1] - delivery_travel_time_ci[0]) / 2 if delivery_travel_time_ci[0] is not None else 0
+    
+    # Travel Time Statistics (Mean of Means with CI)
+    travel_time = order_metrics.get('travel_time', {})
+    travel_time_mom = travel_time.get('mean_of_means', {})
+    travel_time_estimate = travel_time_mom.get('point_estimate', 0)
+    travel_time_ci = travel_time_mom.get('confidence_interval', [0, 0])
+    travel_time_ci_width = (travel_time_ci[1] - travel_time_ci[0]) / 2 if travel_time_ci[0] is not None else 0
+    
+    # Fulfillment Time Statistics (Mean of Means with CI)
+    fulfillment_time = order_metrics.get('fulfillment_time', {})
+    fulfillment_time_mom = fulfillment_time.get('mean_of_means', {})
+    fulfillment_time_estimate = fulfillment_time_mom.get('point_estimate', 0)
+    fulfillment_time_ci = fulfillment_time_mom.get('confidence_interval', [0, 0])
+    fulfillment_time_ci_width = (fulfillment_time_ci[1] - fulfillment_time_ci[0]) / 2 if fulfillment_time_ci[0] is not None else 0
+    
     # Growth Rate
     queue_dynamics_metrics = stats_with_cis.get('queue_dynamics_metrics', {})
     growth_rate = queue_dynamics_metrics.get('unassigned_entities_growth_rate', {})
@@ -716,6 +744,14 @@ for design_name, analysis_result in design_analysis_results.items():
         'mom_ci_width': mom_ci_width,
         'som_estimate': som_estimate,
         'mos_estimate': mos_estimate,
+        'pickup_travel_time_estimate': pickup_travel_time_estimate,
+        'pickup_travel_time_ci_width': pickup_travel_time_ci_width,
+        'delivery_travel_time_estimate': delivery_travel_time_estimate,
+        'delivery_travel_time_ci_width': delivery_travel_time_ci_width,
+        'travel_time_estimate': travel_time_estimate,
+        'travel_time_ci_width': travel_time_ci_width,
+        'fulfillment_time_estimate': fulfillment_time_estimate,
+        'fulfillment_time_ci_width': fulfillment_time_ci_width,
         'growth_rate_estimate': growth_rate_estimate,
         'growth_rate_ci_width': growth_rate_ci_width,
         'pairing_rate_estimate': pairing_rate_estimate,
@@ -727,48 +763,50 @@ metrics_data.sort(key=lambda x: (x['count'], x['ratio'], x['pairing_status']))
 
 # Display table grouped by restaurant count
 print("\n🎯 PRIMARY VIEW: GROUPED BY RESTAURANT COUNT")
-print("="*150)
-print(f"  {'Count':<6} {'Ratio':<6} {'Pairing':<12} │ {'Mean of Means':>18} {'Std of':>10} {'Mean of':>10} │ {'Growth Rate':>22} │ {'Pairing Rate':>18}")
-print(f"  {'':6} {'':6} {'Status':12} │ {'(Assign Time)':>18} {'Means':>10} {'Stds':>10} │ {'(entities/min)':>22} │ {'(% paired)':>18}")
-print("="*150)
+print("="*240)
+print(f"  {'Count':<6} {'Ratio':<6} {'Pairing':<12} │ {'Mean of Means':>18} {'Std of':>10} {'Mean of':>10} │ {'Pickup':>18} │ {'Delivery':>18} │ {'Travel Time':>18} │ {'Fulfillment':>18} │ {'Growth Rate':>22} │ {'Pairing Rate':>18}")
+print(f"  {'':6} {'':6} {'Status':12} │ {'(Assign Time)':>18} {'Means':>10} {'Stds':>10} │ {'Travel':>18} │ {'Travel':>18} │ {'(Total)':>18} │ {'Time':>18} │ {'(entities/min)':>22} │ {'(% paired)':>18}")
+print("="*240)
 
 current_count = None
 for row in metrics_data:
     # Add separator between different restaurant counts
     if current_count is not None and row['count'] != current_count:
-        print("-"*150)
+        print("-" * 240)
     current_count = row['count']
     
-    count = row['count']
-    ratio = row['ratio']
+    # Format metrics
     pairing_display = "ON" if row['pairing_status'] == 'pairing' else "OFF"
+    mom_str = f"{row['mom_estimate']:6.2f} ± {row['mom_ci_width']:5.2f}"
+    som_str = f"{row['som_estimate']:6.2f}"
+    mos_str = f"{row['mos_estimate']:6.2f}"
+    pickup_str = f"{row['pickup_travel_time_estimate']:6.2f} ± {row['pickup_travel_time_ci_width']:5.2f}"
+    delivery_str = f"{row['delivery_travel_time_estimate']:6.2f} ± {row['delivery_travel_time_ci_width']:5.2f}"
+    travel_str = f"{row['travel_time_estimate']:6.2f} ± {row['travel_time_ci_width']:5.2f}"
+    fulfill_str = f"{row['fulfillment_time_estimate']:6.2f} ± {row['fulfillment_time_ci_width']:5.2f}"
+    growth_str = f"{row['growth_rate_estimate']:7.4f} ± {row['growth_rate_ci_width']:6.4f}"
     
-    mom_str = f"{row['mom_estimate']:5.2f} ± {row['mom_ci_width']:5.2f}"
-    som_str = f"{row['som_estimate']:5.2f}"
-    mos_str = f"{row['mos_estimate']:5.2f}"
-    growth_rate_str = f"{row['growth_rate_estimate']:7.4f} ± {row['growth_rate_ci_width']:7.4f}"
-    
-    if row['pairing_rate_estimate'] is not None and row['pairing_rate_ci_width'] is not None:
-        pr_str = f"{row['pairing_rate_estimate']*100:5.2f} ± {row['pairing_rate_ci_width']*100:5.2f}%"
-    elif row['pairing_rate_estimate'] is not None:
-        pr_str = f"{row['pairing_rate_estimate']*100:5.2f}%"
+    if row['pairing_rate_estimate'] is not None:
+        pairing_pct = row['pairing_rate_estimate'] * 100
+        pairing_ci_pct = row['pairing_rate_ci_width'] * 100 if row['pairing_rate_ci_width'] else 0
+        pairing_str = f"{pairing_pct:6.2f} ± {pairing_ci_pct:5.2f}%"
     else:
-        pr_str = "N/A"
+        pairing_str = f"{0:6.2f} ± {0:5.2f}%"
     
-    print(f"  {count:<6} {ratio:<6.1f} {pairing_display:<12} │ {mom_str:>18} {som_str:>10} {mos_str:>10} │ {growth_rate_str:>22} │ {pr_str:>18}")
+    print(f"  {row['count']:<6} {row['ratio']:<6.1f} {pairing_display:<12} │ {mom_str:>18} {som_str:>10} {mos_str:>10} │ {pickup_str:>18} │ {delivery_str:>18} │ {travel_str:>18} │ {fulfill_str:>18} │ {growth_str:>22} │ {pairing_str:>18}")
 
-print("="*150)
+print("="*240)
 
 # =========================================================================
-# ALTERNATIVE VIEW: COUNT COMPARISON AT EACH RATIO × PAIRING
+# ALTERNATIVE VIEW: COMPARING ASSIGNMENT TIMES ACROSS RESTAURANT COUNTS
 # =========================================================================
-print("\n\n🎯 ALTERNATIVE VIEW: COUNT COMPARISON AT EACH RATIO × PAIRING")
+print("\n📊 ALTERNATIVE VIEW: ASSIGNMENT TIME BY COUNT")
+print("Quickly see how restaurant count affects assignment time for each condition")
 print("="*130)
-print(f"  {'Ratio':<6} {'Pairing':<10} │ {'5 Restaurants':>20} {'10 Restaurants':>20} {'15 Restaurants':>20} │ {'Max Diff':>12}")
-print(f"  {'':6} {'':10} │ {'(Assign Time)':>20} {'(Assign Time)':>20} {'(Assign Time)':>20} │ {'':>12}")
+print(f"  {'Ratio':<6} {'Pairing':<10} │ {'Count=5':>20} {'Count=10':>20} {'Count=15':>20} │ {'Max Diff':>12}")
 print("="*130)
 
-for ratio in sorted(set(row['ratio'] for row in metrics_data)):
+for ratio in sorted(set(r['ratio'] for r in metrics_data)):
     for pairing_status in ['no_pairing', 'pairing']:
         pairing_display = "ON" if pairing_status == 'pairing' else "OFF"
         
@@ -800,6 +838,12 @@ print("ASSIGNMENT TIME METRICS:")
 print("  • Mean of Means: Average customer wait time (with 95% CI)")
 print("  • Std of Means: System consistency across replications")
 print("  • Mean of Stds: Within-replication volatility")
+print()
+print("ORDER TIMING BREAKDOWN:")
+print("  • Pickup Travel: Average time driver→restaurant (with 95% CI)")
+print("  • Delivery Travel: Average time restaurant→customer (with 95% CI)")
+print("  • Travel Time (Total): Pickup + Delivery = assignment→delivery (with 95% CI)")
+print("  • Fulfillment Time: Assignment + Travel = arrival→delivery (with 95% CI)")
 print()
 print("QUEUE DYNAMICS METRIC:")
 print("  • Growth Rate: System trajectory (≈0 = bounded, >0 = deteriorating)")
